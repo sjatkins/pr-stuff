@@ -175,7 +175,9 @@ edge type.
 ## 5. Builders are privileged users
 
 With the store in place there is no "edit the source and rebuild" versus
-"edit in-game and hope the room is flagged `AUTOSAVE`". A builder change is
+"edit in-game, then transcribe it into the `.room` file before the next
+restart loses it" (the C save files hold room *state* — contents, doors,
+flags — never the definition; see `SUMMARY.md` §11). A builder change is
 one write with a **propagation policy** — a property of the edit, not the
 architecture:
 
@@ -251,6 +253,150 @@ directly — the C server never needs to know.
 
 ---
 
+## 6a. Persistence, events, and observability
+
+Refinements from later in the same conversation.
+
+### Reads dominate; writes are mostly edges
+
+99% of objects never change; most actual changes are changes of
+*relationship*. So the write stream is almost entirely edge inserts and
+deletes — tiny, uniform, and touching neither endpoint. A sword moving to the
+floor changes nothing about the sword.
+
+The whole static world fits in memory trivially (`live/lib` is 29MB including
+players; the C keeps everything resident from boot and never evicts). So:
+
+- **Static tier** — prototypes and room definitions fully resident,
+  invalidated per object id from the changeset stream, never evicted.
+- **LRU tier** — player and instance state (load on login, fall off after
+  logout), derived views (rendered fragments, right-click menus, `who`), and
+  recent event history for reconnect replay.
+
+Split each instance into an immutable part (a reference to the prototype)
+and a small mutable-state record (hp, condition, lock state), so the bulk is
+shared with the prototype and a "took 14 damage" changeset is one field on
+one small record.
+
+Loading a subgraph is materialising adjacency lists for the frontier — which
+is exactly the C's in-memory shape (`rp->people`, `rp->contents`,
+`next_in_room`, `carrying`, the exit list). The dynamics code never knows
+whether a room came from disk a second ago or has been resident since boot.
+
+### Three persistence policies, chosen by "would a player complain?"
+
+| kind | policy | examples |
+|---|---|---|
+| prototypes | write-through, immediately | builder edits — rare, and expected to stick |
+| edges | write-through, batched per tick | location, containment — losing one means a dropped sword vanishes |
+| instance scalars during play | write-behind, coalesced | hp, mana, position, who is fighting whom, hunger ticks, temporary affects — flush on fight end / death / logout / periodic; a crash resets the fight, as the C already does |
+| **accumulators** | write-through, flushed **by the event** | experience, gold, levels, skill practice, quest flags, bounty kills, bank, warehouse — irreversible and earned; a crash that eats a level-up is a lost player |
+
+A ten-round fight is one changeset ("hp 340 → 112"), not ten. The C draws the
+same line — `save_char` on level gain, on quit, and on periodic autosave,
+never per round — it just had no way to say so except scattered calls.
+
+Record accumulators as **totals, not deltas** ("xp is now 48,210", never
+"xp += 350"), so replay and duplicate delivery are harmless. Gold is where
+people notice first.
+
+### Two logs, joined by commit id
+
+- **Change log** (from the uniform persistence layer): *what* changed — this
+  field on this object, from this value to that, in this commit. Data level,
+  mechanical, complete. No application knowledge.
+- **Event stream** (from the engine): *why* — "Sam attacked the lich, rolled
+  73, hit for 14". Application level, meaningful, rendered through `CAN_SEE`
+  before publication.
+
+Neither derives from the other. Every event carries the id of the commit it
+caused; that is the entire join. Events flow every round; changesets appear
+at the flush.
+
+### Publish changesets as events (CDC)
+
+With a persistence-layer change, changesets go onto the bus too:
+
+```
+changes.<collection>.<uuid>     ← from persistence: mechanical, complete
+events.<room|zone|player>.…     ← from the engine: meaningful, filtered
+```
+
+Consumers that want `changes.*`, not `events.*`: cache invalidation (the
+loaded room as subscriber — "on next visit" is a consumer dropping its copy,
+and rooms change for reasons no event describes), materialised views and read
+models, a search index, the room-image pipeline's "what changed since last
+run", and a **secondary replica** that is also backup, staging with real
+data, and point-in-time state on the side.
+
+Requirements on the changeset format: sequence numbers and **idempotence**
+("set field to value", never "increment by 3"), plus occasional snapshots so
+a replica is "nearest snapshot, then apply" and stream retention can be
+finite.
+
+**Nothing player-facing ever subscribes to `changes.*`.** It is complete by
+construction (an invisible immortal's position, a password hash) and carries
+no perception filter. Players get `events.*`.
+
+### The bus (NATS / JetStream) carries the "out" direction only
+
+Subjects fall out of the radius table: `world.chat.gossip`,
+`zone.<id>.shout`, `room.<id>.events`, `player.<id>.private`. A session view
+is a set of subscriptions (re-subscribed to the room subject on every move)
+with the perception filter applied at render. Telnet and htmx are two
+consumers of the same stream; so are a moderation tail, a bot, analytics, a
+Discord bridge — none touching the engine. Replay gives real reconnect: "resume
+my subjects from the last sequence I acked".
+
+Keep the bus **out of the authoritative write path**: facts go on after the
+commit (outbox); commands may ride the bus in but one consumer serialises
+them. And JetStream is not a scheduler — respawn timers and affect expiry stay
+in the time-indexed timers table; the *result* of a timer firing is what gets
+published. Builder propagation policies become consumer behaviours: immediate
+= publish; when-empty = hold until occupancy hits zero; on-next-visit = no
+bus needed.
+
+The most active subscriber is the logger — radius ∞, no filter. Verbosity,
+retention and indexing become consumer settings rather than `vlog` calls
+chosen in 1996. Make events **facts** ("sword X moved from P to R at tick N"),
+not renderings ("Sam drops a sword."); rendering is per viewer at the edge.
+
+### Reproducing bugs
+
+Record the **outcome of every dice roll** in the event (attack, roll 73, hit,
+14) — cheap at the start, near-impossible to bolt on. Then:
+
+1. Roll a **replica** to commit N−1 using the change log (never rewind
+   production).
+2. Replay events from N with the recorded rolls.
+3. Diff what the engine produces against the change log's independent record
+   of what landed in N, N+1, …
+
+The change log is the oracle, not the input. A replay that *fails* to
+reproduce is itself diagnostic: something bypassed the single writer. The
+same recipe is the **golden-master test for the Python port** — same state,
+same commands, same rolls, diff the facts against the C. Every divergence is
+a port bug or an undocumented rule in thirty years of C.
+
+### Neo4j as a first store
+
+A good place to *find out what the graph wants to be*: labels for the
+class-typed UUIDs, relationships with properties (door state lives once on
+the `EXIT` edge, not on both rooms), and the frontier walk as one Cypher
+query. The browser makes the world a picture — rooms outside any zone are
+literally disconnected nodes. Node access and property updates are ordinary
+index hits and transactional writes; fine at this scale. The one real
+caveat: CDC/changeset publishing is Enterprise/Aura, not Community, and in
+Neo4j's format — the uniform-persistence story would need re-deriving on top
+of it or via an app-level outbox. Prototype there, keep the schema, decide
+the production store separately.
+
+The persistence layer with changeset publishing is the reusable thing; the
+game is the test case — a demanding one (shared mutable world, filtered
+consumers, a tick), with real data and a C implementation to diff against.
+
+---
+
 ## 7. Porting the dynamics
 
 The mass of the C: `fight.c`, `offensive.c`, `mobrank.c` (combat);
@@ -307,6 +453,6 @@ never again. Note the password lives account-side.
 | `pwhere` / `where` | `cmds3.c:1682`; levels in `h/inter.h` |
 | command table with level column | `h/inter.h` |
 | zone reset tick and modes | `zone.c:930`, `:1428` |
-| room autosave and zone save | `room.save.c`, `world.save.c` |
+| room state save (not definitions) | `room.save.c:27` (`WriteRoom`), `:55` (`ReadRoom`), `world.save.c` |
 | MXP | `mxp.c`, `live/lib/mxp_elements` |
 | builder docs | `pr-world/DOCS/` |

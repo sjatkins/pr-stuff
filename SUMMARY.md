@@ -390,19 +390,26 @@ Two routes, and they interact badly:
   then restart. The whole world pipeline needs only `tran`, `Zone/syntax`,
   `sh` and `cp` — **no C compiler**.
 - **In-game route:** `redit` (`redit.c:902`), `rdig`, etc. edit `room_data`
-  **in memory only**. Persistence is indirect and partial: `SaveZone()` writes
-  `WorldSave/zone.N` for rooms inside a zone's declared `save (lo-hi)` range
-  (119 of 136 zones have one); `SaveRoom()` writes `RoomSave/<vnum>.room` only
-  for rooms flagged `AUTOSAVE` (bit 30). Both load *after* `world.out` at boot
-  and override it. A room in neither category **silently reverts** on restart.
+  **in memory only**, and the save files do not carry definitions. `WriteRoom`
+  / `ReadRoom` (`room.save.c:27`, `:55`) persist only runtime **state** — door
+  states that differ from default, mobs present, objects present,
+  `room_flags` — onto a room that must already exist from `world.out`. Name,
+  description, exits and extra descriptions are never saved. So `redit desc`,
+  `redit name` and `rdig` are **lost on every restart, in every room**; only
+  `redit flags` survives. `redit` is a prototyping tool; the definition must be
+  transcribed into the `.room` source (or exported with `room2tran`) to stick.
+  `SaveZone()` → `WorldSave/zone.N` (zones with a `save (lo-hi)` range; 119 of
+  136) and `SaveRoom()` → `RoomSave/<vnum>.room` (rooms flagged `AUTOSAVE`) are
+  the two state-snapshot mechanisms; both load after `world.out` at boot.
 - `room2tran` (`makefile.linux:131`, not built by default) converts live rooms
   back to `.room` source syntax — the bridge from in-game building to the repo.
 
 ### Docker consequences
 
-- In-game edits persist across container restarts and image upgrades:
-  `WorldSave/` and `RoomSave/` are subdirectories of the volume and the
-  entrypoint only refreshes top-level files.
+- In-game **state** (contents, mobs, doors, flags) persists across container
+  restarts and image upgrades: `WorldSave/` and `RoomSave/` are subdirectories
+  of the volume and the entrypoint only refreshes top-level files. In-game
+  **definition** edits never persisted anywhere, in any deployment — see above.
 - Source edits currently require a full image rebuild, because `world.out` is
   baked in and re-copied over the volume on every start. The runtime image has
   no sources, no `tran`, no compiler, no editor — that is a choice in the
