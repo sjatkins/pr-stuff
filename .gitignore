@@ -1,0 +1,12 @@
+# The two source repos are cloned side by side here, each with its own git
+# history. They are checked out, not vendored:
+#   pr/        git@github.com:cabarius/pr.git
+#   pr-world/  git@github.com:cabarius/pr-world.git
+# Adding them here would create gitlinks to commits that live elsewhere.
+pr/
+pr-world/
+
+# Mutable runtime state belonging to neither repo: compiled world data plus
+# the live player database. Never commit it -- live/lib/account/ holds the
+# player password hashes.
+live/
