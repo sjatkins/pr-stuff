@@ -371,3 +371,85 @@ it for free.
 
 No source files were modified in this work beyond the README rename; all
 breakage encountered was missing runtime state, not code.
+
+---
+
+## 11. Remit, and decisions made 2026-09-19 (evening)
+
+**The remit is packaging only:** get Perilous Realms running nicely in Docker
+on some host, in a form the *singleton maintainer/improver* can comfortably
+work on. Rearchitecture (real database, admin CLI, Python port) is explicitly
+out of scope for now. Context on it is recorded below so it is not re-derived.
+
+### How the maintainer edits the world today
+
+Two routes, and they interact badly:
+
+- **Source route (authoritative):** edit the brace-syntax text under
+  `pr-world/ROOM/*.room`, `MOB/*.mob`, `OBJ/`, … then `pr-world/compile`,
+  then restart. The whole world pipeline needs only `tran`, `Zone/syntax`,
+  `sh` and `cp` — **no C compiler**.
+- **In-game route:** `redit` (`redit.c:902`), `rdig`, etc. edit `room_data`
+  **in memory only**. Persistence is indirect and partial: `SaveZone()` writes
+  `WorldSave/zone.N` for rooms inside a zone's declared `save (lo-hi)` range
+  (119 of 136 zones have one); `SaveRoom()` writes `RoomSave/<vnum>.room` only
+  for rooms flagged `AUTOSAVE` (bit 30). Both load *after* `world.out` at boot
+  and override it. A room in neither category **silently reverts** on restart.
+- `room2tran` (`makefile.linux:131`, not built by default) converts live rooms
+  back to `.room` source syntax — the bridge from in-game building to the repo.
+
+### Docker consequences
+
+- In-game edits persist across container restarts and image upgrades:
+  `WorldSave/` and `RoomSave/` are subdirectories of the volume and the
+  entrypoint only refreshes top-level files.
+- Source edits currently require a full image rebuild, because `world.out` is
+  baked in and re-copied over the volume on every start. The runtime image has
+  no sources, no `tran`, no compiler, no editor — that is a choice in the
+  Dockerfile's runtime stage, not a Docker limitation.
+
+### Decided: a `pr3-dev` image alongside `pr3`
+
+- `pr3` — unchanged, 373MB, what gets deployed.
+- `pr3-dev` — the builder stage plus `git`, an editor, and both repos **with
+  `.git` history** (56MB + 25MB), so the maintainer can edit, `compile`,
+  restart, `make`, and `git commit && git push` from inside the container.
+  ~1.2GB; fine for a dev image.
+- Needs: `.dockerignore`'s `**/.git` exclusion made stage-conditional; a
+  `PR_REFRESH_WORLD` gate in the entrypoint so a world compiled in-container is
+  not clobbered on restart; `pr` user created with `--uid 1000` so bind-mounted
+  host checkouts have matching ownership.
+- Push credentials come in at **run time** only (`-v ~/.gitconfig:...:ro`,
+  `-v ~/.git-credentials:...:ro`, or SSH agent). Never baked:
+  `~/.git-credentials` holds plaintext tokens for two accounts.
+
+**Not yet implemented.** Still open after it: the GitHub Actions workflow (§9).
+
+### Things found in `pr-world` that nobody had noted
+
+- `DOCS/` (21 files) is the **builder documentation** — `configflags.txt`,
+  `skills-spells-profs.txt`, `ClassAbilities.txt`, `backplot.txt`, maps. Much
+  of it is `.rtf` / `.xlsx` / `.ods` / `.numbers` from the macOS era; the
+  important ones should be converted to text for the maintainer.
+- `DOCS/scripting-example.lua`, plus `PRLib/interpreter.c` / `Proc.c` /
+  `GEN_proc_table.c` and the dead `-DNO_RUBY` paths: at least two prior
+  attempts at an embedded scripting engine.
+
+### Context for the eventual rearchitecture (out of scope)
+
+- `PRLib/fields.c` holds **17 declarative `Schema` tables** (room, mob, obj,
+  `char_data`, clan, race, shop, skill, item_set…) and `PRLib/Schema.c` is a
+  generic read/write/reflection engine over them. `tran` uses them to parse the
+  text sources. A database backend would be a new backend against this
+  existing data model, not a rewrite — but the migration to it is half-done
+  (see the hand-rolled `switch` with `InitWithSchema` grafted in at
+  `sector.c:37`).
+- The packed `.out` binaries are **derived** from text; a port never needs to
+  read them. The only binary-only data is players/accounts in `stash/` and
+  `account/` (`player.save.c`, described by `char_data_fields`) — one careful
+  decoder, run once as a migration.
+- `-lsqlite3` is linked only for `trident_libs`; the MUD itself uses no
+  database.
+- Sam has a **2023 Python port** (partial; converts some but not all of the
+  data; Mongo was the storage idea at the time). It is **not on this machine**
+  — to be pulled in separately.
