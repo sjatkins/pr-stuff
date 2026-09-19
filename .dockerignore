@@ -1,0 +1,41 @@
+# Context root is pr-stuff/, holding both repos side by side.
+#
+# Host-built artifacts must never enter the builder: Docker preserves mtimes,
+# so make would see objects newer than their sources, skip the rebuild, and the
+# image would ship binaries linked against the host's glibc instead of
+# bookworm's.
+
+**/.git
+**/.gitignore
+
+# Object files and host-built binaries.
+#
+# NOT *.a as a blanket rule: pr/trident_libs/libtrident_engine.a is a committed
+# prebuilt library that pr3 links against, not a build artifact.
+**/*.o
+pr/PRLib/libPR.a
+pr/pr3
+pr/tran/tran
+pr/Zone/syntax
+pr/Zone/y.output
+pr-world/syntax
+pr/trident_client/build/
+
+# Compiled world data is NOT excluded. pr-world/compile regenerates every .out
+# file, so stale copies are harmless -- and ROOM/sector.out is a symlink to
+# ../SECT/sector.out that the ROOM stage needs present, so a *.out pattern
+# silently removes it from the context and the room build dies with
+# "Can't boot sectors... dying".
+
+# Runtime state. Not referenced by the build, and the entrypoint seeds the
+# volume from pr/backup/ instead.
+live/
+
+# Notes, not build inputs.
+SUMMARY.md
+transcript.md
+
+# NOT ignored, though git ignores them: h/fcns.h, proto and Zone/parser.c are
+# generated files whose regeneration rules were never verified in a clean tree.
+# Shipping them keeps the image build off that unknown. A CI build from a fresh
+# checkout will exercise the real regeneration path.
