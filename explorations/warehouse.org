@@ -1,0 +1,127 @@
+#+TITLE: Warehouses — bank item storage for characters and accounts
+#+AUTHOR: notes from reading src/spec_rooms.c, reception.c, spec_mob.c, objdb.c
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Player versus account
+
+Two different records, two different files:
+
+- An *account* is the login identity: name, password hash, email, real
+  name, security question, flags, sites, and a list of *character names*.
+  One file per account under =account/<letter>/<name>= (=account.c=). It
+  owns things that should be shared by everything the person plays.
+- A *player* (the code says =char_data=, the files are in =stash/=) is one
+  character: race, class, level, stats, skills, inventory, equipment. One
+  file per character. Each character file carries =account_name= (id 108)
+  pointing back at its account.
+
+An account has many characters; a character belongs to exactly one account.
+Almost everything in play is per character. The account exists for login,
+for account-wide flags and command grants, for the shared warehouse, and
+for the ignore list. In the backup: 279 accounts, 697 characters.
+
+* What a warehouse is
+
+A list of saved objects hanging off one of those records:
+
+- =ch->warehouse=: the character's storage. Cap =MAX_STORAGE= = 50 items.
+  Saved in the player file as id 86.
+- =acct->warehouse=: the account's storage, shared by all its characters.
+  Cap =MAX_ACC_STORAGE= = 500 items. Saved in the account file as id 25.
+
+That is all it is. There is no warehouse object, no warehouse room, no
+warehouse type beyond "character" or "account". =objdb.c= provides
+=obj_to_warehouse= / =obj_from_warehouse= and the =acct_= pair, which
+push/pop an object on the list and stamp =time_stamp= with the deposit time
+(used for rent). Both lists are already extracted: =warehouse= in
+=players.jsonl= and =accounts.jsonl=, each entry a full saved object with
+=vnum= and any modifications.
+
+* Why you have to go to a bank
+
+Purely game fiction and gating. The commands live in the =bank= special
+procedure (=spec_rooms.c:bank=), assigned to three rooms in
+=spec_assign.c=: the Midgard bank (=Bank=), Terberthia (102128) and Tagol
+(44702). The procedure intercepts the commands =deposit=, =withdraw=,
+=adeposit=, =awithdraw=, =balance=, =list=, =help= only when typed in one
+of those rooms; elsewhere they do their normal thing or nothing. Nothing
+technical requires a room: the lists are on the character and account
+structs and could be reached from anywhere. Making storage a place means
+players travel to it, can be ambushed on the way, and gives the banker a
+voice for the rent messages.
+
+* Commands (in a bank room)
+
+| command             | effect                                                                    |
+|---------------------+---------------------------------------------------------------------------|
+| =deposit <gold>=    | hand → bank balance; cap 50,000 × level × max(remort count, 1)            |
+| =withdraw <gold>=   | bank balance → hand                                                       |
+| =deposit <item>=    | inventory → character warehouse; quotes weekly rent; refused if you cannot afford one week |
+| =withdraw <item>=   | character warehouse → inventory; charges rent pro rata for time stored; enforces per-player item limit |
+| =adeposit <item>=   | inventory → account warehouse; account file saved immediately             |
+| =awithdraw <item>=  | account warehouse → inventory; item limit enforced "as if from another player"; a NODROP item binds to the withdrawing character; account file saved |
+| =list=              | both lists, character first, then "shared account storage"               |
+| =balance=, =help=   |                                                                           |
+
+Refused for storage in either warehouse: trash, traps, cursed or test
+items, no-rent vnums, negative =cost_per_day=, containers with anything in
+them. Limited items are allowed (a locker refuses them). Before storing or
+retrieving, =reset_one_item_keep_mutates= may extract the item outright if
+it fails the current item rules.
+
+* Rent
+
+=rent_cost()= (=reception.c=) sums =cost_per_day= over an item and its
+contents. Character storage pays it:
+
+- On every login (=nanny.c= → =update_warehouse=) each item stored more than
+  a day is charged =days × rent / 7=, first from the bank balance, then
+  from gold on hand. If neither covers it, the item is removed from the
+  warehouse and handed to the insurance salesman (mob =INSURANCE_GUY=) with
+  =held_for= = the character's name; the player can =list= and =buy= it
+  back there at =BUYBACK_MULT= × value (=spec_mob.c:insurance_salesman=).
+- =withdraw= charges the accrued rent for the exact time stored.
+
+Account storage is counted on login but not charged. Also on login the
+receptionist code (=reception.c=) removes "junk" (negative-rent and no-rent
+items) from inventory and from both warehouses, tipping any contents into
+the character's hands.
+
+* Persistence details worth knowing
+
+- The account warehouse is written to disk on every =adeposit= /
+  =awithdraw= (=save_acct=). The character warehouse is written only with
+  the next player save. On a crash the account list is the safer one.
+- Item limits count warehouse contents: objects stored in a character's
+  warehouse are part of that character's per-player count, and =boot_players=
+  counts them toward the world =max_exist= totals that suppress zone loads.
+- =time_stamp= on each stored object is the deposit time; it is what makes
+  rent computable and is preserved in the JSONL.
+
+* Storage mechanisms, complete list
+
+| mechanism           | owner     | shared with          | limit            | cost           | persisted in                    |
+|---------------------+-----------+----------------------+------------------+----------------+---------------------------------|
+| inventory/equipment | character | nobody               | carry caps       | rent on quit   | player file                     |
+| character warehouse | character | nobody               | 50 items         | rent per week  | player file id 86               |
+| account warehouse   | account   | own other characters | 500 items        | none charged   | account file id 25              |
+| locker              | room      | anyone in the room   | container weight | none           | =LockerSave/locker.<vnum>.room= |
+| insurance salesman  | mob       | the =held_for= player | –               | buy-back price | mob inventory                   |
+| corpses             | –         | =held_for= player / PK_LOOT | –         | –              | room contents / world save      |
+
+* For a database
+
+Warehouses and lockers are the same shape: an ordered list of saved
+objects plus a little metadata about the holder. A single =storage=
+collection would do, with documents like
+
+#+BEGIN_SRC json
+{"kind": "character", "owner": "Sabor",  "items": [ ... ]}
+{"kind": "account",   "owner": "abraxia", "items": [ ... ]}
+{"kind": "locker",    "room": 72106,      "items": [ ... ]}
+#+END_SRC
+
+where each item is the saved-object record already used for =inventory= in
+=players.jsonl=. The only per-kind differences are the cap (50 / 500 /
+weight), whether rent applies (character only) and who may access it.

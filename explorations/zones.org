@@ -49,3 +49,142 @@ END
   =zone_limit= and loads: a zero means "nothing" at that step.
 - =scanner.l= tokenises =-= as AND_RANGE, so negative numbers cannot appear.
 - Rooms get their runtime =zone= from these ranges, not from the room file.
+
+* How zones populate the world (zone.c, comm.c, world.save.c)
+
+** The clock
+
+The main loop in =comm.c= calls =zone_update()= every =PULSE_ZONE= pulses.
+=PULSE_PER_SEC= is 100 and =DEF_PULSE_ZONE= is 60 seconds, so by default a
+zone "tick" is one minute; an immortal can change it at runtime with the
+tick command (=ticks.c=). =zone_update= does, for every zone with a reset
+type other than =never=:
+
+1. =age++=
+2. if =age >= reset_freq= and either the type is =always=, or the type is
+   =empty= and =zone_empty()= finds no player standing in any room whose
+   =zone= is this one, call =reset_zone()=.
+
+So =reset (always, 5)= means "top up every 5 minutes"; =(empty, 30)= means
+"top up once 30 minutes have passed and nobody is in the zone". Both
+=reset_freq= and =age= are declared =char= in the =Zone= struct, so a
+frequency above 127 wraps.
+
+** What a reset does
+
+=reset_zone()=:
+1. =count_zone()=: copies each =zone_limit= entry onto the mob prototypes it
+   names (=index_mem.zone_limit=) and counts the mobs currently standing in
+   the zone's room range (=index_mem.zone_count=). Object zone counting is
+   commented out ("doesn't work reliably", Ronan, Oct 2006), so
+   =zone_limit= on objects has no effect.
+2. =age = 0=
+3. =perform_commands(z->cmds)=: for each command, =repeat= times, for each
+   room in the room list, run its sub-commands.
+4. clear the zone counts again.
+
+*Room numbers in =in <room>= are relative to the zone's range start*:
+=perform_command= adds =z->range->values[0]=. =in 0 load obj 3098= in Asgard
+(range 1000–1099) loads into room 1000. The vnums after =mob= / =obj= are
+absolute.
+
+Fragile, and doubly so where ranges overlap: a room's zone is decided by
+=find_zone()=, which walks the zone list in =zone.list= order and returns the
+*first* zone whose range contains the vnum. The =syntax= compiler only prints
+"Warning: The range zone for this range overlaps another range" and carries
+on, so an overlapped room silently belongs to whichever zone is listed first.
+That decides which zone's =empty= test and =zone_limit= count the room takes
+part in, and the =zone= value the room struct carries at runtime.
+
+** Loading a mob
+
+=load_mob()= for one vnum in one room:
+- count mobs of that vnum already in the room. For a chain, count any mob
+  from the chain in the room, and if none, look for one whose =bindpoint=
+  is this room (=get_mob_by_vnum_and_bindpoint=), so a mob that has wandered
+  off still counts as present.
+- =needed = count_wanted - present=; the default is 1. =upto N= caps a
+  single reset at one new mob, so the population grows one per reset;
+  =atmost N= loads all the missing ones at once.
+- for each needed mob roll the probability: =P%= with P ≤ 100 is a straight
+  percentage; P > 100 is treated as two 3% rolls, about a 0.09% chance
+  (comment: "load rates in excess of 100%" as very rare loads).
+- =get_mob(vnum, 1)= refuses if the prototype's live count =game_count= has
+  reached its =max_exist= (the mob source's =world_limit=) or if
+  =zone_count >= zone_limit=.
+- the mob is placed, its =bindpoint= set to the room and =default_zone= to
+  the zone. With =loadgroup=, every mob after the first becomes a follower
+  of the first and both get AFF_GROUP.
+- inventory (=with ...=) is loaded the same way, containers recursively via
+  =containing=, then =mob_start()= makes the mob wield and wear the best of
+  what it carries.
+
+** Loading an object
+
+=load_obj()= mirrors the mob path: count that vnum in the room, honour
+=upto= / =atmost= and the probability, then =get_obj(vnum, 1)=, which refuses
+when =world_count >= max_exist= or the zone limit is hit. =containing= loads
+contents recursively. =requires= is parsed and written to =zone.out= but
+nothing in =zone.c= acts on it at runtime (used once in the sources).
+
+*=world_count= is not just what is in the game.* At boot =boot_players= opens
+every player file and counts the objects players own (or, on the fast path,
+restores the counts from =WorldSave/Misc/limited.obj= written at shutdown by
+=SaveLimitCount=). A limited item sitting in a player's inventory or
+warehouse therefore stops the zone from loading another. Mobs use the live
+=game_count= instead; items owned by players do not count as mobs.
+
+** Chains
+
+=( a > b > c )= after =load= is a fallback list: =perform_load_chain= tries
+each element in order and stops at the first that loads with no failures. A
+vnum of 0 means "load nothing and stop", and the last element in an
+inventory chain skips the probability roll. So
+
+#+BEGIN_EXAMPLE
+42% obj (0 > 29105 > 0)
+#+END_EXAMPLE
+
+reads as: 42% of the time load nothing; otherwise try 29105 at 42%;
+otherwise nothing. Chains are how rare drops and mutually exclusive spawns
+are expressed; they appear 725 times.
+
+** Boot
+
+=boot_reset()= runs after the world, mobs and objects are loaded:
+- =boot_only= commands run for every zone that has no =save= range (boards,
+  fixtures), or for all zones on a clean boot.
+- zones *with* a =save= range are not reset on a normal boot; their room
+  contents come back from =WorldSave/zone.<n>=, read and deleted by
+  =LoadWorld=. On a clean boot (=BOOT_CLEAN= marker) they are reset instead.
+  Their =age= is randomised in =[0, reset_freq)= so resets stagger.
+- finally =zone_update()= runs once, so zones with =reset_freq 1= populate
+  immediately and the rest wait out their first interval.
+
+** Save ranges
+
+=save (lo - hi)= marks rooms whose contents persist. Every =PULSE_ZONE_SAVE=
+(10 seconds) =SaveZone()= writes one saveable zone, round-robin, to
+=WorldSave/zone.<n>= as a header id 252 followed by =WriteRoom= records for
+the range. =full_save_world()= writes them all at shutdown. Rooms flagged
+=autosave= are saved separately to =RoomSave/=. Both directories must exist
+before the server starts. 120 zones declare a save range.
+
+** In-game commands
+
+=zreset [n|all]= (=do_zreset=) resets a zone now, running its boot-only
+commands first if it has no save range; =zbreset= runs only the boot-only
+commands; =zboot= prints them; =zlist= / =zlimit= print a zone's commands and
+limits with room numbers translated back to absolute. The zone number used
+by these is the 1-based position in =zone.list=.
+
+** Consequences for the JSON
+
+- =rooms= in =zones.jsonl= are stored as written, i.e. relative to the
+  zone's range start; add =range.values[0]= to get the absolute vnum.
+- =requires= and object =zone_limit= entries are present in the data but
+  inert at runtime.
+- A zone's effective population depends on three counters that live on the
+  prototypes, not in the zone file: mob =world_limit= (=max_exist=), object
+  =max_exist= / =world_count= (including player-owned items), and the
+  per-reset =zone_count=.

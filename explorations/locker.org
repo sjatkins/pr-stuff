@@ -1,0 +1,143 @@
+#+TITLE: Lockers — communal storage chests
+#+AUTHOR: notes from reading src/lockers.c and the world sources
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* What a locker is
+
+An *equipment locker* is object vnum 10100, a container prototype defined in
+=world/OBJ/GENERIC_OBJS.obj= (weight 200, value 200000, "The equipment
+locker stands here.."). A zone file places one in a room like any other
+object:
+
+#+BEGIN_EXAMPLE
+in 106 load atmost 1 obj 10100      ; ClanHousesTowns.zon
+#+END_EXAMPLE
+
+It is a shared chest. Anyone standing in the room can look in it, put items
+in and take items out, and what is in it persists across zone resets and
+reboots. It is *not* per player and has no owner field. Contrast:
+
+| storage            | scope        | where saved                       |
+|--------------------+--------------+-----------------------------------|
+| inventory/equipment| character    | player file                       |
+| warehouse          | character    | player file, id 86                |
+| account warehouse  | account      | account file, id 25               |
+| locker             | *room*       | =LockerSave/locker.<vnum>.room=   |
+
+Only the locker is reachable by more than one player, which is its purpose:
+a clan drops spare gear and consumables in it for clanmates to take later,
+without both being online.
+
+* Commands (=src/lockers.c=, table in =h/inter.h=)
+
+| command      | effect                                                        |
+|--------------+---------------------------------------------------------------|
+| =list_locker= | rebuild the locker from its file, then look inside it         |
+| =put_locker <item>= | move one item from inventory into the locker, save     |
+| =get_locker <item>= | take one item out (or shift it to the floor if it can't be carried), save; =all= refused |
+| =log_locker= | empty stub                                                   |
+
+Each command requires an object matching "equipment locker" in the current
+room (=generic_find= with =FIND_OBJ_ROOM=).
+
+Restrictions on =put_locker= for mortals: no cursed items, no *limited*
+items (prototype =max_exist= below 32000), no containers that have anything
+in them, nothing no-drop, no-rent, trash, construction, arena-only or test
+flagged, nothing with negative rent, no corpses, no insurance token (vnum
+25). The locker must be open and have weight capacity (=container->cost= is
+used as the capacity). These stop lockers being used to duplicate or launder
+rare gear.
+
+* How persistence works
+
+The locker object in the room is a throwaway view of the file:
+
+1. Every command first calls =ReadLocker=: it =extract_obj=s the locker
+   currently in the room, loads a fresh 10100 from the prototype
+   (=get_obj(10100, 0)=, ignoring limits), puts it in the room, opens
+   =LockerSave/locker.<room vnum>.room= and reads a list of saved objects
+   (=OBJECT= records via =objdb.c:ReadObject=, terminated by =END_OF_LIST=)
+   into the container.
+2. After a put or get, =SaveLocker= renames the current file to
+   =locker.<vnum>.old= and writes the container's contents with
+   =WriteObject=, forcing a rarity update on each item first. The container
+   itself is not written.
+
+So the file *is* the locker. The zone reset only supplies the empty chest;
+the normal room save (=WorldSave= / =RoomSave=) is not involved, although
+=put_locker= also calls =SaveRoom= when the room is autosaved. The
+directory is =LockerSave/= under the server's data directory, i.e.
+=live/lib/LockerSave/= at runtime. It is not in the player backup tar.
+
+The saved-object records are the same format as inventory items in player
+files (see =players.org=): vnum plus every modified field, nested contents
+as =SUB_OBJECT= lists.
+
+* Access control: there is none in the locker code
+
+Nothing in =lockers.c= checks clan, level or name. Whoever can stand in the
+room can use the locker. Protection comes from the room, and only from the
+room:
+
+- *Hidden doors.* The one live locker room, 72106 "Sanctuary" in the NOONE
+  guildhouse (=ClanHousesTowns=), is reached only through an exit flagged
+  =door, closed, secret, hidden, autoclose= from 72104 "Purgatory".
+- *Clan guards.* Mob 10000 carries the =clan_guard= special
+  (=spec_mob.c:6296=): each idle tick it attacks any visible non-immortal
+  player whose clan name does not appear in the guard's own description
+  text. Membership is therefore encoded in the mob's description string.
+  The NOONE guildhouse zone does not actually load a guard.
+- *Room flags.* The room is =private=, =no_mob=, =nosteal=, =no_sum=,
+  =rent_room=. In this code base =private= only blocks relocation and
+  summoning magic into the room (=magic_relo.c=); it does not stop anyone
+  walking in. =no_goto= and =lord_only= restrict immortals, not mortals.
+
+Answers to the obvious questions:
+- Can a player from another clan reach a clan's locker? Yes, if they find
+  the door and there is no guard, or the guard is dead. Nothing in the
+  locker itself would stop them.
+- Can a locker be placed in an unrestricted room? Yes. A locker in a public
+  room is world-shared storage that anyone may fill or empty. The only
+  reason lockers are "clan storage" is where builders chose to put them.
+
+* How many exist
+
+Exactly one is loaded in the compiled world: room 72106. =PerciClanRooms.zon=
+has nine =load ... obj 10100= lines, all commented out. Any =LockerSave/=
+file for a room that no longer loads a locker is dead data.
+
+* Why a separate file rather than part of the room save
+
+Historically the room save covers zones with a =save= range and rooms
+flagged =autosave=, written round-robin every ten seconds. A locker needed
+to survive regardless of the room's zone settings and to be rebuilt from
+scratch on each use (the code destroys and recreates the container, which
+also discards any tampering with the in-room object). The simplest way in
+this code base was a private file per room, hence =LockerSave=. In a
+database it would be a natural sub-document of the room, or a small
+collection keyed by room vnum.
+
+* JSON shape for extraction
+
+Not yet extracted: the files live only in =live/lib/LockerSave/=, which is
+not part of the player backup. When a copy is available, =prworld.players=
+already has the saved-object reader; a =lockers= type would read each
+=locker.<vnum>.room= as an =OBJECT= list ending in =END_OF_LIST= and emit
+one record per room:
+
+#+BEGIN_SRC json
+{"room": 72106, "source": "LockerSave/locker.72106.room",
+ "items": [ <saved object>, ... ]}
+#+END_SRC
+
+where =<saved object>= is the same structure as an entry in a player's
+=inventory= in =players.jsonl= (=vnum=, =name=, flags, applies, timers,
+=contents= ...). Join =items[].vnum= to =objects.jsonl= for prototype text.
+
+* Warehouses versus lockers
+
+See =warehouse.org= for bank storage. In short: a warehouse is a private,
+rent-charging list of objects owned by a character or an account and used
+through the banker in a bank room; a locker is a free, unowned chest that
+belongs to a room and is open to anyone who can stand there.
