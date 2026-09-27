@@ -163,7 +163,13 @@ def main() -> None:
         aliases: dict[int, str] = {}
         for i, v in enumerate(values):
             if not v:
-                out.append(f"    # code {i} has no name in the C table")
+                if table.endswith(("bits", "flags")):
+                    # A flag the C table leaves unnamed. Players still carry
+                    # some of these set; the extractor spells them "bit<n>".
+                    out.append(f"    bit{i} = 'bit{i}', {i}    # no name in the C table")
+                    used.add(f"bit{i}")
+                else:
+                    out.append(f"    # code {i} has no name in the C table")
                 continue
             member = ident(v, used)
             if v in seen:

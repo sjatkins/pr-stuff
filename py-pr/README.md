@@ -26,11 +26,24 @@ markers) and is carried as an `AttackType` `{number, kind, name}`.
 (sex, position, rarity, material, weapon class, damage type, drink, item
 kind, race, class, and every flag set), generated from the C name tables by
 `tools/gen_enums.py`; a member's position is the numeric code or bit index.
-Fields with a fixed vocabulary use them. Two deliberate exceptions: mob
-`sex` also accepts a plain string because the sources contain values the
-server silently accepts, and player affect bit lists accept `bitN` for the
-three bits whose names are blank in `constants.c`. Zero/one fields that the
-code treats as flags are `bool`.
+Fields with a fixed vocabulary use them, without exceptions: flag bits the C
+table leaves unnamed are generated as `bitN` members (the extractor spells
+them the same way), and an enum word the source misspells is dropped by the
+extractor with a warning, since `tran` writes the failed lookup into the
+binary and the game never sees a value either. Zero/one fields that the code
+treats as flags are `bool`.
+
+Lists whose positions carry meaning are named models, not `list[int]`:
+`Dice(number, sides, bonus)`; `BodyPartDefense(armor, stopping)` grouped per
+hit location in `Defense`, on both `Mob` and `Player`; `OpenHours`;
+`MinAvgMax`; `SavingThrows` in `SAVING_*` order; `Conditions(drunk, hunger,
+thirst)`; `Resistances` in `*_DAMAGE` order; `Stats` for the class stat
+tables. A saved item's five `value[]` slots become the item-type model the
+game reads them as (`WeaponType`, `ArmorType`, `DrinkContainerType`, ...; spell
+items keep spell numbers) or `UntypedValues` for marker types. These are a
+typed view of the JSONL: `Positional` maps a list onto its fields by slot,
+and `mode="before"` validators on `Mob`, `Player` and `SavedObject` regroup
+the flat keys, so the models do not serialise back to the extractor's shape.
 
 Conventions: fields the source may leave unset are `Optional` with default
 `None`; list-valued fields default to `[]`; nested blocks carry only what

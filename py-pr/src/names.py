@@ -596,16 +596,16 @@ class AffectBit(CodedStrEnum):
     farsee = 'farsee', 34
     nofear = 'nofear', 35
     calm = 'calm', 36
-    # code 37 has no name in the C table
-    # code 38 has no name in the C table
-    # code 39 has no name in the C table
+    bit37 = 'bit37', 37    # no name in the C table
+    bit38 = 'bit38', 38    # no name in the C table
+    bit39 = 'bit39', 39    # no name in the C table
     no_poison = 'no-poison', 40
     bearform = 'bearform', 41
     catform = 'catform', 42
     boomform = 'boomform', 43
     treeform = 'treeform', 44
     normform = 'normform', 45
-    # code 46 has no name in the C table
+    bit46 = 'bit46', 46    # no name in the C table
 
 
 class Immunity(CodedStrEnum):
@@ -663,7 +663,7 @@ class ClanFlag(CodedStrEnum):
     private = 'private', 2
     stealth = 'stealth', 3
     openenroll = 'openenroll', 4
-    # code 5 has no name in the C table
+    bit5 = 'bit5', 5    # no name in the C table
 
 
 class TrapEffect(CodedStrEnum):

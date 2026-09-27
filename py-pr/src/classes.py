@@ -18,13 +18,18 @@ Conventions:
   ``Optional``.
 - Enum and flag values are the server's canonical name strings.
 - ``vnum`` is the object/mob/room number; ``source`` is ``file:line``.
+- Fixed-length int lists in the JSONL (dice, hit-location pairs, saving
+  throws, the ``value[]`` slots of a saved item ...) become small named
+  models here; see ``Positional`` and the ``mode="before"`` validators on
+  ``Mob``, ``Player`` and ``SavedObject``. The models are a typed view of the
+  extractor's output and do not serialise back to the same shape.
 """
 
 from __future__ import annotations
 
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from names import (  # generated vocabularies, see tools/gen_enums.py
     AccountFlag, Direction, AffectBit, ApplyLocation, BoardFlag, ClanFlag, ClanRank, ClassName, ConfigFlag,
@@ -40,6 +45,27 @@ class PRModel(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
+class Positional(PRModel):
+    """A small record that the source files and the extractor write as a
+    fixed-length list of ints (the tran field types T32, DIC and V32, and the
+    fixed C arrays in the player file).
+
+    Subclasses declare their fields in slot order. A list input is mapped onto
+    the fields by position; a dict input is taken as-is, so the models
+    round-trip through their own JSON too.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _from_list(cls, data: Any) -> Any:
+        if isinstance(data, (list, tuple)):
+            names = list(cls.model_fields)
+            if len(data) != len(names):
+                raise ValueError(f"{cls.__name__} takes {len(names)} values ({', '.join(names)}), got {len(data)}")
+            return dict(zip(names, data))
+        return data
+
+
 # ---------------------------------------------------------------------------
 # Shared pieces
 # ---------------------------------------------------------------------------
@@ -51,9 +77,130 @@ class ExtraDescription(PRModel):
     description: Optional[str] = None
 
 
-Dice = list[Optional[int]]        # DIC: number, sides, bonus
-IntPair = list[Optional[int]]     # T32: two ints (armor/stopping, open/close)
-IntTriple = list[Optional[int]]   # V32: three ints (min, avg, max)
+class Dice(Positional):
+    """A dice roll, ``number`` d ``sides`` + ``bonus`` (tran type DIC, ``dice()`` in the C)."""
+
+    number: int
+    sides: int
+    bonus: int
+
+
+class BodyPartDefense(Positional):
+    """Protection of one hit location: the T32 pair on a mob's ``head`` ..
+    ``feet`` lines and the ``armor[]`` / ``stopping[]`` slots of a character.
+
+    ``armor`` is the location's armour class on the game's internal scale,
+    -100..100 with 100 meaning unarmoured and lower being better; it lowers
+    the attacker's chance to land a blow on that location (fight.c). ``stopping``
+    is the stopping power of what is worn there: a blow that does land has
+    0..``stopping`` subtracted from its damage.
+    """
+
+    armor: int
+    stopping: int
+
+
+class Defense(PRModel):
+    """Defence of the five hit locations, LOCATION_FEET .. LOCATION_HEAD in const.h.
+
+    A location the mob file leaves out stays ``None``; the server then uses its
+    defaults of 100 armour and 0 stopping.
+    """
+
+    head: Optional[BodyPartDefense] = None
+    body: Optional[BodyPartDefense] = None
+    arms: Optional[BodyPartDefense] = None
+    legs: Optional[BodyPartDefense] = None
+    feet: Optional[BodyPartDefense] = None
+
+
+# name -> C array index. Slot 0 is LOCATION_UNKNOWN, never a hit location.
+_LOCATION_SLOTS = {"feet": 1, "legs": 2, "arms": 3, "body": 4, "head": 5}
+
+
+class OpenHours(Positional):
+    """When a shop trades: the game hours (0..23) it opens and closes."""
+
+    open: int
+    close: int
+
+
+class MinAvgMax(Positional):
+    """A range with its typical value (tran type V32), e.g. a race's height or weight."""
+
+    min: int
+    avg: int
+    max: int
+
+
+class SavingThrows(Positional):
+    """One value per saving-throw type, in SAVING_* order (spells.h):
+    paralyzation, rod, petrification, breath, spell."""
+
+    paralyzation: int
+    rod: int
+    petrification: int
+    breath: int
+    spell: int
+
+
+class Conditions(Positional):
+    """``conditions[3]`` of a character: hours of drunkenness, hunger and thirst
+    left (DRUNK, HUNGER, THIRST in const.h)."""
+
+    drunk: int
+    hunger: int
+    thirst: int
+
+
+class Resistances(Positional):
+    """Elemental resistances in *_DAMAGE order (const.h): fire, cold,
+    electricity, water, acid, poison, force, magic, light, darkness.
+
+    The class files list the first eight; the loader (skills.c boot_class)
+    reads ten and the two missing ones become 0, which is what a short list
+    is padded with here.
+    """
+
+    fire: int
+    cold: int
+    electricity: int
+    water: int
+    acid: int
+    poison: int
+    force: int
+    magic: int
+    light: int
+    darkness: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def _from_list(cls, data: Any) -> Any:
+        if isinstance(data, (list, tuple)) and 8 <= len(data) <= 10:
+            data = list(data) + [0] * (10 - len(data))
+            return dict(zip(cls.model_fields, data))
+        return Positional._from_list.__func__(cls, data)
+
+
+class Stats(PRModel):
+    """The seven primary attributes. Accepts the class file's short keys
+    (str, int, wis, dex, con, chr, lck) as well as the full names."""
+
+    strength: Optional[int] = Field(default=None, validation_alias=AliasChoices("strength", "str"))
+    intelligence: Optional[int] = Field(default=None, validation_alias=AliasChoices("intelligence", "int"))
+    wisdom: Optional[int] = Field(default=None, validation_alias=AliasChoices("wisdom", "wis"))
+    dexterity: Optional[int] = Field(default=None, validation_alias=AliasChoices("dexterity", "dex"))
+    constitution: Optional[int] = Field(default=None, validation_alias=AliasChoices("constitution", "con"))
+    charisma: Optional[int] = Field(default=None, validation_alias=AliasChoices("charisma", "chr"))
+    luck: Optional[int] = Field(default=None, validation_alias=AliasChoices("luck", "lck"))
+
+
+class ExtraStatPoints(Stats):
+    """A class's ``extr`` line: how many points above base a new character may
+    put into each stat, and ``max_total`` across all of them (class_entry.extra[8])."""
+
+    max_total: Optional[int] = None
+
 
 # apply blocks: name -> number, or name -> list of names for enum/bit applies
 ApplyValue = Union[int, float, list[str]]
@@ -71,11 +218,6 @@ class AttackType(PRModel):
     number: int
     kind: Literal["spell", "weapon", "room", "marker", "remort", "skill", "proficiency", "special", "unknown"]
     name: str
-
-
-# affected_bits has blank names at bits 38, 39 and 46 in constants.c, yet
-# players carry those bits set; the extractor emits them as "bit38" etc.
-AffectBitOrUnnamed = Union[AffectBit, str]
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +298,7 @@ class Mob(PRModel):
     description: Optional[str] = None
     race: Optional[RaceName] = None
     class_: Optional[ClassName] = Field(default=None, alias="class")
-    sex: Optional[Union[Sex, str]] = None          # str: the sources also contain none/memale/fale
+    sex: Optional[Sex] = None
     level: Optional[int] = None
     alignment: Optional[int] = None
     gold: Optional[int] = None
@@ -178,11 +320,7 @@ class Mob(PRModel):
     wisdom: Optional[int] = None
     charisma: Optional[int] = None
     luck: Optional[int] = None
-    head: Optional[IntPair] = None
-    body: Optional[IntPair] = None
-    arms: Optional[IntPair] = None
-    legs: Optional[IntPair] = None
-    feet: Optional[IntPair] = None
+    defense: Optional[Defense] = None                  # the file's head/body/arms/legs/feet lines
     immune: list[Immunity] = Field(default_factory=list)
     resistant: list[Immunity] = Field(default_factory=list)
     susceptible: list[Immunity] = Field(default_factory=list)
@@ -234,6 +372,17 @@ class Mob(PRModel):
     remort_count: Optional[int] = None
     rage: Optional[int] = None
     energy: Optional[int] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _gather_defense(cls, data: Any) -> Any:
+        """Fold the extractor's top-level ``head`` .. ``feet`` pairs into ``defense``."""
+        if isinstance(data, dict) and "defense" not in data and any(k in data for k in _LOCATION_SLOTS):
+            data = dict(data)
+            parts = {k: data.pop(k) for k in _LOCATION_SLOTS if k in data}
+            parts = {k: v for k, v in parts.items() if v is not None}
+            data["defense"] = parts or None
+        return data
 
 
 # ---------------------------------------------------------------------------
@@ -484,7 +633,7 @@ class Shop(PRModel):
     buy: Optional[list[int]] = None
     sell_mult: Optional[float] = None
     buy_mult: Optional[float] = None
-    hours: Optional[IntPair] = None
+    hours: Optional[OpenHours] = None
     messages: Optional[ShopMessages] = None
     temper_player: Optional[int] = None
     temper_attacked: Optional[int] = None
@@ -513,8 +662,8 @@ class Race(PRModel):
     source: str
     name: Optional[str] = None
     abbrev: Optional[str] = None
-    height: Optional[IntTriple] = None
-    weight: Optional[IntTriple] = None
+    height: Optional[MinAvgMax] = None
+    weight: Optional[MinAvgMax] = None
     adjust: Optional[StatAdjust] = None
     intrinsic: list[Intrinsic] = Field(default_factory=list)
     immune: list[Immunity] = Field(default_factory=list)
@@ -795,36 +944,34 @@ class Speed(PRModel):
     max: int
 
 
-StatBlock = dict[str, int]  # keys str int wis dex con chr lck (+ max_total for extr)
-
-
 class CharacterClass(PRModel):
-    """A character class from world/CLASSES/classes: stat limits, flags and learnable skills and spells."""
+    """A character class from world/CLASSES/classes (skills.c boot_class):
+    stat limits, saving throws, flags and learnable skills and spells."""
 
     index: int
     source: str
     classname: Optional[str] = None
     abbrv: Optional[str] = None
-    align: list[str] = Field(default_factory=list)     # neutral / good / evil
-    hp: Optional[list[int]] = None
-    min: Optional[StatBlock] = None
-    max: Optional[StatBlock] = None
-    base: Optional[StatBlock] = None
-    extr: Optional[StatBlock] = None
+    align: list[Literal["neutral", "good", "evil"]] = Field(default_factory=list)
+    hp: Optional[Dice] = None                          # hit points gained per level
+    min: Optional[Stats] = None                        # lowest each stat may be rolled
+    max: Optional[Stats] = None                        # highest each stat may be rolled
+    base: Optional[Stats] = None                       # starting stats in "char gen mode"
+    extr: Optional[ExtraStatPoints] = None             # points a new character may add
     races: list[str] = Field(default_factory=list)     # two-letter abbreviations
-    resists: Optional[list[int]] = None
-    items: list[int] = Field(default_factory=list)
+    resists: Optional[Resistances] = None              # scaled by level/500 in play
+    items: list[int] = Field(default_factory=list)     # vnums of the starting kit
     thac0: Optional[Thac0] = None
     speed: Optional[Speed] = None
-    mult: float = 1.0
+    mult: float = 1.0                                  # experience multiplier
     flags: list[str] = Field(default_factory=list)
     build: Optional[str] = None
     desc: Optional[str] = None
     title: Optional[str] = None
     prof: Optional[str] = None
-    saves: Optional[list[int]] = None
-    decrease: Optional[list[int]] = None
-    minsave: Optional[list[int]] = None
+    saves: Optional[SavingThrows] = None               # base saving throws, 100 based
+    decrease: Optional[SavingThrows] = None            # levels per one-point improvement
+    minsave: Optional[SavingThrows] = None             # floor each save can reach
     skills: list[ClassSkillRow] = Field(default_factory=list)
     spells: list[ClassSpellRow] = Field(default_factory=list)
     profs: list[ClassSkillRow] = Field(default_factory=list)
@@ -855,6 +1002,82 @@ class SocketApply(PRModel):
     unique: Optional[bool] = None
 
 
+class SavedSpellItemType(PRModel):
+    """scroll and potion as saved: up to three spells, by number, cast at ``level``."""
+    level: Optional[int] = None
+    spell1: Optional[int] = None
+    spell2: Optional[int] = None
+    spell3: Optional[int] = None
+
+
+class SavedChargedItemType(PRModel):
+    """wand and staff as saved: one spell, by number, with charges."""
+    level: Optional[int] = None
+    max_charges: Optional[int] = None
+    charges: Optional[int] = None
+    spell: Optional[int] = None
+
+
+class SavedTrapType(PRModel):
+    """trap as saved; ``damage_type`` is the raw attack-type number (see TrapType)."""
+    effect_type: list[TrapEffect] = Field(default_factory=list)
+    damage_type: Optional[int] = None
+    level: Optional[int] = None
+    charges: Optional[int] = None
+
+
+class UntypedValues(PRModel):
+    """The five ``value[]`` slots of an item whose type gives them no fixed
+    meaning: the marker types (other, worn, note, pen, boat, trash, book,
+    missile, fire weapon, hierarchical, set item), spell gems (which keep their
+    real data in ``dvalue[]``), and items with no type."""
+    slots: list[int]
+
+
+SavedItemValues = Union[
+    LightType, SavedSpellItemType, SavedChargedItemType, TreasureType, ContainerType,
+    DrinkContainerType, ArmorType, WeaponType, FoodType, UsesType, AudioType, BoardType,
+    SocketGemType, SavedTrapType, UntypedValues,
+]
+
+# How the game reads ``obj->value[0..4]`` for each item type: the field ids of
+# the type block in fields.c minus one (weapon: no_dice is value[1] and so on,
+# as fight.c and cmds1.c use them). Enum and flag slots hold numeric codes.
+_VALUE_LAYOUT: dict[ItemKind, tuple[type[PRModel], dict[str, tuple[int, Any]]]] = {
+    ItemKind.light: (LightType, {"duration": (2, None)}),
+    ItemKind.scroll: (SavedSpellItemType, {"level": (0, None), "spell1": (1, None), "spell2": (2, None), "spell3": (3, None)}),
+    ItemKind.potion: (SavedSpellItemType, {"level": (0, None), "spell1": (1, None), "spell2": (2, None), "spell3": (3, None)}),
+    ItemKind.wand: (SavedChargedItemType, {"level": (0, None), "max_charges": (1, None), "charges": (2, None), "spell": (3, None)}),
+    ItemKind.staff: (SavedChargedItemType, {"level": (0, None), "max_charges": (1, None), "charges": (2, None), "spell": (3, None)}),
+    ItemKind.treasure: (TreasureType, {"value": (0, None)}),
+    ItemKind.money: (TreasureType, {"value": (0, None)}),
+    ItemKind.container: (ContainerType, {"max_hold": (0, None), "flags": (1, ContainerFlag.from_bits), "key": (2, None), "timer": (3, None)}),
+    ItemKind.pouch: (ContainerType, {"max_hold": (0, None), "flags": (1, ContainerFlag.from_bits), "key": (2, None), "timer": (3, None)}),
+    ItemKind.liquid_container: (DrinkContainerType, {"max_units": (0, None), "amount": (1, None), "type": (2, Drink.from_code), "poisoned": (3, None)}),
+    ItemKind.armor: (ArmorType, {"effective_ac": (0, None), "force": (1, None), "stopping": (2, None), "absorb": (3, None), "timer": (4, None)}),
+    ItemKind.weapon: (WeaponType, {"wtype": (0, WeaponClass.from_code), "no_dice": (1, None), "size_dice": (2, None), "type": (3, DamageType.from_code), "speed": (4, None)}),
+    ItemKind.food: (FoodType, {"fullness": (0, None), "poisoned": (3, None)}),
+    ItemKind.key: (UsesType, {"uses": (0, None)}),
+    ItemKind.component: (UsesType, {"uses": (0, None)}),
+    ItemKind.audio: (AudioType, {"frequency": (0, None)}),
+    ItemKind.board: (BoardType, {"flags": (0, BoardFlag.from_bits)}),
+    ItemKind.socket: (SocketGemType, {"combine": (0, None), "combine_to": (1, None), "removable": (2, bool), "unique": (3, bool)}),
+    ItemKind.trap: (SavedTrapType, {"effect_type": (0, TrapEffect.from_bits), "damage_type": (1, None), "level": (2, None), "charges": (3, None)}),
+}
+
+
+def typed_item_values(kind: Optional[str], slots: list[int]) -> PRModel:
+    """Give a saved object's ``value[]`` slots the meaning its type gives them."""
+    try:
+        layout = _VALUE_LAYOUT.get(ItemKind(kind)) if kind is not None else None
+    except ValueError:
+        layout = None
+    if layout is None or len(slots) != 5:
+        return UntypedValues(slots=slots)
+    model, fields = layout
+    return model(**{name: (conv(slots[i]) if conv else slots[i]) for name, (i, conv) in fields.items()})
+
+
 class SavedObject(PRModel):
     """An item instance. Strings that are None fall back to the prototype's text."""
 
@@ -864,10 +1087,10 @@ class SavedObject(PRModel):
     description: Optional[str] = None
     action_description: Optional[str] = None
     contents: list[SavedObject] = Field(default_factory=list)
-    value: Optional[list[int]] = None
+    values: Optional[SavedItemValues] = None           # the file's value[5], read per ``type``
     wear_flags: list[WearFlag] = Field(default_factory=list)
     extra_flags: list[ObjectFlag] = Field(default_factory=list)
-    affects: list[AffectBitOrUnnamed] = Field(default_factory=list)   # granted while worn
+    affects: list[AffectBit] = Field(default_factory=list)   # granted while worn
     xtra_bits: Optional[int] = None
     intrinsic_weight: Optional[int] = None
     intrinsic_volume: Optional[int] = None
@@ -917,6 +1140,16 @@ class SavedObject(PRModel):
     tier: Optional[int] = None
     sockets: Optional[int] = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _type_values(cls, data: Any) -> Any:
+        """Turn the extractor's raw ``value`` list into ``values`` typed by ``type``."""
+        if isinstance(data, dict) and "value" in data and "values" not in data:
+            data = dict(data)
+            raw = data.pop("value")
+            data["values"] = typed_item_values(data.get("type"), raw) if raw is not None else None
+        return data
+
 
 # ---------------------------------------------------------------------------
 # Players  (stash/<a-z>/<name>, players.jsonl)
@@ -930,7 +1163,7 @@ class Affect(PRModel):
     duration: Optional[int] = None
     modifier: Optional[int] = None
     location: Optional[ApplyLocation] = None
-    bitvector: list[AffectBitOrUnnamed] = Field(default_factory=list)
+    bitvector: list[AffectBit] = Field(default_factory=list)
 
 
 class PulseAffect(PRModel):
@@ -989,7 +1222,7 @@ class PulseAffect(PRModel):
     is_item_ability: Optional[bool] = None
     no_msg: Optional[bool] = None
     proc_modifier_cap: Optional[float] = None
-    bitvector: list[AffectBitOrUnnamed] = Field(default_factory=list)
+    bitvector: list[AffectBit] = Field(default_factory=list)
     finish_aoe_dam_as_target: Optional[int] = None
     initial_aoe_dam_as_target: Optional[int] = None
     pulse_aoe_dam_as_target: Optional[int] = None
@@ -1003,7 +1236,7 @@ class PulseCooldown(PRModel):
     type: Optional[int] = None
     type_name: Optional[str] = None
     cooldown_expire: Optional[int] = None
-    bitvector: list[AffectBitOrUnnamed] = Field(default_factory=list)
+    bitvector: list[AffectBit] = Field(default_factory=list)
 
 
 class ItemSetAbility(PRModel):
@@ -1043,18 +1276,6 @@ class Kill(PRModel):
 
     vnum: int
     count: int
-
-
-class Stats(PRModel):
-    """The seven primary attributes."""
-
-    strength: Optional[int] = None
-    intelligence: Optional[int] = None
-    wisdom: Optional[int] = None
-    dexterity: Optional[int] = None
-    constitution: Optional[int] = None
-    charisma: Optional[int] = None
-    luck: Optional[int] = None
 
 
 class PlayerTimes(PRModel):
@@ -1116,7 +1337,7 @@ class Player(PRModel):
     act: list[PlayerFlag] = Field(default_factory=list)
     config: list[ConfigFlag] = Field(default_factory=list)
     log: list[LogFlag] = Field(default_factory=list)
-    affected_by: list[AffectBitOrUnnamed] = Field(default_factory=list)
+    affected_by: list[AffectBit] = Field(default_factory=list)
     resist: list[Immunity] = Field(default_factory=list)
     immune: list[Immunity] = Field(default_factory=list)
     susceptible: list[Immunity] = Field(default_factory=list)
@@ -1124,13 +1345,11 @@ class Player(PRModel):
     dam_bonus: Optional[int] = None
     attacks_per_round: Optional[float] = None
     assassinate: Optional[int] = None
-    armor: Optional[list[int]] = None
-    armor_legacy: Optional[int] = None
-    base_armor: Optional[list[int]] = None
-    stopping: Optional[list[int]] = None
-    base_stopping: Optional[list[int]] = None
-    apply_saving_throw: Optional[list[int]] = None
-    conditions: Optional[list[int]] = None
+    defense: Optional[Defense] = None                  # the file's armor[6] and stopping[6]
+    base_defense: Optional[Defense] = None             # base_armor[6] and base_stopping[6]
+    armor_legacy: Optional[int] = None                 # one AC value, from older player files
+    apply_saving_throw: Optional[SavingThrows] = None  # bonuses from equipment and spells
+    conditions: Optional[Conditions] = None
     fullness: Optional[int] = None
     weight: Optional[int] = None
     height: Optional[int] = None
@@ -1177,6 +1396,30 @@ class Player(PRModel):
     equipment: dict[WearPosition, Union[SavedObject, list[SavedObject]]] = Field(default_factory=dict)
     inventory: list[SavedObject] = Field(default_factory=list)
     warehouse: list[SavedObject] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _pair_defense(cls, data: Any) -> Any:
+        """Zip the file's parallel ``armor[]`` / ``stopping[]`` arrays into one
+        ``BodyPartDefense`` per hit location. Slot 0 (LOCATION_UNKNOWN) is never
+        hit and only ever holds the boot default, so it is dropped."""
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        for armor_key, stopping_key, target in (("armor", "stopping", "defense"),
+                                                ("base_armor", "base_stopping", "base_defense")):
+            if armor_key not in data and stopping_key not in data:
+                continue
+            armor, stopping = data.pop(armor_key, None), data.pop(stopping_key, None)
+            if target in data:
+                continue
+            if armor is None or stopping is None:
+                data[target] = None
+                continue
+            if len(armor) != 6 or len(stopping) != 6:
+                raise ValueError(f"{armor_key}/{stopping_key} must have 6 slots (LOCATION_UNKNOWN..LOCATION_HEAD)")
+            data[target] = {name: [armor[i], stopping[i]] for name, i in _LOCATION_SLOTS.items()}
+        return data
 
 
 # ---------------------------------------------------------------------------

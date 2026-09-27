@@ -341,8 +341,11 @@ def parse_value(ctx: Context, where: str, f: F, param: str) -> Any:
             return p
         idx = string_lookup(p, table)
         if idx < 0:
+            # tran writes the failed lookup (-1) straight into the u8/u32, so
+            # the game sees garbage, not a value: report it and leave the
+            # field unset rather than pass the misspelling downstream.
             ctx.warn(where, f"{f.name}: {p!r} is not a legal value")
-            return p
+            return None
         return table[idx]
     if t == "ESTR":
         table = ctx.tables.get(f.list) if f.list else None
