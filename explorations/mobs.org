@@ -1,0 +1,73 @@
+#+TITLE: Mobs — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (mobs)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where mobs live
+
+- Source: =world/MOB/*.mob=, 114 files, driven by =world/MOB/ALLMOB= (plain
+  =#include= list, no defines, no offsets: mob vnums are written absolute).
+- Compiled by =world/MOB/compile= → =../tran mob ALLMOB mob.out=. Loaded by
+  =mobdb.c:boot_mob= into the =mob_db= hash of =index_mem= prototypes; the
+  prototype is copied when a mob is spawned by a zone reset.
+- Extracted to =py_json/out/mobs.jsonl=: 3,450 prototypes.
+
+* Record format
+
+Schema =mob_fields= (85 entries). The commonly used fields:
+
+| token                | type | notes                                                     |
+|----------------------+------+-----------------------------------------------------------|
+| name, namelist       | STR  | display name and keyword list                             |
+| shortdesc / short    | STR  | room line                                                 |
+| longdesc / long      | STR  | look description                                          |
+| race                 | E32  | =race_list=                                               |
+| class                | E8   | =class_list=; also inferred at boot when absent           |
+| sex                  | E8   | =sexes= = neuter, male, female                            |
+| level, alignment     | S32  |                                                           |
+| gold, experience     | U32/S32 |                                                        |
+| hp, damage           | DIC  | three ints: dice, sides, bonus                            |
+| move, mana, power    | U32  |                                                           |
+| hit_bonus, dam_bonus | S32  |                                                           |
+| attacks_per_round    | DBL  |                                                           |
+| head/body/arms/legs/feet | T32 | two ints per body part: armor, stopping              |
+| immune/resistant/susceptible | BIT | =immunity_names= (incl. "plus 1".."plus 4")     |
+| affected             | IDV  | extended bitvector over =affected_bits=                  |
+| act                  | BIT  | =action_bits= (sentinel, aggressive, special, wimpy ...) |
+| skills, spells       | L16  | name lists resolved against =skills[]= / =spells[]=      |
+| caster               | U8   |                                                           |
+| world_limit          | S32  | max existing at once                                      |
+| group_with           | U32  |                                                           |
+| story_teller         | STR  | file name for the story-teller special                    |
+| resist_*, *_penetration, spell_power, life_steal, spell_vamp, *_regen, hit_shield, remort_count, rage, energy | | newer combat tuning fields |
+
+* Things learned
+
+- Macros are used here. =Void.mob= defines =@GuildMaster= and
+  =@GenericGuildMaster= (which itself expands =@GuildMaster=); macro text is
+  the raw block contents and expansion is recursive. Macros are global for
+  the rest of the =ALLMOB= run, and a mob that uses one typically overrides
+  fields afterwards, which is why most "duplicate field" warnings are in
+  =Midgard.mob=.
+- =tran='s E8 case has a bug: it tests the wrong variable after the lookup,
+  so an unknown value is written as 255 without complaint. Roughly 30 mobs
+  have =sex { none }= or =sex { memale }= and run with sex = 255.
+- =mob_fields= has duplicate ids with different names: 57/58 appear twice,
+  59 is both =resist_light= and (earlier) =resist_all=, 60 is both
+  =resist_darkness= and =resist_energy=. The last spelling in the table wins
+  for the binary id; the extractor keeps whichever token the source used.
+- =boot_mob= does real post-processing: appends newlines to descriptions,
+  defaults the description, sets =ACT_ISNPC=, copies base stats, and infers
+  =job= (SCHOLAR if it has spells and =magic_use=, else WARRIOR) unless the
+  mob has an assassin skill. A JSON record from the source therefore differs
+  from the runtime prototype in those derived fields.
+- Immunity names include weapon-plus immunities spelled with a space
+  ("plus 1"), which is why =split_names= splits only on commas.
+
+* Caveats in the data
+
+- 205 warnings, almost all macro-then-override duplicates. Two files contain
+  top-level lines starting with =#= that are not directives (=#3903=); =tran=
+  ignores them and so does the extractor.
+- Vnum set checked against =mob.out= by walking the binary with the same
+  schema sizes: exact match on 3,450.

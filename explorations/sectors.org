@@ -1,0 +1,50 @@
+#+TITLE: Sectors — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (sectors)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where sectors live
+
+- Source: =world/SECT/sectors.current= (2,476 lines). The top of the file
+  carries =;= comment lines explaining the fields; =tran= ignores any
+  top-level line that does not start with a digit.
+- Compiled first by =world/compile= → =../tran sector sectors.current
+  sector.out=. Loaded by =sector.c:boot_sectors= / =read_one_sector= into
+  =sector[MAX_SECTOR]=, and at the same time =sector_types[]= is built from
+  the names so rooms can be validated against it.
+- Extracted to =py_json/out/sectors.jsonl=: 84 sectors.
+
+* Record format
+
+Schema =sector_fields=:
+
+| token         | type | notes                                                   |
+|---------------+------+---------------------------------------------------------|
+| name          | STR  | the value rooms reference in =sector { }=              |
+| flags         | BIT  | =sector_bits=: no_weather, fly_only, water_breath, no_spells, prototype |
+| normal / fly / boat | SUB | =move_cost=: moves, delay, tracks, damage, damage_type |
+| map           | SUB  | ASCII-map glyph strings and colour codes                |
+| default_sizes | VEC  | unused                                                  |
+
+The =map= block: =room=, =walls=, =exits=, =doors=, =odoors= are glyph
+strings indexed by direction; =room_color=, =detail_color=, =dark_color=,
+=wall_color=, =exit_color=, =door_color=, =odoor_color=, =fill_color=,
+=pc_color=, =mob_color= are colour codes written as =#{dim white rev}=.
+
+* Things learned
+
+- Colour codes contain braces, e.g. =room_color {#{dim white rev}}=. The
+  brace tokenizer nests, so the value comes out as =#{dim white rev}=.
+- =map= is the one place the schema-driven reader is used for world data:
+  =sector.c= calls =InitWithSchema(fp, sector_map_fields, &s->map)=. Because
+  =sector_map_fields= has a TYPEDEF entry, =tran= writes an END_OF_DATA (241)
+  marker after the block, which the binary cross-checker had to learn to
+  skip.
+- Field id 6 is used twice (=map= SUB and =default_sizes= VEC); harmless
+  because =default_sizes= is never written.
+- Sector 0 is "Inside"; "Prototype" is the sector 10,001 rooms carry.
+  Several names differ only by case (=road= vs =Road=, =cavern= vs
+  =Cavern=); the server's lookup is case-insensitive.
+- Three colour fields are written twice (=door_color= once, =dark_color=
+  twice); last wins.
+- Vnum set checked against =sector.out=: exact match on 84.

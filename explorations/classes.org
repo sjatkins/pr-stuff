@@ -1,0 +1,56 @@
+#+TITLE: Classes — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (classes)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where classes live
+
+- Source: =world/CLASSES/classes= (4,564 lines), a =KEY: value= text format,
+  copied verbatim to =live/lib/classes= by =world/compile= (no =tran= step).
+  =classes.2010-09-25= is an old copy.
+- Loaded at boot by =skills.c:boot_classes= / =boot_class= into
+  =classes[MAX_DEF_CLASS]=. The first line, =40 <-- TOTAL RECORDS=, sets
+  =MAX_DEF_CLASS=.
+- Extracted to =py_json/out/classes.jsonl=: 40 classes.
+
+* Record format
+
+Each class starts at =INDEX: n= and runs to the next =INDEX:=. Keys the
+server reads (case-insensitive, anything else ignored):
+
+| key        | meaning                                                          |
+|------------+------------------------------------------------------------------|
+| CLASSNAME, ABBRV, DESC, TITLE, BUILD | text                                   |
+| ALIGN      | letters N/G/E                                                    |
+| HP         | 3 ints                                                           |
+| MIN, MAX, BASE | 7 ints in order STR INT WIS DEX CON CHR LCK                  |
+| EXTR       | 8 ints: the 7 stats plus max_total                               |
+| RACES      | two-letter race abbreviations (=race_header_types= in cmds3.c)   |
+| RESISTS    | 8 ints                                                           |
+| ITEMS      | object vnums                                                     |
+| THAC0, SPEED | level, min/max                                                 |
+| MULT       | float                                                            |
+| FLAGS      | letters F C M T I D B S X → fighter cleric mage thief immortal disabled basic specialist multiclass |
+| PROF       | weapon proficiency name                                          |
+| SAVES, DECREASE, MINSAVE | saving throws (file gives 5, server reads 6)       |
+
+Then three tables introduced by lines starting =SKILL=, =SPELL=, =PROF=.
+Rows are =|= separated: name, level, difficulty, cost, gold, max, then for
+spells mana and source (M/P), then prerequisites (comma list) and for spells
+components (vnums).
+
+* Things learned
+
+- The parser is line-oriented and stateful: any line containing =:= is a
+  key/value, otherwise a =|= line is a table row in the current state. A
+  skill whose name started a line with "SPELL" would flip the state; none do.
+- Data after =INDEX: n= belongs to class n because =boot_class= returns the
+  next index when it sees the key.
+- Names are matched against =skills[]=, =spells[]= and =weapon_types[]= with
+  exact search; unknown names are logged and skipped by the server. The
+  extractor warns but keeps them.
+- One record has =SAVE:= instead of =SAVES:= (line 4165); the server
+  silently ignores it, so that class runs with default saving throws.
+- Skill numbers: proficiencies are stored as index + =PROF_BASE= (5000) and
+  the server also recognises index + =SKILL_BASE= (10000); this matters when
+  reading player files.

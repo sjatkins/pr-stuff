@@ -1,0 +1,53 @@
+#+TITLE: Effects and skills (new system) — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (effects, skills)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* What these are
+
+The 2011 "new spell and skill system" by Christy Warren: =EffectDefinition=
+records (=PRLib/Effect.c=) and skills that bundle a list of effects. It is
+the only world data loaded through the schema-driven reader
+(=ReadWithSchema=) rather than a hand-coded switch.
+
+* Where they live
+
+- Source: =world/SKILL/effects.tran= (30 lines) and =world/SKILL/skills.tran=
+  (37 lines). Both are clearly test data: names like =*name*= and
+  =strongsleepnfly=.
+- Compiled by =world/compile= → =../tran effect effects.tran effects.out= and
+  =../tran skill skills.tran skills.out=. =effects.out= is loaded at boot by
+  =PRLib/Effect.c:boot_effects=; note =const.h= spells the skills file
+  =skils.out= (sic) and nothing loads it.
+- Extracted to =py_json/out/effects.jsonl= (2 records) and
+  =py_json/out/skills.jsonl= (1 record).
+
+* Record format
+
+=effect_fields=:
+
+| token           | type | notes                                                 |
+|-----------------+------+-------------------------------------------------------|
+| name, description, location | STR |                                             |
+| tags            | SET  | comma separated strings                               |
+| modify, pulse_modify, custom_modify | SUB | =value= (DBL), =dice= (DIC), =extra_values= (ADBL) |
+| min, max, duration, pulse | DBL |                                               |
+| modifier_join   | ESTR | =effect_join_styles=: none, sum, avg, min, max       |
+| messages        | HASH | key => text, keys from =effect_message_keys=          |
+| procs           | HASH | phase => procedure name, keys from =effect_proc_keys= |
+
+=skill_fields=: =name= (STR) and =effects= (ASUB), an array of anonymous
+={ ... }= blocks each parsed with =effect_fields=.
+
+* Things learned
+
+- HASH syntax is =key => value= pairs separated by commas; =tran= strips all
+  whitespace inside the key and validates it against the key table. Values
+  are not validated (PROC names are checked elsewhere against =proc_table=,
+  which is generated at build time by =strip.c= into =GEN_proc_table.c=).
+- ASUB is written as a u32 count, then per item a u32 index and the block,
+  terminated by END_OF_SUBRECORD (253). It is the only place the binary
+  format has an explicit array of records.
+- These files use =SET= / =HASH= / =ASUB=, whose binary encodings come from
+  =PRLib/Object.c= (=SetWriteToFile=, =HashWriteToFile=), so the binary
+  cross-checker does not cover them.

@@ -1,0 +1,34 @@
+#+TITLE: Clans — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (clans)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where clans live
+
+- Source: =world/CLAN/clans.current= (255 lines); =clans.sample= is a
+  template.
+- Compiled by =world/compile= → =../tran clan clans.current clans.out=.
+  Loaded by =clandb.c:boot_clans= / =read_one_clan=; reloadable in game.
+- Extracted to =py_json/out/clans.jsonl=: 29 clans.
+
+* Record format
+
+Schema =clan_fields=:
+
+| token                 | type | notes                                        |
+|-----------------------+------+----------------------------------------------|
+| name                  | STR  |                                              |
+| flags                 | BIT  | =clan_flags=: pkothers, pkclan, openenroll ...|
+| xp_mult               | DBL  |                                              |
+| min_join_level, max_join_level | U16 |                                     |
+| clanmaster, deputy    | STR  | character names                              |
+
+* Things learned
+
+- Clan 1 ("Protected", =min_join_level 20=) and clan 2 are special: the
+  player-file version 5 → 6 upgrade in =player.save.c:finish_char= puts
+  every character above level 20 into clan 1 and moves anyone carrying the
+  old "corrupt" act bit into clan 2.
+- Clan 3 writes =deputy ( Snuff )= with parentheses. =tran= would lose that
+  value; the extractor reads it.
+- Vnum set checked against =clans.out=: exact match on 29.

@@ -1,0 +1,85 @@
+#+TITLE: Players — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (players)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where players live
+
+- Runtime: =live/lib/stash/<first letter>/<lowercased name>=, one binary file
+  per character, indexed by the line list =live/lib/players.new=. Written by
+  =player.save.c:save_char=, read by =load_char_with_path=.
+- Backups: =players_<date>.tar= at the repo root holds =stash/= and
+  =account/= (697 players, 280 accounts on 2026-09-23). The tar has no index
+  files. It is git-ignored; the extracted JSONL is committed.
+- Extracted to =py_json/out/players.jsonl=: 697 records, all file version 6.
+
+* Record format
+
+Tagged binary: u16 id then a payload sized by the C field. Markers from
+=player.save.c=: 255 EOF, 254 SUB_OBJECT (inventory follows), 253 OBJECT,
+252 END_OF_OBJECT, 251 END_OF_LIST, 250 WEAR, 249/248 AFFECT, 246 MAIL,
+245 file-version marker, 244/243 PULSE_AFFECT, 242/241 PULSE_AFFECT_COOLDOWN,
+240/239 ITEM_SET_ABILITY. Strings are u16 length (including NUL) then bytes.
+Arrays are a u16 byte count then raw structs.
+
+Field ids 1–134 cover: sex, class, name, descriptions, title, level,
+bindpoint, max_level, base and current stats (7 each), mana/hit/move/power
+and maxima, gold, bankgold, exp, apex_exp, questpoints, resist/immune/susc
+flags, extended =affected_by= bitvector, position, act flags, config and
+log bits, timers, saving throws, conditions, armor/stopping arrays (and base
+versions), alignment, clan and rank, invis level, wimpy level, skills,
+spells, remort bonuses, kill list, granted/revoked commands, times (birth,
+logon, logout, motd, password, played, first_login), email, plan, prompt,
+last site, page settings, lockout, account link, weight/height, rage,
+energy, hit_shield, assassinate.
+
+Sub-records: affects (type, duration, modifier, location, bitvector), pulse
+affects (59 fields), pulse cooldowns, item set abilities, mail. Equipment:
+=WEAR pos SUB_OBJECT objlist= per worn slot. Inventory: =SUB_OBJECT objlist=.
+Warehouse: id 86.
+
+Saved objects (=objdb.c:ReadObject=, a *different* id set from the prototype
+file): value array, wear/extra flags, weight, cost, timers, bitvector,
+name/description/short/action, eq_pos, in_room, type, vnum, min_level,
+time_stamp, volume, material, dimensions, applies (three generations: id 20
+old struct, id 27 u8 pairs, id 62 tagged), real_cost, contents weight and
+volume, touch messages, owner, held_for, rarity, mutation_count, fixed,
+cooldowns, imm audit strings (loaded/edited/mutated/stringed by), created
+date, pulse applies, item set fields, crack code, tier, sockets, socket
+applies. Nested contents follow as SUB_OBJECT lists.
+
+* Things learned
+
+- Field sizes cannot be guessed from the C types by eye. =tools/layout.c=
+  compiles against =h/structs.h= (with =-fsigned-char=, as the makefile does)
+  and emits =player_layout.json= with the exact size and signedness of every
+  field the readers touch. Examples that would have been wrong otherwise:
+  =sex= and =position= are signed 8-bit, =attacks_per_round= is a double at
+  id 125 but a s32 at the old id 41, the =affected= array (id 54) is raw
+  56-byte =affected_type= structs including an 8-byte =next= pointer.
+- The version upgrades in =finish_char= are part of the format: version 0
+  files store weight in pounds and height in cm; version ≤2 files carry a
+  wimpy act bit that becomes =whimpy_level=; version ≤5 files get clan 1/2
+  assigned. All current files are version 6 so none applied, but the
+  extractor implements them.
+- Skill numbers ≥ 5000 are weapon proficiencies (=PROF_BASE=) and ≥ 10000
+  skills (=SKILL_BASE=); the JSON carries =kind= and the resolved name.
+- The spell name table has 240 entries and =MAX_EXIST_SPELL= is 240, yet 83
+  learned-spell entries carry numbers 242–246. They are legitimate to the
+  server, which only compares numbers; emitted as =\"#246\"=.
+- 13 files hold only creation-time fields (no level or class): abandoned
+  character creations.
+- Empty strings on saved objects mean "use the prototype text"; emitted as
+  =null=. 59,354 saved objects in total, most under 60 KB per player, the
+  largest file 255 KB.
+- =SendMail= appends to a player file by seeking back over the EOF marker;
+  hence MAIL records can appear after everything else.
+- Password hashes (id 56) are dropped unless =--include-secrets=.
+
+* Caveats
+
+- The old command-list fields (ids 99/100) held numeric command ids that
+  the server now discards; the extractor keeps them as =legacy_granted= /
+  =legacy_revoked= only when non-empty.
+- Equipment slot names come from =equipment_types[]=, which has two entries
+  spelled "Worn as trinket"; the JSON keys them by name so the two collapse.

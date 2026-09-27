@@ -1,0 +1,59 @@
+#+TITLE: Accounts — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (accounts)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where accounts live
+
+- Runtime: =live/lib/account/<first letter>/<lowercased name>=, indexed by
+  =live/lib/account.list=. Written and read by =account.c= (=save_acct= /
+  =load_acct=). An account owns one or more characters; the character file
+  points back through =account_name= (player id 108).
+- Backups: the =account/= tree inside =players_<date>.tar=.
+- Extracted to =py_json/out/accounts.jsonl=: 279 of 280 files.
+
+* Record format
+
+Same tagged binary style as players, no version marker. Ids:
+
+| id | field            | notes                                        |
+|----+------------------+----------------------------------------------|
+|  1 | name             |                                              |
+|  2 | pw               | password hash; dropped unless --include-secrets |
+|  3 | maiden_name      | security question answer                     |
+|  4 | email_address    |                                              |
+|  5 | account          | s32 balance                                  |
+|  6 | term_type_id     | u8                                           |
+|  7 | characters       | u16 count then names                         |
+|  8 | flags            | =account_bits= (VALID ...)                    |
+|  9 | real_name        |                                              |
+| 10 | motd             | u32 time                                     |
+| 11 | last_site        | host/IP of last connection                   |
+| 12, 13 | last_login, last_logout | u32 times                           |
+| 14, 15 | granted, revoked | command lists: s32 count then strings   |
+| 16 | notes            |                                              |
+| 17 | ignore_list      | u16 count then names                         |
+| 18 | last_roll_start  | *8-byte* time_t                              |
+| 19 | num_rolls        | u16                                          |
+| 20 | last_class_char  | *8-byte* time_t                              |
+| 21–23 | last_site1..3 | previous connection sites                    |
+| 24 | vote_time        | u32                                          |
+| 25 | warehouse        | SUB_OBJECT marker then object list           |
+
+* Things learned
+
+- Times are inconsistent: most are written with =ReadTime= as u32, but
+  =last_roll_start= and =last_class_char= are read with plain =Read= on a
+  =time_t= field and so occupy 8 bytes. The layout helper caught this.
+- Blank character names in the list are removed on load (the server
+  decrements the count and logs it).
+- =account/a/alcanzar= is not an account file: it begins with the player
+  version marker (245) and is a player save that landed in the wrong tree.
+  The extractor reports and skips it. The player =stash/a/alcanzar= is a
+  different, newer file.
+- 45 accounts have a shared warehouse; 711 character names across 279
+  accounts versus 697 player files, so some listed characters no longer have
+  files.
+- The two files that matter for privacy are this one and the tar: emails,
+  real names, maiden names, and connection sites are kept in the JSONL;
+  password hashes are not.

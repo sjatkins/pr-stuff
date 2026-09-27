@@ -1,0 +1,38 @@
+#+TITLE: Races — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (races)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where races live
+
+- Source: =world/RACE/races.current= (601 lines). Documented in
+  =world/RACE/race.doc=.
+- Compiled by =world/compile= → =../tran race races.current race.out=.
+  Loaded by =race.c:boot_races= / =read_one_race= into a fixed array
+  =race[MAX_RACES]= indexed by vnum; reloadable in game.
+- Extracted to =py_json/out/races.jsonl=: 54 races.
+
+* Record format
+
+Schema =race_fields=:
+
+| token        | type | notes                                              |
+|--------------+------+----------------------------------------------------|
+| name, abbrev | STR  | abbrev is the two-letter code used in =classes=   |
+| height, weight | V32 | three ints: min, average, max                    |
+| adjust       | SUB  | stat adjustments: str/int/wis/dex/con/chr/lck (S8) |
+| intrinsic    | BIT  | =intrinsics= (infravision, fast-heal ...)          |
+| immune, resistant, susceptible | BIT | =immunity_names=                     |
+| form         | BIT  | =forms= (humanoid, person, animal ...)             |
+| track, move, power_gain, refresh | S8/S16 |                                 |
+| resist_*     | S32  | fire, cold, electricity, water, acid, poison, force, magic, light, darkness, all |
+
+* Things learned
+
+- The race vnum in this file is the index into =race[]= and must match the
+  order of =race_list[]= in =constants.c= (56 entries), which is what mob
+  and player records reference by number. The two are maintained by hand.
+- =adjust= accepts both long and short stat names (=dex= or =dexterity=);
+  the extractor emits the long form.
+- One race sets =height= twice (=races.current:238=); last wins.
+- Vnum set checked against =race.out=: exact match on 54.

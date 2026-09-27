@@ -1,0 +1,51 @@
+#+TITLE: Zones — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (zones)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where zones live
+
+- Source: =world/ZONE/*.zon=, 131 files, of which 129 are listed in
+  =world/ZONE/zone.list= and compiled. =Nether.zon= and
+  =OnikumasClanRooms.zon= are not in the list.
+- Compiled by =world/ZONE/compile= → =../syntax zone.list=, a separate
+  yacc/flex program from =src/Zone/parser.y= + =scanner.l= (not =tran=).
+  Loaded by =zone.c:ReadZones= into a linked list of =Zone=; zone number is
+  the 1-based position in the list.
+- Extracted to =py_json/out/zones.jsonl=: 129 zones.
+
+* Grammar (from parser.y)
+
+#+BEGIN_EXAMPLE
+ZONE "Name"
+  range (lo - hi)              ; vnums owned by the zone
+  save  (lo - hi)              ; optional: rooms whose contents persist
+  reset never | (empty, N) | (always, N)
+  boot_only { commands }       ; run once at boot
+  zone_limit { N mob V ... }   ; max N of mob/obj V in the zone
+  [repeat N] in <rooms> <load ...>
+  ...
+END
+#+END_EXAMPLE
+
+- =load= or =loadgroup=, then a load spec: =[atmost N | upto N] [P%] mob V
+  [with objlist]= or =... obj V [containing objlist] [requires objlist]=, or
+  a chain =( spec > spec > ... )=.
+- Lists: a number, =(a - b)= and-range, =(a |- b)= or-range, =(a & b & c)=,
+  =(a | b | c)=, =(a > b > c)= chain list. Room lists and vnum lists share
+  the syntax.
+- Comments are =//= to end of line. Probabilities are written =42%=.
+  =atmost= may be written =at most=.
+
+* Things learned
+
+- Constructs actually used: =with= 1,885 times, =atmost= 2,278, =upto= 304,
+  probabilities 5,803, chains (=>=) 725, =containing= 113, =zone_limit= 106,
+  =save= 120, =boot_only= 28, =loadgroup= 21, =repeat= once, =requires=
+  once, =reset never= 9, =reset (empty, N)= 5, =reset (always, N)= 121.
+- The yacc actions build lists by prepending, so the compiled =zone.out=
+  holds commands in reverse source order. The extractor keeps source order.
+- Chain lists like =(0 > 29105 > 0 > 0 > 25251 > 0)= are common in
+  =zone_limit= and loads: a zero means "nothing" at that step.
+- =scanner.l= tokenises =-= as AND_RANGE, so negative numbers cannot appear.
+- Rooms get their runtime =zone= from these ranges, not from the room file.

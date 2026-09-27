@@ -1,0 +1,47 @@
+#+TITLE: Item sets — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (item_sets)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* What an item set is
+
+A gear set: a named group of objects (for example "Layered Battlegear")
+whose bonuses switch on as a character wears more pieces from the set.
+Objects belong to a set through their own =item_set= / =piece_of_set= fields.
+
+* Where item sets live
+
+- Source: =world/ITEM_SETS/item_sets.current= (2,679 lines).
+- Compiled by =world/compile= → =../tran item_set item_sets.current
+  item_sets.out=. Loaded by =item_setdb.c:boot_item_sets= /
+  =read_one_item_set=; reloadable in game.
+- Extracted to =py_json/out/item_sets.jsonl=: 85 sets.
+
+* Record format
+
+Schema =item_set_fields=:
+
+| token                         | type | notes                                |
+|-------------------------------+------+--------------------------------------|
+| name, description             | STR  |                                      |
+| rarity                        | E32  | =rarity_types=                       |
+| use_cooldown, ws_cooldown     | S32  | seconds                              |
+| one_set_bonus .. ten_set_bonus| SUB  | =set_bonus_fields=                   |
+| vnum                          | S32  | an *inner* field, never used         |
+
+Each =<n>_set_bonus= block: =apply { }= (passive bonuses, apply-name → value),
+=set_ability { }= (bonuses granted on use), =set_ability_duration=,
+=set_ability_msg=.
+
+* Things learned
+
+- The schema declares a field literally named =vnum= inside the record body.
+  Every record already gets its vnum from the block number, so this inner
+  field would collide; the extractor emits it as =declared_vnum=. No set in
+  the file writes it, so it is =null= everywhere.
+- Set bonuses reuse the object =apply= vocabulary (=apply_fields=), so the
+  same names (hitndamage, stopping_all, melee_haste, spell_power ...) appear.
+- One set repeats =melee_haste= inside a single apply block (line 736: 10
+  and 8). The server stacks applies to the same location, so the extractor
+  sums to 18 and warns. One set writes =two_set_bonus= twice; last wins.
+- Vnum set checked against =item_sets.out=: exact match on 85.

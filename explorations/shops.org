@@ -1,0 +1,38 @@
+#+TITLE: Shops — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (shops)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where shops live
+
+- Source: single file =world/SHOP/shops.current= (1,049 lines).
+- Compiled by =world/SHOP/compile= → =../tran shop shops.current shop.out=.
+  Loaded by =shop.c:boot_shp= into a linked list (=shop_index=); called from
+  =spec_assign.c=, and reloadable in game via the wizard reload command.
+- Extracted to =py_json/out/shops.jsonl=: 63 shops.
+
+* Record format
+
+Schema =shp_fields=:
+
+| token              | type | notes                                              |
+|--------------------+------+----------------------------------------------------|
+| shopkeeper / keeper| S32  | mob vnum                                           |
+| location           | S32  | room vnum                                          |
+| sell               | A32  | object vnums stocked                               |
+| buy                | A32  | object vnums the shop will buy                     |
+| buy_type           | L16  | item types the shop buys (=item_types=)            |
+| sell_mult, buy_mult| DBL  | price multipliers                                  |
+| hours              | T32  | open, close                                        |
+| temper_player, temper_attacked | U32 |                                          |
+| messages           | SUB  | dont_have, no_item, dont_buy, shop_cant_afford, player_cant_afford, buy, sell |
+
+* Things learned
+
+- Shops use a macro inside a sub-block: =@sell_only= expands to
+  =no_item {...} dont_buy {...}= inside =messages { }=. Macro expansion is
+  purely textual, so it works anywhere in the record. Most shops then
+  override =dont_buy= or =no_item= after the macro, which produces 91 of the
+  92 "duplicate field" warnings; the server keeps the last message written.
+- Shop records have no name; the record number is the shop's index.
+- Vnum set checked against =shop.out=: exact match on 63.

@@ -1,0 +1,77 @@
+#+TITLE: Objects — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (objects)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where objects live
+
+- Source: =world/OBJ/*.obj=, 125 files, driven by =world/OBJ/ALLOBJS=
+  (=#include= list, absolute vnums, no offsets).
+- Compiled by =world/OBJ/compile= → =../tran obj ALLOBJS obj.out=. Loaded
+  by =objdb.c:boot_obj= into the =obj_db= hash of prototypes.
+- Extracted to =py_json/out/objects.jsonl=: 4,855 prototypes.
+- The same =ReadObject= / =ReadObjList= code in =objdb.c= also reads the
+  *saved* object records inside player, account, locker, auction and
+  world-save files; that is a different (hand-coded) field id set, covered
+  in =players.org=.
+
+* Record format
+
+Schema =obj_fields=. The =type= block selects one item type and its own
+sub-schema (=item_fields=):
+
+| type token        | sub-fields                                                |
+|-------------------+-----------------------------------------------------------|
+| armor             | effective_ac, force, stopping, absorb, timer              |
+| weapon            | wtype (=weapon_types=), no_dice, size_dice, type (=damage_types=), speed |
+| light             | duration                                                  |
+| scroll, potion    | level, spell1..3                                          |
+| wand, staff       | level, max_charges, charges, spell                        |
+| container, pouch  | max_hold, flags (=container_bits=), key, timer            |
+| drink_container   | max_units, amount, type (=drinks=), poisoned              |
+| food              | fullness, poisoned                                        |
+| key               | uses                                                      |
+| trap              | effect_type (=trap_eff_flags=), damage_type, level, charges |
+| board             | flags (=board_bits=)                                      |
+| spellgem          | effect_multiplier, power_mana_multiplier, casting_time, failure_modifier |
+| socket            | combine, combine_to, removable, unique                    |
+| component, audio, treasure, money | uses / frequency / value                  |
+| hierarchical, item_set | A32 lists                                            |
+| other, book, worn, trash, note, pen, boat, missile, fireweapon | markers (HOL): no value |
+
+Other top-level fields: name, namelist, longdesc/long, action/special,
+weight, value, rent, real_cost, qpvalue, bits (=extra_bits=), wear
+(=wear_bits=), material (=material_types=), rarity (=rarity_types=), tier,
+min_level, max_exist, max_player, mass, volume, dimensions {length, width,
+height}, apply { ... }, sockets, item_set, piece_of_set, use_cooldown,
+ws_cooldown, item_ability { ... }, item_ability_duration/msg/desc, touch
+{transport_room, msg_to_room, msg_to_char, msg_to_dest}, owner, extras.
+
+* Things learned
+
+- =apply= blocks are lists of (location, modifier) in the server
+  (=objdb.c= case 49 appends one entry per line, =MAX_OBJ_APPLY= slots) and
+  modifiers to the same location stack. The extractor emits a dict; the
+  only repeats in the data are name-valued applies (=spell_affect=,
+  =eat_spell=, =resistance=), emitted as lists.
+- The apply location names come from =apply_fields= in =constants.c=, 104
+  rows, which double as the enchant-suffix table ("of toughness").
+- Marker item types are written as =other { 0, 0, 0, 0 }=; =tran= writes only
+  the type id and the server then reads (and discards) the next word. The
+  extractor emits =\"type\": {\"other\": null}=.
+- Empty prototype text is normal: a saved object with an empty string means
+  "use the prototype text" and =ReadObject= copies it from =obj_db=.
+- =obj_data= has two apply-like arrays besides =apply=: =pulse_apply= and
+  =socket_apply=, plus =activate_thresholds= for set bonuses. Only =apply=
+  appears in the prototype sources.
+- Macros: =Void.obj= defines =@board=, =@mortboard=, =@wizboard=.
+
+* Caveats in the data
+
+- =Asgard.obj= writes =hitndamage ( 10 )= with parentheses on twelve objects.
+  =tran= skips to the next brace, so those values are lost in =obj.out= and
+  the next field is misassigned. The extractor reads parenthesised values
+  deliberately, so the JSON is more complete than the binary here.
+- 72 remaining warnings: =bits= or =wear= given twice (last wins in the
+  server), duplicate =min_level=, one =other 0,0,0,0= with no delimiter.
+- Vnum set checked against =obj.out=: exact match on 4,855.

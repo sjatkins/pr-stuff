@@ -1,0 +1,75 @@
+#+TITLE: Rooms — what the extractor taught us
+#+AUTHOR: notes from building py_json/src/prworld (rooms)
+#+DATE: 2026-09-27
+#+STARTUP: overview
+
+* Where rooms live
+
+- Source: =world/ROOM/*.room=, 149 files, one per area. Driven by
+  =world/ROOM/ALLROOMS=, which =#include=s =area.list= and then every area
+  file in a fixed order.
+- =area.list= is nothing but =#define <Area> <base vnum>= lines, one per
+  area (163 lines). Each area file opens with =#offset <Area>=, which sets
+  the base added to every local room number and exit target in that file.
+- Compiled by =world/ROOM/compile= → =../tran room ALLROOMS world.out=,
+  copied to =live/lib/world.out=. Loaded at boot by =roomdb.c:boot_world= /
+  =read_one_room= into the =room_db= hash table (preallocated for 163,840
+  =room_data= slots).
+- Extracted to =py_json/out/rooms.jsonl=: 26,287 rooms, 148 areas.
+
+* Record format
+
+A room is =<local number> { field { value } ... }=. Absolute vnum = local +
+area base. Fields (schema =room_fields= in =PRLib/fields.c=):
+
+| token                | type | notes                                                  |
+|----------------------+------+--------------------------------------------------------|
+| name                 | STR  |                                                        |
+| description / desc   | STR  | leading =\"= is a convention and is stripped           |
+| sector               | E32  | name from the *sector* table, which is data-driven     |
+| flags                | BIT  | =room_bits=: dark, death, no_mob, indoors, mapable ... |
+| river                | RVR  | =dir, speed=                                           |
+| teleport / tele      | TEL  | =time, look, target-room=                              |
+| max_people           | S8   |                                                        |
+| size                 | VEC  | 3 doubles; unused in the sources                       |
+| map                  | ASTR | unused in the sources                                  |
+| extra                | SUB  | keyword/desc pairs; several pairs may share one block  |
+| exits                | SUB  | see below                                              |
+
+Exits: inside =exits { }= each =to { dir, room }= starts a new exit and the
+lines that follow (=desc=, =keywords=, =info=, =start=, =key=, =reset=) attach
+to it. Directions may be names, abbreviations (=n=, =sw=) or numbers 0–9.
+Room references are a bare local number (same area) or =Area:n=. The
+=info= / =start= flags come from =exit_bits= (door, closed, locked, secret,
+pickproof, knockable, hidden, message, autoclose, autolock, crackable).
+
+* Things learned
+
+- The sector name table is *not* in the C sources. =sector.c= builds
+  =sector_types[]= at boot from =sector.out=, so validation of =sector {}=
+  needs =world/SECT/sectors.current=. The extractor loads it first and emits
+  canonical spellings (=road= → =Road=). 6,450 rooms have no sector at all.
+- =tran='s =#define= name runs to the first space or ~=~, so =PR-Entrance= is
+  a legal area name.
+- =var_insert= rejects a duplicate *value*, not a duplicate name, and
+  =var_lookup= returns the lowest value for a name. =_Unknown9= is defined
+  twice in =area.list= (124800 and 129000) and resolves to 124800.
+- The room struct's =zone= is not in the source; it is computed at boot from
+  the zone ranges in =zone.out=. =funct= (special procedure) comes from a
+  hard-coded table in =spec_assign.c=. Everything else in =room_data= that
+  is not runtime state (light, people, contents, track) comes from the file.
+- Field id 13 is used twice in =room_fields=: =sector= (E32) and =size=
+  (VEC). Harmless only because =size= is never written.
+- =room_fields= has four field types (RVR, TEL, ROM, EXI) the schema-driven
+  reader in =PRLib/Schema.c= cannot handle, which is why rooms still go
+  through the hand-coded =read_one_room=.
+
+* Caveats in the data
+
+- 62 exits point at vnums that do not exist in any source file.
+- 14 rooms set =flags=, =sector= or =tele= twice; the server keeps the last
+  value and so does the extractor.
+- =Nether.zon= and =OnikumasClanRooms.zon= have room ranges but are not in
+  =zone.list=, so those rooms have no zone at runtime.
+- The extracted vnum set was checked against =world.out= byte-walked with
+  the same field sizes: exact match on all 26,287 vnums.
