@@ -1,0 +1,29 @@
+{"vnum": 0, "source": "clans.current:1", "name": "Newbie", "flags": [], "xp_mult": 1.5, "min_join_level": null, "max_join_level": null, "clanmaster": null, "deputy": null}
+{"vnum": 1, "source": "clans.current:7", "name": "Protected", "flags": [], "xp_mult": 1.0, "min_join_level": 20, "max_join_level": null, "clanmaster": null, "deputy": null}
+{"vnum": 2, "source": "clans.current:14", "name": "Freelance", "flags": ["pkothers", "pkclan", "openenroll"], "xp_mult": 1.0, "min_join_level": 20, "max_join_level": 300, "clanmaster": null, "deputy": null}
+{"vnum": 3, "source": "clans.current:23", "name": "-<(Silver Circle)>-", "flags": [], "xp_mult": null, "min_join_level": 10, "max_join_level": null, "clanmaster": "Tasha", "deputy": "Snuff"}
+{"vnum": 4, "source": "clans.current:31", "name": "Alcs Thugs", "flags": ["pkothers", "pkclan"], "xp_mult": null, "min_join_level": 501, "max_join_level": null, "clanmaster": "Alcanzar", "deputy": "Fionn"}
+{"vnum": 5, "source": "clans.current:40", "name": "Black Tower", "flags": [], "xp_mult": 1.0, "min_join_level": 10, "max_join_level": null, "clanmaster": "Faine", "deputy": "Davin"}
+{"vnum": 6, "source": "clans.current:50", "name": "ark Hand", "flags": [], "xp_mult": 1.0, "min_join_level": 10, "max_join_level": null, "clanmaster": "Morp", "deputy": "Riptor"}
+{"vnum": 7, "source": "clans.current:59", "name": "HLE - Honorable, Loyal, Elite", "flags": [], "xp_mult": 1.0, "min_join_level": 10, "max_join_level": null, "clanmaster": "Nathan", "deputy": "Agony"}
+{"vnum": 8, "source": "clans.current:68", "name": "B.R.O.E.S", "flags": [], "xp_mult": 1.0, "min_join_level": 10, "max_join_level": null, "clanmaster": "Garbad", "deputy": "Clux"}
+{"vnum": 9, "source": "clans.current:77", "name": "MaKaG - Mooses are Kewl Appreciation Group", "flags": [], "xp_mult": 1.0, "min_join_level": 10, "max_join_level": null, "clanmaster": "Tommas", "deputy": "Tre"}
+{"vnum": 10, "source": "clans.current:87", "name": "KotM - Knights of the Moose", "flags": ["pkothers"], "xp_mult": 1.0, "min_join_level": 10, "max_join_level": null, "clanmaster": "Keldain", "deputy": "Alemi"}
+{"vnum": 11, "source": "clans.current:98", "name": "Five Lions", "flags": ["private"], "xp_mult": null, "min_join_level": 75, "max_join_level": null, "clanmaster": "Nolat", "deputy": "Warden"}
+{"vnum": 12, "source": "clans.current:108", "name": "/SwedeS\\", "flags": [], "xp_mult": null, "min_join_level": 10, "max_join_level": null, "clanmaster": "rhodry", "deputy": "quasi"}
+{"vnum": 13, "source": "clans.current:118", "name": "NOONE", "flags": ["pkothers"], "xp_mult": null, "min_join_level": 10, "max_join_level": null, "clanmaster": "hempel", "deputy": "peek"}
+{"vnum": 14, "source": "clans.current:128", "name": "Metal Militia", "flags": [], "xp_mult": null, "min_join_level": 25, "max_join_level": null, "clanmaster": "chord", "deputy": "infiniti"}
+{"vnum": 15, "source": "clans.current:139", "name": "Black Company", "flags": [], "xp_mult": null, "min_join_level": 25, "max_join_level": null, "clanmaster": "aspire", "deputy": "emerald"}
+{"vnum": 16, "source": "clans.current:148", "name": "Hamsters of Darkness", "flags": [], "xp_mult": null, "min_join_level": 25, "max_join_level": null, "clanmaster": "medius", "deputy": "justin"}
+{"vnum": 17, "source": "clans.current:156", "name": "Shinsen-Gumi", "flags": [], "xp_mult": null, "min_join_level": 25, "max_join_level": null, "clanmaster": "malganis", "deputy": "alric"}
+{"vnum": 18, "source": "clans.current:164", "name": "Krakendor", "flags": [], "xp_mult": 1.0, "min_join_level": 10, "max_join_level": null, "clanmaster": "tygen", "deputy": "maven"}
+{"vnum": 19, "source": "clans.current:173", "name": "MooO!", "flags": [], "xp_mult": null, "min_join_level": 10, "max_join_level": null, "clanmaster": "thundy", "deputy": "bain"}
+{"vnum": 20, "source": "clans.current:181", "name": "-=<S*O*F*K>=-", "flags": ["private"], "xp_mult": null, "min_join_level": 10, "max_join_level": null, "clanmaster": "sevristh", "deputy": "lapse"}
+{"vnum": 21, "source": "clans.current:190", "name": "-<<SpellGuard>>-", "flags": ["pkothers", "private"], "xp_mult": null, "min_join_level": 20, "max_join_level": null, "clanmaster": "aspire", "deputy": "gundithius"}
+{"vnum": 22, "source": "clans.current:199", "name": "-=<<<Dragon's Hoard>>>=-", "flags": [], "xp_mult": null, "min_join_level": 20, "max_join_level": null, "clanmaster": "belial", "deputy": "telrunya"}
+{"vnum": 23, "source": "clans.current:207", "name": "Knight Foundation", "flags": [], "xp_mult": null, "min_join_level": 501, "max_join_level": null, "clanmaster": "percival", "deputy": "clark"}
+{"vnum": 24, "source": "clans.current:215", "name": "Delirium", "flags": ["private"], "xp_mult": 1.0, "min_join_level": 10, "max_join_level": null, "clanmaster": "miral", "deputy": null}
+{"vnum": 25, "source": "clans.current:224", "name": "S.I.N. - Strength In Numbers", "flags": ["pkothers"], "xp_mult": null, "min_join_level": 20, "max_join_level": null, "clanmaster": "krieg", "deputy": null}
+{"vnum": 26, "source": "clans.current:232", "name": "[HELPERS]", "flags": ["openenroll"], "xp_mult": null, "min_join_level": 100, "max_join_level": null, "clanmaster": null, "deputy": null}
+{"vnum": 27, "source": "clans.current:239", "name": "Jb's Thugs", "flags": ["private"], "xp_mult": 1.0, "min_join_level": 10, "max_join_level": null, "clanmaster": "zurt", "deputy": null}
+{"vnum": 28, "source": "clans.current:248", "name": "-==<<<BLACK HALL>>>==-", "flags": ["private"], "xp_mult": 1.0, "min_join_level": 30, "max_join_level": null, "clanmaster": "Viller", "deputy": "Hassan"}

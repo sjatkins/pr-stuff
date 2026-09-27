@@ -1,12 +1,16 @@
 # The two source repos are cloned side by side here, each with its own git
 # history. They are checked out, not vendored:
-#   pr/        git@github.com:cabarius/pr.git
-#   pr-world/  git@github.com:cabarius/pr-world.git
+#   src/       git@github.com:cabarius/pr.git
+#   world/     git@github.com:cabarius/pr-world.git
 # Adding them here would create gitlinks to commits that live elsewhere.
-pr/
-pr-world/
+src/
+world/
 
 # Mutable runtime state belonging to neither repo: compiled world data plus
 # the live player database. Never commit it -- live/lib/account/ holds the
 # player password hashes.
 live/
+
+# Player backups: binary player and account files with password hashes.
+# The extracted JSONL in py_json/out/ is what gets committed.
+players_*.tar
