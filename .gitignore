@@ -3,13 +3,13 @@
 #   src/       git@github.com:cabarius/pr.git
 #   world/     git@github.com:cabarius/pr-world.git
 # Adding them here would create gitlinks to commits that live elsewhere.
-src/
-world/
+/src/
+/world/
 
 # Mutable runtime state belonging to neither repo: compiled world data plus
 # the live player database. Never commit it -- live/lib/account/ holds the
 # player password hashes.
-live/
+/live/
 
 # Player backups: binary player and account files with password hashes.
 # The extracted JSONL in py_json/out/ is what gets committed.
@@ -18,3 +18,6 @@ players_*.tar
 # graphify: machine-specific interpreter path and rebuildable extraction cache
 graphify-out/.graphify_python
 graphify-out/cache/
+
+# editor lock files
+.#*
