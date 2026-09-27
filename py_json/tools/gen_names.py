@@ -28,7 +28,24 @@ TABLES = {
     "race_header_types": "cmds3.c",
     "apply_types": "constants.c", "player_bits": "constants.c", "position_types": "constants.c",
     "account_bits": "constants.c", "equipment_types": "constants.c",
+    "clan_ranks": "constants.c",
 }
+
+# Tables that exist only as #define groups in const.h: (name, regex over the
+# macro name, value pattern). The captured group becomes the lower-case name.
+DEFINE_TABLES = {
+    # FIRE_DAMAGE 0 .. DARKNESS_DAMAGE 9: the damage kinds damage() takes
+    "damage_kinds": (r"#define\s+([A-Z]+)_DAMAGE\s+(\d+)\s*//", {"ELECTRICTY": "electricity"}),
+    "pulse_types": (r"#define\s+PULSE_TYPE_([A-Z]+)\s+(\d+)", {}),
+    "config_bits": (r"#define\s+CONFIG_([A-Z_]+)\s+\(1<<(\d+)\)", {}),
+    "log_bits": (r"#define\s+LOG_([A-Z_]+)\s+\(1<<(\d+)\)", {}),
+}
+
+WEAR_POSITIONS = [
+    "light", "finger_r", "finger_l", "neck_1", "neck_2", "body", "head", "legs", "feet",
+    "hands", "arms", "shield", "about", "waist", "wrist_r", "wrist_l", "wield", "hold",
+    "pouch", "wings", "trinket_r", "trinket_l",
+]  # WEAR_* / WIELD / HOLD / POUCH in const.h, indexes 0..21
 
 def strip_comments(text: str) -> str:
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
@@ -60,6 +77,16 @@ def apply_fields(text: str) -> list[dict]:
                          "list": None if mm.group(4) == "0" else mm.group(4)})
     return rows
 
+def define_table(text: str, pattern: str, fixups: dict[str, str]) -> list[str]:
+    found: dict[int, str] = {}
+    for m in re.finditer(pattern, text):
+        name = fixups.get(m.group(1), m.group(1)).lower()
+        found[int(m.group(2))] = name
+    if not found:
+        raise SystemExit(f"no defines matched {pattern}")
+    return [found.get(i, f"bit{i}") for i in range(max(found) + 1)]
+
+
 def item_type_ids(text: str) -> dict[str, int]:
     ids = {}
     m = re.search(r"enum item_t\s*\{(.*?)\}", text, flags=re.S)
@@ -73,6 +100,24 @@ def main() -> None:
            "item_type_ids": item_type_ids(strip_comments((SRC / "h/const.h").read_text(errors="replace")))}
     for name, f in TABLES.items():
         out["tables"][name] = c_array(files[f], name)
+    const_h = strip_comments((SRC / "h/const.h").read_text(errors="replace"))
+    raw_const_h = (SRC / "h/const.h").read_text(errors="replace")  # damage kinds are told apart by their // comment
+    for name, (pattern, fixups) in DEFINE_TABLES.items():
+        out["tables"][name] = define_table(raw_const_h if name == "damage_kinds" else const_h, pattern, fixups)
+    out["tables"]["wear_positions"] = WEAR_POSITIONS
+    # attack-type numbers above the spell table: weapon TYPE_*, room hazards,
+    # remort/item-set affect markers (spells.h). Keyed by number as a string.
+    spells_h = strip_comments((SRC / "h/spells.h").read_text(errors="replace"))
+    specials = {}
+    for m in re.finditer(r"#define\s+(SPELL_WEAPONSPELL|TYPE_[A-Z_]+|ROOM_[A-Z_0-9]+|AFFECT_[A-Z_]+)\s+(\d+)", spells_h):
+        name, num = m.group(1), int(m.group(2))
+        if 900 <= num < 1000:
+            specials[str(num)] = name.replace("SPELL_", "").replace("TYPE_", "").lower() if not name.startswith(("ROOM_", "AFFECT_")) else name.lower()
+    out["attack_specials"] = specials
+    # REMORT_* flags (const.h) also turn up as affect types, e.g. 301
+    out["remort_flags"] = {m.group(2): m.group(1).lower()
+                           for m in re.finditer(r"#define\s+REMORT_([A-Z_0-9]+)\s+(\d+)", const_h)}
+    out["skill_bases"] = {"PROF_BASE": 5000, "SKILL_BASE": 10000, "MAX_EXIST_SPELL": 240}
     OUT.write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     for k, v in out["tables"].items():
         print(f"{k:22s} {len(v)}")
