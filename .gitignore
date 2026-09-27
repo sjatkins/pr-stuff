@@ -14,3 +14,7 @@ live/
 # Player backups: binary player and account files with password hashes.
 # The extracted JSONL in py_json/out/ is what gets committed.
 players_*.tar
+
+# graphify: machine-specific interpreter path and rebuildable extraction cache
+graphify-out/.graphify_python
+graphify-out/cache/
