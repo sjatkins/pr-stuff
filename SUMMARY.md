@@ -659,7 +659,8 @@ is the data directory. On production `PR_HOME=/home/pr` reproduces the old
 
 | script | what it does |
 |---|---|
-| `setup_pr_home.sh [github-user]` | one command from empty directory to running-ready, no-op afterwards: clone `src`/`world` if absent (`https://USER@github.com` form only when a user is given), create the live tree, `ln -sfn ../src/pr3 live/pr3`, build if `src/pr3` absent, `world/compile` if `world.out` absent, rebuild indexes. Never pulls. |
+| `setup_pr_home.sh [github-user]` | one command from empty directory to running-ready, no-op afterwards: clone `src`/`world` if absent (`https://USER@github.com` form only when a user is given), create the live tree and `Backups/`, `ln -sfn ../src/pr3 live/pr3`, build if `src/pr3` absent, `world/compile` if `world.out` absent, restore the newest `Backups/players_*.tar.gz` if `stash/` is empty, rebuild indexes. Never pulls. |
+| `load_players_from_last_backup.sh [-y] [file]` | reverse of `backup_players.sh`: extract `stash/` and `account/` from the newest `Backups/players_*.tar.gz` (or `.tar`, or the given file) into `live/lib` and rebuild the indexes. Refuses while `pr3` runs; refuses to overwrite existing players without `-y`. Tested against the 09-23 tar in a scratch `PR_HOME`: 697 players, 280 accounts, indexes identical to the live ones. |
 | `PR_SERVER_SCRIPT` | the launch loop the restart script runs under `screen`: calls `setup_pr_home.sh`, rotates `live/logs`, rebuilds indexes, runs `pr3 -p 179 -d live/lib -a 5024 2150`, relaunches on exit; `CLEAN_EXIT` / `BOOT_CLEAN` marker files |
 | `pr_functions.sh` | sourced library: `rebuild_index`, `rebuild_locker_index`, `rebuild_indexes` (players.new, account.list, lockers.save from the directory listings) and `list_all_players`. Replaces `stash/build`, `account/build`, `LockerSave/build`, `stash/list_all_players.sh`, which were hand-written into the data directory in 2016/2023 and travel in every player tar |
 | `restart_pr_server.sh` | stop the game (exact `pgrep -x pr3`), optional clean reboot (`-c`), start `PR_SERVER_SCRIPT` under `screen`, wait for the port |
@@ -688,6 +689,11 @@ and `set -e` made the script exit 2 after writing every index. Fixed in
 
 **Not yet exercised:** the fresh-directory path, clone and build.
 Production already has `src/pr3`, so the build step is skipped there.
+
+**Collaborator recipe:** clone `pr-stuff`, drop a `players_*.tar.gz` into
+`Backups/` (gitignored), run `scripts/setup_pr_home.sh <github-user>`,
+then `scripts/PR_SERVER_SCRIPT`. The 09-23 tar on this machine still sits
+at `pr-stuff/players_2026-09-23.tar`, not in `Backups/`.
 
 **Still nothing schedules any of it** on production: no cron, no timer, no
 unit. The auto-restart is the `while true` loop in `PR_SERVER_SCRIPT`.

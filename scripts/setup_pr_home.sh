@@ -16,7 +16,8 @@
 #   3. Point live/pr3 at src/pr3.
 #   4. Build pr3, tran and Zone/syntax if src/pr3 is absent.
 #   5. Compile the world into live/lib if world.out is absent.
-#   6. Rebuild the player, account and locker indexes.
+#   6. Restore the newest Backups/players_*.tar.gz if live has no players.
+#   7. Rebuild the player, account and locker indexes.
 set -e
 PR_HOME="${PR_HOME:-$(pwd)}"
 . "$(dirname "$(readlink -f "$0")")/pr_functions.sh"
@@ -76,6 +77,16 @@ else
   ( cd "$PR_HOME/world" && ./compile )
 fi
 
-# 6. Indexes.
+# 6. Players. If there are none, restore the newest player backup from
+#    Backups/ (if there is one); otherwise leave the live data alone.
+if [ "$(find "$LIB/stash" -mindepth 2 -type f 2>/dev/null | wc -l)" -gt 0 ]; then
+  say "players exist in live/lib/stash, not restoring"
+elif ls "$PR_HOME"/Backups/players_*.tar* >/dev/null 2>&1; then
+  "$(dirname "$(readlink -f "$0")")/load_players_from_last_backup.sh"
+else
+  say "no players and no Backups/players_*.tar.gz to restore; the world will be empty"
+fi
+
+# 7. Indexes.
 rebuild_indexes "$LIB"
 say "done: $PR_HOME"

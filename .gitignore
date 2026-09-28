@@ -24,3 +24,6 @@ graphify-out/*.sig
 
 # editor lock files
 .#*
+
+# Player and full backups made or restored by the scripts
+/Backups/
