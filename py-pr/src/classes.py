@@ -27,7 +27,7 @@ Conventions:
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Union
+from typing import Any, ClassVar, Literal, Optional, Union, get_args, get_origin
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
@@ -389,50 +389,109 @@ class Mob(PRModel):
 # Objects  (world/OBJ, objects.jsonl)
 # ---------------------------------------------------------------------------
 
-class LightType(PRModel):
+class ItemType(PRModel):
+    """What kind of item an object is, with the data that kind carries.
+
+    This is the ``type { <kind> { ... } }`` block of an object prototype and
+    also the typed reading of a saved item's ``value[]`` slots. There is one
+    subclass per kind of item, or per group of kinds that share a layout
+    (scroll and potion, wand and staff ...); ``kind`` names the kind as the
+    tran block spells it. Validating against ``ItemType`` itself picks the
+    subclass from the kind, given either an explicit ``kind`` key or the
+    extractor's ``{"<kind>": {...}}`` shape, so ``ObjectPrototype.type`` and
+    ``SavedObject.values`` are simply ``ItemType``.
+    """
+
+    kind: str
+
+    _by_kind: ClassVar[dict[str, type[ItemType]]] = {}
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        super().__pydantic_init_subclass__(**kwargs)
+        ann = cls.model_fields["kind"].annotation
+        if get_origin(ann) is Literal:
+            for k in get_args(ann):
+                ItemType._by_kind.setdefault(k, cls)   # first subclass to claim a kind owns it
+
+    @staticmethod
+    def _flatten(data: dict[str, Any]) -> dict[str, Any]:
+        """``{"weapon": {...}}`` / ``{"other": None}`` / ``{"hierarchical": [..]}`` -> ``{"kind": ..., ...}``."""
+        if "kind" in data or len(data) != 1:
+            return data
+        (k, v), = data.items()
+        if k not in ItemType._by_kind:
+            return data
+        if v is None:
+            return {"kind": k}
+        if isinstance(v, list):
+            return {"kind": k, "vnums": v}
+        return {"kind": k, **v}
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _dispatch(cls, data: Any, handler: Any) -> Any:
+        if isinstance(data, dict):
+            data = cls._flatten(data)
+            if cls is ItemType:
+                sub = cls._by_kind.get(data.get("kind"))
+                if sub is None:
+                    raise ValueError(f"unknown item kind {data.get('kind')!r}")
+                return sub.model_validate(data)
+        return handler(data)
+
+
+class LightType(ItemType):
     """light: hours of light left (-1 permanent)."""
+    kind: Literal["light"] = "light"
     duration: Optional[int] = None
 
 
-class SpellItemType(PRModel):
+class SpellItemType(ItemType):
     """scroll and potion: up to three spells cast at ``level``."""
+    kind: Literal["scroll", "potion"]
     level: Optional[int] = None
     spell1: Optional[str] = None
     spell2: Optional[str] = None
     spell3: Optional[str] = None
 
 
-class ChargedItemType(PRModel):
+class ChargedItemType(ItemType):
     """wand and staff: one spell with charges."""
+    kind: Literal["wand", "staff"]
     level: Optional[int] = None
     max_charges: Optional[int] = None
     charges: Optional[int] = None
     spell: Optional[str] = None
 
 
-class TreasureType(PRModel):
+class TreasureType(ItemType):
     """treasure and money: worth in coins."""
+    kind: Literal["treasure", "money"]
     value: Optional[int] = None
 
 
-class ContainerType(PRModel):
+class ContainerType(ItemType):
     """container and pouch: capacity, closed/locked flags, key vnum, decay timer."""
+    kind: Literal["container", "pouch"]
     max_hold: Optional[int] = None
     flags: list[ContainerFlag] = Field(default_factory=list)
     key: Optional[int] = None
     timer: Optional[int] = None
 
 
-class DrinkContainerType(PRModel):
+class DrinkContainerType(ItemType):
     """drink_container: capacity, current amount, liquid, poison."""
+    kind: Literal["drink_container"] = "drink_container"
     max_units: Optional[int] = None
     amount: Optional[int] = None
     type: Optional[Drink] = None
     poisoned: Optional[int] = None
 
 
-class ArmorType(PRModel):
+class ArmorType(ItemType):
     """armor: armour class and the force/stopping/absorb protections."""
+    kind: Literal["armor"] = "armor"
     effective_ac: Optional[int] = None
     force: Optional[int] = None
     stopping: Optional[int] = None
@@ -440,8 +499,9 @@ class ArmorType(PRModel):
     timer: Optional[int] = None
 
 
-class WeaponType(PRModel):
+class WeaponType(ItemType):
     """weapon: weapon class, damage dice, damage type, speed."""
+    kind: Literal["weapon"] = "weapon"
     wtype: Optional[WeaponClass] = None
     no_dice: Optional[int] = None
     size_dice: Optional[int] = None
@@ -449,102 +509,72 @@ class WeaponType(PRModel):
     speed: Optional[int] = None
 
 
-class FoodType(PRModel):
+class FoodType(ItemType):
     """food: hours of fullness, poison."""
+    kind: Literal["food"] = "food"
     fullness: Optional[int] = None
     poisoned: Optional[int] = None
 
 
-class UsesType(PRModel):
+class UsesType(ItemType):
     """key and component: remaining uses."""
+    kind: Literal["key", "component"]
     uses: Optional[int] = None
 
 
-class AudioType(PRModel):
+class AudioType(ItemType):
     """audio: sound frequency."""
+    kind: Literal["audio"] = "audio"
     frequency: Optional[int] = None
 
 
-class TrapType(PRModel):
+class TrapType(ItemType):
     """trap: effect flags, what it does when sprung, level, charges.
 
     ``damage_type`` is an attack type: a spell to cast (fireball, frost
     breath ...), a weapon TYPE_* for blunt/pierce/slash, or a negative special
     (-2 teleport, -3 sleep); see TRAP_DAM_* in const.h.
     """
+    kind: Literal["trap"] = "trap"
     effect_type: list[TrapEffect] = Field(default_factory=list)
     damage_type: Optional[AttackType] = None
     level: Optional[int] = None
     charges: Optional[int] = None
 
 
-class BoardType(PRModel):
+class BoardType(ItemType):
     """board: who may read, write and remove (board_bits)."""
+    kind: Literal["board"] = "board"
     flags: list[BoardFlag] = Field(default_factory=list)
 
 
-class SocketGemType(PRModel):
+class SocketGemType(ItemType):
     """socket: a gem that can be inserted into socketed items."""
+    kind: Literal["socket"] = "socket"
     combine: Optional[int] = None
     combine_to: Optional[int] = None
     removable: Optional[bool] = None
     unique: Optional[bool] = None
 
 
-class SpellGemType(PRModel):
+class SpellGemType(ItemType):
     """spellgem: multipliers applied to spells cast through it."""
+    kind: Literal["spellgem"] = "spellgem"
     effect_multiplier: Optional[float] = None
     power_mana_multiplier: Optional[float] = None
     casting_time: Optional[float] = None
     failure_modifier: Optional[float] = None
 
 
-class ItemType(PRModel):
-    """The ``type { <kind> { ... } }`` block of an object prototype.
+class VnumListType(ItemType):
+    """hierarchical and item_set: the vnums of the objects this one groups."""
+    kind: Literal["hierarchical", "item_set"]
+    vnums: list[int] = Field(default_factory=list)
 
-    Exactly one field is set: the object's item type, keyed by its name as in
-    ``item_types``. Marker types (other, book, worn, trash, note, pen, boat,
-    missile, fireweapon) carry no data and appear as ``null``; hierarchical
-    and item_set carry a list of vnums. ``kind`` gives the set key.
-    """
 
-    light: Optional[LightType] = None
-    scroll: Optional[SpellItemType] = None
-    potion: Optional[SpellItemType] = None
-    wand: Optional[ChargedItemType] = None
-    staff: Optional[ChargedItemType] = None
-    treasure: Optional[TreasureType] = None
-    money: Optional[TreasureType] = None
-    container: Optional[ContainerType] = None
-    pouch: Optional[ContainerType] = None
-    drink_container: Optional[DrinkContainerType] = None
-    armor: Optional[ArmorType] = None
-    weapon: Optional[WeaponType] = None
-    food: Optional[FoodType] = None
-    key: Optional[UsesType] = None
-    component: Optional[UsesType] = None
-    audio: Optional[AudioType] = None
-    trap: Optional[TrapType] = None
-    board: Optional[BoardType] = None
-    socket: Optional[SocketGemType] = None
-    spellgem: Optional[SpellGemType] = None
-    hierarchical: Optional[list[int]] = None
-    item_set: Optional[list[int]] = None
-    other: None = None
-    book: None = None
-    worn: None = None
-    trash: None = None
-    note: None = None
-    pen: None = None
-    boat: None = None
-    missile: None = None
-    fireweapon: None = None
-
-    @property
-    def kind(self) -> Optional[str]:
-        """The item type name: the one key that was present in the source."""
-        keys = self.model_fields_set
-        return next(iter(keys)) if keys else None
+class MarkerType(ItemType):
+    """The kinds that carry no data of their own; the block is just the name."""
+    kind: Literal["other", "book", "worn", "trash", "note", "pen", "boat", "missile", "fireweapon"]
 
 
 class Dimensions(PRModel):
@@ -1002,80 +1032,79 @@ class SocketApply(PRModel):
     unique: Optional[bool] = None
 
 
-class SavedSpellItemType(PRModel):
-    """scroll and potion as saved: up to three spells, by number, cast at ``level``."""
-    level: Optional[int] = None
+class SavedSpellItemType(SpellItemType):
+    """scroll and potion as saved: the spells are numbers, not names."""
     spell1: Optional[int] = None
     spell2: Optional[int] = None
     spell3: Optional[int] = None
 
 
-class SavedChargedItemType(PRModel):
-    """wand and staff as saved: one spell, by number, with charges."""
-    level: Optional[int] = None
-    max_charges: Optional[int] = None
-    charges: Optional[int] = None
+class SavedChargedItemType(ChargedItemType):
+    """wand and staff as saved: the spell is a number, not a name."""
     spell: Optional[int] = None
 
 
-class SavedTrapType(PRModel):
-    """trap as saved; ``damage_type`` is the raw attack-type number (see TrapType)."""
-    effect_type: list[TrapEffect] = Field(default_factory=list)
+class SavedTrapType(TrapType):
+    """trap as saved: ``damage_type`` is the raw attack-type number."""
     damage_type: Optional[int] = None
-    level: Optional[int] = None
-    charges: Optional[int] = None
 
 
-class UntypedValues(PRModel):
-    """The five ``value[]`` slots of an item whose type gives them no fixed
-    meaning: the marker types (other, worn, note, pen, boat, trash, book,
-    missile, fire weapon, hierarchical, set item), spell gems (which keep their
-    real data in ``dvalue[]``), and items with no type."""
+class UntypedValues(ItemType):
+    """The five ``value[]`` slots of a saved item whose kind gives them no
+    fixed meaning: the marker kinds, spell gems (whose real data is in
+    ``dvalue[]``), and items with no type. ``kind`` is the item_types name."""
+    kind: Optional[str] = None
     slots: list[int]
 
 
-SavedItemValues = Union[
-    LightType, SavedSpellItemType, SavedChargedItemType, TreasureType, ContainerType,
-    DrinkContainerType, ArmorType, WeaponType, FoodType, UsesType, AudioType, BoardType,
-    SocketGemType, SavedTrapType, UntypedValues,
-]
+# item_types names (ItemKind, what a saved object's ``type`` carries) that
+# the tran block spells differently.
+_TRAN_KIND = {
+    ItemKind.liquid_container: "drink_container", ItemKind.fire_weapon: "fireweapon",
+    ItemKind.spell_gem: "spellgem", ItemKind.set_item: "item_set",
+}
 
-# How the game reads ``obj->value[0..4]`` for each item type: the field ids of
-# the type block in fields.c minus one (weapon: no_dice is value[1] and so on,
-# as fight.c and cmds1.c use them). Enum and flag slots hold numeric codes.
-_VALUE_LAYOUT: dict[ItemKind, tuple[type[PRModel], dict[str, tuple[int, Any]]]] = {
-    ItemKind.light: (LightType, {"duration": (2, None)}),
-    ItemKind.scroll: (SavedSpellItemType, {"level": (0, None), "spell1": (1, None), "spell2": (2, None), "spell3": (3, None)}),
-    ItemKind.potion: (SavedSpellItemType, {"level": (0, None), "spell1": (1, None), "spell2": (2, None), "spell3": (3, None)}),
-    ItemKind.wand: (SavedChargedItemType, {"level": (0, None), "max_charges": (1, None), "charges": (2, None), "spell": (3, None)}),
-    ItemKind.staff: (SavedChargedItemType, {"level": (0, None), "max_charges": (1, None), "charges": (2, None), "spell": (3, None)}),
-    ItemKind.treasure: (TreasureType, {"value": (0, None)}),
-    ItemKind.money: (TreasureType, {"value": (0, None)}),
-    ItemKind.container: (ContainerType, {"max_hold": (0, None), "flags": (1, ContainerFlag.from_bits), "key": (2, None), "timer": (3, None)}),
-    ItemKind.pouch: (ContainerType, {"max_hold": (0, None), "flags": (1, ContainerFlag.from_bits), "key": (2, None), "timer": (3, None)}),
-    ItemKind.liquid_container: (DrinkContainerType, {"max_units": (0, None), "amount": (1, None), "type": (2, Drink.from_code), "poisoned": (3, None)}),
-    ItemKind.armor: (ArmorType, {"effective_ac": (0, None), "force": (1, None), "stopping": (2, None), "absorb": (3, None), "timer": (4, None)}),
-    ItemKind.weapon: (WeaponType, {"wtype": (0, WeaponClass.from_code), "no_dice": (1, None), "size_dice": (2, None), "type": (3, DamageType.from_code), "speed": (4, None)}),
-    ItemKind.food: (FoodType, {"fullness": (0, None), "poisoned": (3, None)}),
-    ItemKind.key: (UsesType, {"uses": (0, None)}),
-    ItemKind.component: (UsesType, {"uses": (0, None)}),
-    ItemKind.audio: (AudioType, {"frequency": (0, None)}),
-    ItemKind.board: (BoardType, {"flags": (0, BoardFlag.from_bits)}),
-    ItemKind.socket: (SocketGemType, {"combine": (0, None), "combine_to": (1, None), "removable": (2, bool), "unique": (3, bool)}),
-    ItemKind.trap: (SavedTrapType, {"effect_type": (0, TrapEffect.from_bits), "damage_type": (1, None), "level": (2, None), "charges": (3, None)}),
+# How the game reads ``obj->value[0..4]`` for each kind: the field ids of the
+# type block in fields.c minus one (weapon: no_dice is value[1] and so on, as
+# fight.c and cmds1.c use them). Enum and flag slots hold numeric codes.
+_SPELL_SLOTS = {"level": (0, None), "spell1": (1, None), "spell2": (2, None), "spell3": (3, None)}
+_CHARGED_SLOTS = {"level": (0, None), "max_charges": (1, None), "charges": (2, None), "spell": (3, None)}
+_CONTAINER_SLOTS = {"max_hold": (0, None), "flags": (1, ContainerFlag.from_bits), "key": (2, None), "timer": (3, None)}
+_VALUE_LAYOUT: dict[str, tuple[type[ItemType], dict[str, tuple[int, Any]]]] = {
+    "light": (LightType, {"duration": (2, None)}),
+    "scroll": (SavedSpellItemType, _SPELL_SLOTS),
+    "potion": (SavedSpellItemType, _SPELL_SLOTS),
+    "wand": (SavedChargedItemType, _CHARGED_SLOTS),
+    "staff": (SavedChargedItemType, _CHARGED_SLOTS),
+    "treasure": (TreasureType, {"value": (0, None)}),
+    "money": (TreasureType, {"value": (0, None)}),
+    "container": (ContainerType, _CONTAINER_SLOTS),
+    "pouch": (ContainerType, _CONTAINER_SLOTS),
+    "drink_container": (DrinkContainerType, {"max_units": (0, None), "amount": (1, None), "type": (2, Drink.from_code), "poisoned": (3, None)}),
+    "armor": (ArmorType, {"effective_ac": (0, None), "force": (1, None), "stopping": (2, None), "absorb": (3, None), "timer": (4, None)}),
+    "weapon": (WeaponType, {"wtype": (0, WeaponClass.from_code), "no_dice": (1, None), "size_dice": (2, None), "type": (3, DamageType.from_code), "speed": (4, None)}),
+    "food": (FoodType, {"fullness": (0, None), "poisoned": (3, None)}),
+    "key": (UsesType, {"uses": (0, None)}),
+    "component": (UsesType, {"uses": (0, None)}),
+    "audio": (AudioType, {"frequency": (0, None)}),
+    "board": (BoardType, {"flags": (0, BoardFlag.from_bits)}),
+    "socket": (SocketGemType, {"combine": (0, None), "combine_to": (1, None), "removable": (2, bool), "unique": (3, bool)}),
+    "trap": (SavedTrapType, {"effect_type": (0, TrapEffect.from_bits), "damage_type": (1, None), "level": (2, None), "charges": (3, None)}),
 }
 
 
-def typed_item_values(kind: Optional[str], slots: list[int]) -> PRModel:
-    """Give a saved object's ``value[]`` slots the meaning its type gives them."""
+def typed_item_values(kind: Optional[str], slots: list[int]) -> ItemType:
+    """Give a saved object's ``value[]`` slots the meaning its kind gives them."""
     try:
-        layout = _VALUE_LAYOUT.get(ItemKind(kind)) if kind is not None else None
+        ik = ItemKind(kind) if kind is not None else None
     except ValueError:
-        layout = None
+        ik = None
+    tran = _TRAN_KIND.get(ik, ik.value) if ik is not None else None
+    layout = _VALUE_LAYOUT.get(tran) if tran is not None else None
     if layout is None or len(slots) != 5:
-        return UntypedValues(slots=slots)
+        return UntypedValues(kind=kind, slots=slots)
     model, fields = layout
-    return model(**{name: (conv(slots[i]) if conv else slots[i]) for name, (i, conv) in fields.items()})
+    return model(kind=tran, **{name: (conv(slots[i]) if conv else slots[i]) for name, (i, conv) in fields.items()})
 
 
 class SavedObject(PRModel):
@@ -1087,7 +1116,7 @@ class SavedObject(PRModel):
     description: Optional[str] = None
     action_description: Optional[str] = None
     contents: list[SavedObject] = Field(default_factory=list)
-    values: Optional[SavedItemValues] = None           # the file's value[5], read per ``type``
+    values: Optional[ItemType] = None                  # the file's value[5], read per ``type``
     wear_flags: list[WearFlag] = Field(default_factory=list)
     extra_flags: list[ObjectFlag] = Field(default_factory=list)
     affects: list[AffectBit] = Field(default_factory=list)   # granted while worn
@@ -1393,19 +1422,22 @@ class Player(PRModel):
     carry_volume: Optional[int] = None
     carry_items: Optional[int] = None
     timer: Optional[int] = None
-    equipment: dict[WearPosition, Union[SavedObject, list[SavedObject]]] = Field(default_factory=dict)
+    equipment: dict[WearPosition, list[SavedObject]] = Field(default_factory=dict)   # a slot may hold several
     inventory: list[SavedObject] = Field(default_factory=list)
     warehouse: list[SavedObject] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
-    def _pair_defense(cls, data: Any) -> Any:
+    def _regroup(cls, data: Any) -> Any:
         """Zip the file's parallel ``armor[]`` / ``stopping[]`` arrays into one
-        ``BodyPartDefense`` per hit location. Slot 0 (LOCATION_UNKNOWN) is never
-        hit and only ever holds the boot default, so it is dropped."""
+        ``BodyPartDefense`` per hit location (slot 0, LOCATION_UNKNOWN, is never
+        hit and only ever holds the boot default, so it is dropped), and make
+        every equipment slot a list, as the extractor writes a lone item bare."""
         if not isinstance(data, dict):
             return data
         data = dict(data)
+        if isinstance(data.get("equipment"), dict):
+            data["equipment"] = {k: (v if isinstance(v, list) else [v]) for k, v in data["equipment"].items()}
         for armor_key, stopping_key, target in (("armor", "stopping", "defense"),
                                                 ("base_armor", "base_stopping", "base_defense")):
             if armor_key not in data and stopping_key not in data:

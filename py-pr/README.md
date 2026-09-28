@@ -38,12 +38,21 @@ Lists whose positions carry meaning are named models, not `list[int]`:
 hit location in `Defense`, on both `Mob` and `Player`; `OpenHours`;
 `MinAvgMax`; `SavingThrows` in `SAVING_*` order; `Conditions(drunk, hunger,
 thirst)`; `Resistances` in `*_DAMAGE` order; `Stats` for the class stat
-tables. A saved item's five `value[]` slots become the item-type model the
-game reads them as (`WeaponType`, `ArmorType`, `DrinkContainerType`, ...; spell
-items keep spell numbers) or `UntypedValues` for marker types. These are a
-typed view of the JSONL: `Positional` maps a list onto its fields by slot,
-and `mode="before"` validators on `Mob`, `Player` and `SavedObject` regroup
-the flat keys, so the models do not serialise back to the extractor's shape.
+tables.
+
+An object's kind is a class hierarchy: `ItemType` is the base, with one
+subclass per kind or per group of kinds sharing a layout (`WeaponType`,
+`ArmorType`, `SpellItemType` for scroll and potion, `MarkerType` for the
+kinds with no data, ...). `ObjectPrototype.type` is an `ItemType`; validating
+the extractor's `{"weapon": {...}}` block against it yields the subclass,
+picked by `kind`. A saved item's five `value[]` slots become the same
+subclass, read the way the game reads them (spell items keep spell numbers,
+so `SavedSpellItemType` and friends subclass the prototype types), or
+`UntypedValues` for kinds that give the slots no meaning. Equipment slots are
+always lists. These are a typed view of the JSONL: `Positional` maps a list
+onto its fields by slot, and `mode="before"` validators on `Mob`, `Player`
+and `SavedObject` regroup the flat keys, so the models do not serialise back
+to the extractor's shape.
 
 Conventions: fields the source may leave unset are `Optional` with default
 `None`; list-valued fields default to `[]`; nested blocks carry only what
