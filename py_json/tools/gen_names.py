@@ -41,6 +41,21 @@ DEFINE_TABLES = {
     "log_bits": (r"#define\s+LOG_([A-Z_]+)\s+\(1<<(\d+)\)", {}),
 }
 
+# Table entries whose C spelling is not the name of the bit. The #define is
+# the authority; the table string is what tran matches against and what the
+# game prints, so it is corrected here rather than in the models. Input
+# lookup is exact-then-prefix (string_lookup), so the old spellings that
+# world sources could use still resolve to the same bit.
+NAME_FIXES = {
+    # immunity_names[] pads bit 19 with "20"; const.h has IMM_MAGIC (1<<19),
+    # tested in fight.c against MAGIC_DAMAGE.
+    ("immunity_names", 19): "magic",
+    # action_bits[] lists "polymorphed" twice; const.h has ACT_POLYSELF (1<<14)
+    # and ACT_POLYOTHER (1<<15).
+    ("action_bits", 14): "polymorphed-self",
+    ("action_bits", 15): "polymorphed-other",
+}
+
 WEAR_POSITIONS = [
     "light", "finger_r", "finger_l", "neck_1", "neck_2", "body", "head", "legs", "feet",
     "hands", "arms", "shield", "about", "waist", "wrist_r", "wrist_l", "wield", "hold",
@@ -100,6 +115,11 @@ def main() -> None:
            "item_type_ids": item_type_ids(strip_comments((SRC / "h/const.h").read_text(errors="replace")))}
     for name, f in TABLES.items():
         out["tables"][name] = c_array(files[f], name)
+    for (name, i), fixed in NAME_FIXES.items():
+        table = out["tables"][name]
+        if i >= len(table):
+            raise SystemExit(f"{name}[{i}] does not exist; NAME_FIXES is stale")
+        table[i] = fixed
     const_h = strip_comments((SRC / "h/const.h").read_text(errors="replace"))
     raw_const_h = (SRC / "h/const.h").read_text(errors="replace")  # damage kinds are told apart by their // comment
     for name, (pattern, fixups) in DEFINE_TABLES.items():
