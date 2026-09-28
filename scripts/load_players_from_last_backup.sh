@@ -22,14 +22,14 @@ if [ -z "$file" ] || [ ! -f "$file" ]; then
   exit 1
 fi
 
-if pgrep -x pr3 >/dev/null; then
-  echo "load_players: pr3 is running; stop it before restoring players" >&2
-  exit 1
-fi
-
 existing=$(find "$PR_LIB/stash" -mindepth 2 -type f 2>/dev/null | wc -l)
 if [ "$existing" -gt 0 ]; then
   echo "load_players: $PR_LIB/stash already holds $existing player files; not touching them" >&2
+  exit 1
+fi
+
+if pgrep -x pr3 >/dev/null; then
+  echo "load_players: pr3 is running; stop it before restoring players" >&2
   exit 1
 fi
 
