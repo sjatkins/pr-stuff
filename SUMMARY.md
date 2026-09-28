@@ -566,11 +566,12 @@ the record). The link line is now just `-lPR -lcrypt -lm`, so §3's glibc
 2.38 floor and the bookworm/trixie note apply only to `sam_build`.
 
 The §3 recipe still holds (`serverversion` first, then `pr3`, `tran`,
-`Zone`). One new trap: **`Zone/makefile.linux` calls gcc with no `-std`**,
-and gcc 15+ defaults to C23, where `bool` is a keyword and
-`h/compat.h:27` `typedef char bool;` is an error. The main makefile pins a
-standard so `pr3` is unaffected. Worked around by running the Zone
-makefile's own commands with `-std=gnu11`; the makefile is not changed.
+`Zone`). One trap found and fixed: `Zone/makefile.linux` called gcc with
+no `-std`, and gcc 15+ defaults to C23, where `bool` is a keyword and
+`h/compat.h:27` `typedef char bool;` is an error. It now pins
+`-std=gnu11` (94876a77 on `src` master, verified with a clean rebuild
+from the grammar sources). `setup_pr_home.sh` therefore builds cleanly on
+a current toolchain.
 
 ### Player data
 
@@ -685,10 +686,8 @@ taken first). It exposed one bug: with no lockers, `ls *.room` returns 2
 and `set -e` made the script exit 2 after writing every index. Fixed in
 `pr_functions.sh` (72752c1); rerun exits 0.
 
-**Not yet exercised:** the fresh-directory path, clone and build. The
-build step would fail here at `Zone` (gcc C23 / `bool`, see above) until
-the Zone makefile pins a C standard. Production already has `src/pr3`, so
-the step is skipped there.
+**Not yet exercised:** the fresh-directory path, clone and build.
+Production already has `src/pr3`, so the build step is skipped there.
 
 **Still nothing schedules any of it** on production: no cron, no timer, no
 unit. The auto-restart is the `while true` loop in `PR_SERVER_SCRIPT`.
