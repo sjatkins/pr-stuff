@@ -22,16 +22,24 @@ typed accordingly: equipment slots (`WearPosition`), pulse affect kinds
 numbering (spells, weapon TYPE_*, room hazards, remort flags, skills,
 markers) and is carried as an `AttackType` `{number, kind, name}`.
 
-`src/names.py` holds `StrEnum` classes for the game's fixed vocabularies
-(sex, position, rarity, material, weapon class, damage type, drink, item
-kind, race, class, and every flag set), generated from the C name tables by
-`tools/gen_enums.py`; a member's position is the numeric code or bit index.
-Fields with a fixed vocabulary use them, without exceptions: flag bits the C
-table leaves unnamed are generated as `bitN` members (the extractor spells
-them the same way), and an enum word the source misspells is dropped by the
-extractor with a warning, since `tran` writes the failed lookup into the
-binary and the game never sees a value either. Zero/one fields that the code
-treats as flags are `bool`.
+`src/names.py` holds the game's fixed vocabularies, generated from the C name
+tables by `tools/gen_enums.py`. Code tables (sex, position, rarity, material,
+weapon class, damage type, drink, item kind, race, class ...) are `StrEnum`
+classes whose members carry the numeric `code`. Bit tables (room, exit,
+object and wear flags, mob actions, affect bits, immunities, intrinsics,
+forms, player, account, config and log flags ...) are `enum.Flag` classes:
+a field holding a set of them is one integer, so `RoomFlag.dark in
+room.flags`, `mob.immune & (Immunity.fire | Immunity.cold)` and
+`flags & wanted == wanted` are single AND operations rather than list scans.
+Each flag member carries the game's `label` string and its bit `code`; the
+list of labels the JSONL carries is the boundary form, converted by
+`from_names` / `.names`, which pydantic applies on validation and
+serialisation. Fields with a fixed vocabulary use these classes, without
+exceptions: bits the C table leaves unnamed are generated as `bitN` members
+(the extractor spells them the same way), and an enum word the source
+misspells is dropped by the extractor with a warning, since `tran` writes the
+failed lookup into the binary and the game never sees a value either.
+Zero/one fields that the code treats as flags are `bool`.
 
 Lists whose positions carry meaning are named models, not `list[int]`:
 `Dice(number, sides, bonus)`; `BodyPartDefense(armor, stopping)` grouped per

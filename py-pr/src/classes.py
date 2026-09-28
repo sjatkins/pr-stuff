@@ -13,10 +13,15 @@ structs in ``src/h/structs.h`` and the loaders that read them.
 
 Conventions:
 - A top-level record field that the source may leave unset is ``Optional``
-  with default ``None``; list-valued fields default to ``[]``.
+  with default ``None``; list-valued fields default to ``[]``; flag-set
+  fields default to the empty set.
 - Nested blocks only carry what was written, so their fields are all
   ``Optional``.
-- Enum and flag values are the server's canonical name strings.
+- Enum values are the server's canonical name strings. A set of flags (room
+  flags, affect bits, immunities ...) is one ``CodedFlag`` value, an
+  ``enum.Flag``, so ``RoomFlag.dark in room.flags`` and
+  ``room.flags & (RoomFlag.dark | RoomFlag.death)`` are single integer
+  operations; the JSONL's list of names is converted on the way in and out.
 - ``vnum`` is the object/mob/room number; ``source`` is ``file:line``.
 - Fixed-length int lists in the JSONL (dice, hit-location pairs, saving
   throws, the ``value[]`` slots of a saved item ...) become small named
@@ -287,8 +292,8 @@ class Exit(PRModel):
     to_raw: str
     description: Optional[str] = None
     keywords: Optional[str] = None
-    info: list[ExitFlag] = Field(default_factory=list)
-    start: list[ExitFlag] = Field(default_factory=list)   # default door state
+    info: ExitFlag = ExitFlag(0)
+    start: ExitFlag = ExitFlag(0)   # default door state
     key: Optional[int] = None
     reset: Optional[int] = None
 
@@ -303,7 +308,7 @@ class Room(PRModel):
     name: Optional[str] = None
     description: Optional[str] = None
     sector: Optional[str] = None
-    flags: list[RoomFlag] = Field(default_factory=list)
+    flags: RoomFlag = RoomFlag(0)
     river: Optional[RoomRiver] = None
     teleport: Optional[RoomTeleport] = None
     max_people: Optional[int] = None
@@ -352,16 +357,16 @@ class Mob(PRModel):
     charisma: Optional[int] = None
     luck: Optional[int] = None
     defense: Optional[Defense] = None                  # the file's head/body/arms/legs/feet lines
-    immune: list[Immunity] = Field(default_factory=list)
-    resistant: list[Immunity] = Field(default_factory=list)
-    susceptible: list[Immunity] = Field(default_factory=list)
+    immune: Immunity = Immunity(0)
+    resistant: Immunity = Immunity(0)
+    susceptible: Immunity = Immunity(0)
     rod: Optional[int] = None
     spell: Optional[int] = None
     breath: Optional[int] = None
     petrification: Optional[int] = None
     paralyzation: Optional[int] = None
-    affected: list[AffectBit] = Field(default_factory=list)
-    act: list[MobAction] = Field(default_factory=list)
+    affected: AffectBit = AffectBit(0)
+    act: MobAction = MobAction(0)
     caster: Optional[int] = None
     skills: list[str] = Field(default_factory=list)
     spells: list[str] = Field(default_factory=list)
@@ -506,7 +511,7 @@ class ContainerType(ItemType):
     """container and pouch: capacity, closed/locked flags, key vnum, decay timer."""
     kind: Literal["container", "pouch"]
     max_hold: Optional[int] = None
-    flags: list[ContainerFlag] = Field(default_factory=list)
+    flags: ContainerFlag = ContainerFlag(0)
     key: Optional[int] = None
     timer: Optional[int] = None
 
@@ -567,7 +572,7 @@ class TrapType(ItemType):
     (-2 teleport, -3 sleep); see TRAP_DAM_* in const.h.
     """
     kind: Literal["trap"] = "trap"
-    effect_type: list[TrapEffect] = Field(default_factory=list)
+    effect_type: TrapEffect = TrapEffect(0)
     damage_type: Optional[AttackType] = None
     level: Optional[int] = None
     charges: Optional[int] = None
@@ -576,7 +581,7 @@ class TrapType(ItemType):
 class BoardType(ItemType):
     """board: who may read, write and remove (board_bits)."""
     kind: Literal["board"] = "board"
-    flags: list[BoardFlag] = Field(default_factory=list)
+    flags: BoardFlag = BoardFlag(0)
 
 
 class SocketGemType(ItemType):
@@ -640,8 +645,8 @@ class ObjectPrototype(PRModel):
     rent: Optional[int] = None
     real_cost: Optional[int] = None
     qpvalue: Optional[int] = None
-    bits: list[ObjectFlag] = Field(default_factory=list)
-    wear: list[WearFlag] = Field(default_factory=list)
+    bits: ObjectFlag = ObjectFlag(0)
+    wear: WearFlag = WearFlag(0)
     material: Optional[Material] = None
     rarity: Optional[Rarity] = None
     tier: Optional[int] = None
@@ -726,12 +731,12 @@ class Race(PRModel):
     height: Optional[MinAvgMax] = None
     weight: Optional[MinAvgMax] = None
     adjust: Optional[StatAdjust] = None
-    intrinsic: list[Intrinsic] = Field(default_factory=list)
-    immune: list[Immunity] = Field(default_factory=list)
-    resistant: list[Immunity] = Field(default_factory=list)
-    susceptible: list[Immunity] = Field(default_factory=list)
+    intrinsic: Intrinsic = Intrinsic(0)
+    immune: Immunity = Immunity(0)
+    resistant: Immunity = Immunity(0)
+    susceptible: Immunity = Immunity(0)
     track: Optional[int] = None
-    form: list[Form] = Field(default_factory=list)
+    form: Form = Form(0)
     move: Optional[int] = None
     power_gain: Optional[int] = None
     refresh: Optional[int] = None
@@ -788,7 +793,7 @@ class Sector(PRModel):
     vnum: int
     source: str
     name: Optional[str] = None
-    flags: list[SectorFlag] = Field(default_factory=list)
+    flags: SectorFlag = SectorFlag(0)
     boat: Optional[MoveCost] = None
     fly: Optional[MoveCost] = None
     normal: Optional[MoveCost] = None
@@ -806,7 +811,7 @@ class Clan(PRModel):
     vnum: int
     source: str
     name: Optional[str] = None
-    flags: list[ClanFlag] = Field(default_factory=list)
+    flags: ClanFlag = ClanFlag(0)
     xp_mult: Optional[float] = None
     min_join_level: Optional[int] = None
     max_join_level: Optional[int] = None
@@ -1148,9 +1153,9 @@ class SavedObject(PRModel):
     action_description: Optional[str] = None
     contents: list[SavedObject] = Field(default_factory=list)
     values: Optional[ItemType] = None                  # the file's value[5], read per ``type``
-    wear_flags: list[WearFlag] = Field(default_factory=list)
-    extra_flags: list[ObjectFlag] = Field(default_factory=list)
-    affects: list[AffectBit] = Field(default_factory=list)   # granted while worn
+    wear_flags: WearFlag = WearFlag(0)
+    extra_flags: ObjectFlag = ObjectFlag(0)
+    affects: AffectBit = AffectBit(0)   # granted while worn
     xtra_bits: Optional[int] = None
     intrinsic_weight: Optional[int] = None
     intrinsic_volume: Optional[int] = None
@@ -1223,7 +1228,7 @@ class Affect(PRModel):
     duration: Optional[int] = None
     modifier: Optional[int] = None
     location: Optional[ApplyLocation] = None
-    bitvector: list[AffectBit] = Field(default_factory=list)
+    bitvector: AffectBit = AffectBit(0)
 
 
 class PulseAffect(PRModel):
@@ -1282,7 +1287,7 @@ class PulseAffect(PRModel):
     is_item_ability: Optional[bool] = None
     no_msg: Optional[bool] = None
     proc_modifier_cap: Optional[float] = None
-    bitvector: list[AffectBit] = Field(default_factory=list)
+    bitvector: AffectBit = AffectBit(0)
     finish_aoe_dam_as_target: Optional[int] = None
     initial_aoe_dam_as_target: Optional[int] = None
     pulse_aoe_dam_as_target: Optional[int] = None
@@ -1296,7 +1301,7 @@ class PulseCooldown(PRModel):
     type: Optional[int] = None
     type_name: Optional[str] = None
     cooldown_expire: Optional[int] = None
-    bitvector: list[AffectBit] = Field(default_factory=list)
+    bitvector: AffectBit = AffectBit(0)
 
 
 class ItemSetAbility(PRModel):
@@ -1390,13 +1395,13 @@ class Player(PRModel):
     alignment: Optional[int] = None
     base_alignment: Optional[int] = None
     position: Optional[Position] = None
-    act: list[PlayerFlag] = Field(default_factory=list)
-    config: list[ConfigFlag] = Field(default_factory=list)
-    log: list[LogFlag] = Field(default_factory=list)
-    affected_by: list[AffectBit] = Field(default_factory=list)
-    resist: list[Immunity] = Field(default_factory=list)
-    immune: list[Immunity] = Field(default_factory=list)
-    susceptible: list[Immunity] = Field(default_factory=list)
+    act: PlayerFlag = PlayerFlag(0)
+    config: ConfigFlag = ConfigFlag(0)
+    log: LogFlag = LogFlag(0)
+    affected_by: AffectBit = AffectBit(0)
+    resist: Immunity = Immunity(0)
+    immune: Immunity = Immunity(0)
+    susceptible: Immunity = Immunity(0)
     hit_bonus: Optional[int] = None
     dam_bonus: Optional[int] = None
     attacks_per_round: Optional[float] = None
@@ -1505,7 +1510,7 @@ class Account(PRModel):
     email_address: Optional[str] = None
     characters: list[str] = Field(default_factory=list)
     account: Optional[int] = None                      # balance
-    flags: list[AccountFlag] = Field(default_factory=list)
+    flags: AccountFlag = AccountFlag(0)
     term_type_id: Optional[int] = None
     last_site: Optional[str] = None
     last_site1: Optional[str] = None
