@@ -1,0 +1,65 @@
+#!/bin/bash
+#set -x
+DIR="/home/pr/live"
+LIB="$DIR/lib"
+LOGS="$DIR/logs"
+# additional ports
+ADD_PORTS="-a 5024"
+PORT=2150
+BOOT_FLAGS="-p 179"
+FLAGS="$BOOT_FLAGS"
+#MALLOC_CHECK_=1
+export MALLOC_CHECK_
+umask 002
+ulimit -c unlimited
+
+DYLD_LIBRARY_PATH="/home/pr/src"
+export DYLD_LIBRARY_PATH
+#DYLD_PRINT_LIBRARIES=1
+export DYLD_PRINT_LIBRARIES
+
+while true
+do
+  if [ -f $LIB/CLEAN_EXIT ]
+  then
+	echo "Exiting because of $LIB/CLEAN_EXIT" >> $LOGS/log
+	rm -f $LIB/CLEAN_EXIT
+	exit 1
+  fi
+  if [ -f $LIB/BOOT_CLEAN ]
+  then
+    echo "Booting clean" >> $LOGS/log
+    rm -rf $LIB/WorldSave
+    mkdir $LIB/WorldSave
+    mkdir $LIB/WorldSave/Misc
+    rm -f $LIB/BOOT_CLEAN
+    FLAGS="-c $BOOT_FLAGS"
+  fi
+
+ # rm -f $LOGS/ITEMS.old
+ # mv $LOGS/ITEMS $LOGS/ITEMS.old
+
+[ -f $LOGS/recent/log.5 ] && rm -f $LOGS/recent/log.5
+[ -f $LOGS/recent/log.4 ] && mv $LOGS/recent/log.4 $LOGS/recent/log.5
+[ -f $LOGS/recent/log.3 ] && mv $LOGS/recent/log.3 $LOGS/recent/log.4
+[ -f $LOGS/recent/log.2 ] && mv $LOGS/recent/log.2 $LOGS/recent/log.3
+[ -f $LOGS/recent/log.1 ] && mv $LOGS/recent/log.1 $LOGS/recent/log.2
+
+[ -f $LOGS/log ] && cp $LOGS/log $LOGS/recent/log.1
+[ -f $LOGS/log ] && mv $LOGS/log $LOGS/`date '+%y%m%d%H%M%S'`.log
+
+  (cd $LIB/stash; ./build; cp $LIB/stash/players.new $LIB)
+  (cd $LIB/account; ./build; cp $LIB/account/account.list $LIB)
+  (cd $LIB/LockerSave; ./build)   
+
+#  if test -f $DIR/prs.new
+#  then
+#    rm -f prs.old
+#    mv $DIR/prs $DIR/prs.old
+#    mv $DIR/prs.new $DIR/prs
+#  fi
+
+  $DIR/pr3 $FLAGS -d $LIB $ADD_PORTS $PORT > $LOGS/log 2>&1 < /dev/null
+#  $DIR/pr3 $FLAGS -d $LIB $ADD_PORTS $PORT > $LOGS/log
+  FLAGS=$BOOT_FLAGS
+done
