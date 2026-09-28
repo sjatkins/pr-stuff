@@ -11,7 +11,7 @@ You need: `git`, `make`, `gcc` or `clang`, `bison`, `flex`, `libcrypt-dev`,
 `screen`, and GitHub access to `cabarius/pr` and `cabarius/pr-world`.
 
 ```sh
-git clone https://github.com/cabarius/pr-stuff.git   # or wherever this repo lives
+git clone https://github.com/sjatkins/pr-stuff.git
 cd pr-stuff
 mkdir -p Backups
 cp /path/to/players_YYYY-MM-DD.tar.gz Backups/       # a player backup, if you have one

@@ -22,6 +22,7 @@ A new session can start from this file alone. Turn-by-turn records are in
 ├── explorations/  per-type org notes on the game data, session transcript
 ├── graphify-out/  graphify knowledge graph of src/ + world/
 ├── FUTURE.md    out-of-scope rearchitecture notes (property graph, Mongo)
+├── README.md    the collaborator recipe: clone, setup_pr_home.sh, PR_SERVER_SCRIPT
 ├── transcript.md
 └── SUMMARY.md   (this file)
 ```
