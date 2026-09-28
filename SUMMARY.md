@@ -1,6 +1,6 @@
 # Perilous Realms — Project State and Handoff
 
-**Last updated:** 2026-09-28 (built master here with production players; use-after-free fix merged; production host surveyed)
+**Last updated:** 2026-09-28 (built master here with production players; use-after-free fix merged; production ops scripts in git)
 **Goal:** revive Perilous Realms (`pr3`) and package it as an installable
 Docker image for its maintainer, preserving the existing player base.
 
@@ -625,9 +625,14 @@ Surveyed read-only. Nothing there was changed.
   1,995 files there. Player backups run daily until 2026-03-08, then
   nothing until 2026-09-20..23, consistent with being run by hand.
   Monthly full backups exist through at least 2025-01.
-- **None of `~pr/scripts/` is under version control** (restart script,
-  backup scripts, check-and-restart). Only copies are on that host. Worth
-  committing to the repo or an ops repo.
+- `~pr/scripts/` was not under version control. Now copied into
+  `pr-stuff/scripts/` (see below).
+- Production's `live/pr3` is a hand-made symlink into `src/`, and the
+  restart script launches `live/PR_SERVER_SCRIPT` in a screen session.
+  **`PR_SERVER_SCRIPT` is still only on the host**, not in the copy.
+- The host is a lineage of snapshots: the 09-24 rebuild copied the previous
+  install and rebuilt the source in place, so hand-set things (the symlink,
+  the scripts, the stray `alcanzar` file) carry forward.
 
 ### What live/lib holds beyond the player tar
 
@@ -637,3 +642,29 @@ and `RoomSave/` (room contents), board files, the auction file, and
 `PURGED/` (deleted characters/accounts, moved there by a shell `mv` the
 server never creates the directory for). `full_backup_*.tar.gz` covers all
 of it.
+
+### Ops scripts, now in git (`pr-stuff/scripts/`)
+
+Copied from `~pr/scripts/` on production. Commit 919ec43 is the verbatim
+copy; cf1423a makes them portable.
+
+| script | what it does |
+|---|---|
+| `restart_pr_server.sh` | stop the game (exact `pgrep -x pr3`), optional clean reboot (`-c` wipes save files), start `live/PR_SERVER_SCRIPT` under `screen`, wait for the port |
+| `cron/check_and_restart_pr_server.sh` | probe ports 5024 / 2150 for the banner, three tries 30 s apart, then run the restart script; lock file in `/tmp` |
+| `cron/backup_players.sh` | `tar czf Backups/players_<date>.tar.gz -C live/lib stash account`; exit 1 if under 1 MB |
+| `cron/backup_full.sh` | same for all of `live/lib` as `full_backup_<date>.tar.gz` |
+| `cron/cleanup_core.sh` | delete `core.*` older than 175 days |
+| `millie_compile.sh` | `git pull` in `world`, then `./compile` |
+| `cron/us_debt.sh`, `db/us_debt.txt` | unrelated to the game; left untouched |
+
+**`PR_HOME` convention** (cf1423a): every game script starts with
+`PR_HOME="${PR_HOME:-$(pwd)}"` and resolves `live/`, `scripts/`, `Backups/`
+and `world/` from it, instead of from `$HOME`. On production
+`PR_HOME=/home/pr` reproduces the old behaviour; here, run from `pr-stuff/`.
+
+Still hand-rolled and not captured: `live/PR_SERVER_SCRIPT` (the actual
+launch command), the `live/pr3` symlink, and whatever schedules the cron
+scripts (nothing, at the time of the survey). The scripts also write the
+tar into the current directory before moving it, silence all errors, and
+never prune `Backups/`.
