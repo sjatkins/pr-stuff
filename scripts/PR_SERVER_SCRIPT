@@ -3,6 +3,7 @@
 # PR_HOME is the directory that holds live/ and src/.
 # Defaults to the current directory, so run from that directory or export it.
 PR_HOME="${PR_HOME:-$(pwd)}"
+. "$(dirname "$(readlink -f "$0")")/pr_functions.sh"
 DIR="$PR_HOME/live"
 LIB="$DIR/lib"
 LOGS="$DIR/logs"
@@ -51,9 +52,7 @@ do
 [ -f $LOGS/log ] && cp $LOGS/log $LOGS/recent/log.1
 [ -f $LOGS/log ] && mv $LOGS/log $LOGS/`date '+%y%m%d%H%M%S'`.log
 
-  (cd $LIB/stash; ./build; cp $LIB/stash/players.new $LIB)
-  (cd $LIB/account; ./build; cp $LIB/account/account.list $LIB)
-  (cd $LIB/LockerSave; ./build)   
+  rebuild_indexes "$LIB"
 
 #  if test -f $DIR/prs.new
 #  then

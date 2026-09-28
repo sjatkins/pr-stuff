@@ -1,0 +1,18 @@
+#!/usr/bin/perl
+
+$count=0;
+$last=0;
+
+# Reads IMMORTALS from the game data directory: PR_LIB, else PR_HOME/live/lib,
+# else ./live/lib.
+my $lib = $ENV{PR_LIB} // (($ENV{PR_HOME} // ".") . "/live/lib");
+open(IMMORT,"sort -k 3 < $lib/IMMORTALS |") || die("Can't open $lib/IMMORTALS");
+while (<IMMORT>) {
+  if (/(\w+)\s+\d+\s+(\w+)/) {
+    if ($2!=$last) {
+	printf "#define %-20s %6d\n",$1,$2;
+	$last=$2;
+    }
+  }
+}
+close(IMMORT);

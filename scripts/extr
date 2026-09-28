@@ -1,4 +1,12 @@
 #!/bin/sh
+# PR_HOME is the directory that holds live/ and Backups/; defaults to the
+# current directory. Works inside the data directory (stash/, PURGED/).
+PR_HOME="${PR_HOME:-$(pwd)}"
+PR_LIB="${PR_LIB:-$PR_HOME/live/lib}"
+cd "$PR_LIB" || exit 1
+
+# Default backup: the newest players_*.tar.gz in Backups/ (see -f).
+FILE=$(ls -t "$PR_HOME"/Backups/players_*.tar.gz 2>/dev/null | head -n 1)
 # be sure to change this next line to point to where the backup file is
 # and the backup should be created with the following commands:
 # cd PR/lib
@@ -6,7 +14,6 @@
 # gzip Players.tar
 # mv Players.tar.gz $HOME/backup
 
-FILE=/usr/PR/lib/Players.tar.gz
 
 if [ $# -gt 1 -a "$1" = "-f" ]
 then
