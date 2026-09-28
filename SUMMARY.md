@@ -661,7 +661,12 @@ and 4b29ced are the rewrites.
 `PR_HOME="${PR_HOME:-$(pwd)}"` and resolves `src/`, `world/`, `live/`,
 `scripts/` and `Backups/` from it; `PR_LIB` (default `$PR_HOME/live/lib`)
 is the data directory. On production `PR_HOME=/home/pr` reproduces the old
-`$HOME`-relative behaviour; here, run from `pr-stuff/`.
+`$HOME`-relative behaviour; here, run from `pr-stuff/`. Every script
+exports it, so a chain like cron -> `check_and_restart` ->
+`restart_pr_server.sh` -> `screen` -> `PR_SERVER_SCRIPT` -> `setup_pr_home.sh`
+keeps the first value instead of each child recomputing it from its own
+working directory (under cron that would be `$HOME`). Reviewed all scripts
+2026-09-28 for stale paths after the moves into `scripts/`.
 
 | script | what it does |
 |---|---|

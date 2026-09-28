@@ -2,7 +2,7 @@
 #set -x
 # PR_HOME is the directory that holds live/ and src/.
 # Defaults to the current directory, so run from that directory or export it.
-PR_HOME="${PR_HOME:-$(pwd)}"
+PR_HOME="${PR_HOME:-$(pwd)}"; export PR_HOME
 . "$(dirname "$(readlink -f "$0")")/pr_functions.sh"
 DIR="$PR_HOME/live"
 LIB="$DIR/lib"

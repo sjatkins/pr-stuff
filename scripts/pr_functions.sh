@@ -5,7 +5,7 @@
 #
 # PR_HOME is the directory that holds live/, scripts/ and Backups/ and
 # defaults to the current directory. PR_LIB is the game's data directory.
-PR_HOME="${PR_HOME:-$(pwd)}"
+PR_HOME="${PR_HOME:-$(pwd)}"; export PR_HOME
 PR_LIB="${PR_LIB:-$PR_HOME/live/lib}"
 
 # rebuild_index <dir> <index-file>

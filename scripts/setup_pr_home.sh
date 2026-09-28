@@ -20,7 +20,7 @@
 #   6. Restore the newest Backups/players_*.tar.gz if live has no players.
 #   7. Rebuild the player, account and locker indexes.
 set -e
-PR_HOME="${PR_HOME:-$(pwd)}"
+PR_HOME="${PR_HOME:-$(pwd)}"; export PR_HOME
 . "$(dirname "$(readlink -f "$0")")/pr_functions.sh"
 
 GITHUB_USER="$1"
