@@ -1,0 +1,13 @@
+#!/bin/sh
+
+PRS=$(pgrep -f prs)
+PR3=$(pgrep -f pr3)
+SS=$(pgrep -f PR_SERVER_SCRIPT)
+kill -9 $SS
+kill -9 $PRS
+kill -9 $PR3
+killall SCREEN
+screen -wipe
+sleep 3
+cd /Users/pr/live
+screen -d -m /Users/pr/live/PR_SERVER_SCRIPT

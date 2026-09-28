@@ -1,0 +1,7 @@
+#!/bin/bash
+
+BACKUP_NAME=full_backup_`date +%F`.tar.gz
+
+tar --exclude="core.*" --exclude="logs" -cvzf $BACKUP_NAME -C /home/pr/live/lib .
+mv $BACKUP_NAME /home/pr/PlayerBackups
+

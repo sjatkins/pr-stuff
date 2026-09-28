@@ -1,0 +1,4 @@
+#!/bin/bash
+
+find /home/pr/live/lib/ -iname "core.*" -mtime +175 -size +1000k -exec rm {} +
+
