@@ -645,26 +645,42 @@ of it.
 
 ### Ops scripts, now in git (`pr-stuff/scripts/`)
 
-Copied from `~pr/scripts/` on production. Commit 919ec43 is the verbatim
-copy; cf1423a makes them portable.
+Copied from production, then made portable. Commits 919ec43, 2a80561 and
+3913d6e are the verbatim copies (`~pr/scripts/`, `live/PR_SERVER_SCRIPT`,
+and the scripts that lived *inside* `live/lib`); cf1423a, 0b2f743, 0e16692
+and 4b29ced are the rewrites.
+
+**`PR_HOME` convention.** Every script starts with
+`PR_HOME="${PR_HOME:-$(pwd)}"` and resolves `src/`, `world/`, `live/`,
+`scripts/` and `Backups/` from it; `PR_LIB` (default `$PR_HOME/live/lib`)
+is the data directory. On production `PR_HOME=/home/pr` reproduces the old
+`$HOME`-relative behaviour; here, run from `pr-stuff/`.
 
 | script | what it does |
 |---|---|
-| `restart_pr_server.sh` | stop the game (exact `pgrep -x pr3`), optional clean reboot (`-c` wipes save files), start `live/PR_SERVER_SCRIPT` under `screen`, wait for the port |
-| `cron/check_and_restart_pr_server.sh` | probe ports 5024 / 2150 for the banner, three tries 30 s apart, then run the restart script; lock file in `/tmp` |
-| `cron/backup_players.sh` | `tar czf Backups/players_<date>.tar.gz -C live/lib stash account`; exit 1 if under 1 MB |
-| `cron/backup_full.sh` | same for all of `live/lib` as `full_backup_<date>.tar.gz` |
+| `setup_pr_home.sh [github-user]` | one command from empty directory to running-ready, no-op afterwards: clone `src`/`world` if absent (`https://USER@github.com` form only when a user is given), create the live tree, `ln -sfn ../src/pr3 live/pr3`, build if `src/pr3` absent, `world/compile` if `world.out` absent, rebuild indexes. Never pulls. |
+| `PR_SERVER_SCRIPT` | the launch loop the restart script runs under `screen`: calls `setup_pr_home.sh`, rotates `live/logs`, rebuilds indexes, runs `pr3 -p 179 -d live/lib -a 5024 2150`, relaunches on exit; `CLEAN_EXIT` / `BOOT_CLEAN` marker files |
+| `pr_functions.sh` | sourced library: `rebuild_index`, `rebuild_locker_index`, `rebuild_indexes` (players.new, account.list, lockers.save from the directory listings) and `list_all_players`. Replaces `stash/build`, `account/build`, `LockerSave/build`, `stash/list_all_players.sh`, which were hand-written into the data directory in 2016/2023 and travel in every player tar |
+| `restart_pr_server.sh` | stop the game (exact `pgrep -x pr3`), optional clean reboot (`-c`), start `PR_SERVER_SCRIPT` under `screen`, wait for the port |
+| `cron/check_and_restart_pr_server.sh` | probe ports 5024 / 2150 for the banner, three tries 30 s apart, then run the restart script |
+| `cron/backup_players.sh`, `cron/backup_full.sh` | `Backups/players_<date>.tar.gz` of `stash`+`account`; `full_backup_<date>.tar.gz` of all of `lib` |
 | `cron/cleanup_core.sh` | delete `core.*` older than 175 days |
 | `millie_compile.sh` | `git pull` in `world`, then `./compile` |
-| `cron/us_debt.sh`, `db/us_debt.txt` | unrelated to the game; left untouched |
+| `unpurge`, `extr` | 2006 single-player restore from a tar (default: newest `Backups/players_*.tar.gz`); interactive |
+| `gen_defines` | 2006 perl: `#define`s from the `IMMORTALS` file; unused |
+| `deprecated/`, `cron/us_debt.sh`, `db/` | old versions, a 2011 Ruby launcher, and an unrelated debt tracker; untouched |
 
-**`PR_HOME` convention** (cf1423a): every game script starts with
-`PR_HOME="${PR_HOME:-$(pwd)}"` and resolves `live/`, `scripts/`, `Backups/`
-and `world/` from it, instead of from `$HOME`. On production
-`PR_HOME=/home/pr` reproduces the old behaviour; here, run from `pr-stuff/`.
+**Index files are derived.** `players.new` and `account.list` are just
+`ls` of the letter directories; the server only appends to them. After any
+restore, `rebuild_indexes` (or a start via `PR_SERVER_SCRIPT`) regenerates
+them. Verified: the function reproduces the 2026-09-23 tar's indexes
+exactly. This is also why the misfiled `alcanzar` is in `account.list`.
 
-Still hand-rolled and not captured: `live/PR_SERVER_SCRIPT` (the actual
-launch command), the `live/pr3` symlink, and whatever schedules the cron
-scripts (nothing, at the time of the survey). The scripts also write the
-tar into the current directory before moving it, silence all errors, and
-never prune `Backups/`.
+**Not yet exercised:** `setup_pr_home.sh` has been syntax-checked only.
+Its clone path is untested (both checkouts exist here), and its build step
+would fail here at `Zone` (gcc C23 / `bool`, see above) until the Zone
+makefile pins a C standard. Production already has `src/pr3`, so the step
+is skipped there.
+
+**Still nothing schedules any of it** on production: no cron, no timer, no
+unit. The auto-restart is the `while true` loop in `PR_SERVER_SCRIPT`.
