@@ -1,0 +1,54 @@
+#!/bin/sh
+# be sure to change this next line to point to where the backup file is
+# and the backup should be created with the following commands:
+# cd PR/lib
+# tar -cf Players.tar stash
+# gzip Players.tar
+# mv Players.tar.gz $HOME/backup
+
+FILE=/usr/PR/lib/Players.tar.gz
+
+if [ $# -gt 1 -a "$1" = "-f" ]
+then
+  FILE=$2
+  echo "Using $FILE as backup."
+  shift 2
+fi
+
+if [ $# -eq 0 ]
+then
+  echo "Usage: "`basename $0`" [-f backupfile] player1 [player2 [player3 [...]]]"
+  exit 1
+fi
+
+
+ARGS=""
+for i in $*
+do
+  FILENAME="stash/`echo $i | cut -c-1`/$i"
+  if [ -f $FILENAME ]
+  then
+    echo "$FILENAME exists"
+    /bin/echo -n "Overwrite? "
+    read a
+    if [ "$a" = "y" ]
+    then
+      ARGS="$ARGS $FILENAME"
+    fi
+  else
+    ARGS="$ARGS $FILENAME"
+  fi
+done
+
+echo "About to extract:"
+echo $ARGS
+/bin/echo -n "Press enter to begin or q to abort: "
+read a
+if [ "$a" = "q" ]
+then
+  echo "Restore aborted."
+  exit 1
+fi
+
+echo "tar -xvzf $FILE $ARGS"
+tar -xvzf $FILE $ARGS

@@ -1,0 +1,77 @@
+#!/bin/sh
+
+FILE=/usr/PR/lib/Players.tar.gz
+
+if [ $# -gt 1 -a "$1" = "-f" ]
+then
+  FILE=$2
+  echo "Using $FILE as backup."
+  shift 2
+fi
+
+if [ $# -eq 0 ]
+then
+  echo "Usage: "`basename $0`" [-f backupfile] player1 [player2 [player3 [...]]]"
+  exit 1
+fi
+
+
+ARGS=""
+for i in $*
+do
+  FILENAME2="PURGED/$i"
+  if [ -f $FILENAME2 ]
+  then
+    /bin/echo -n "$FILENAME2 exists.  Restore from $FILE? "
+    read a
+    if [ "$a" = "y" ]
+    then
+      ARGS="$ARGS $FILENAME2"
+    fi
+  else
+    ARGS="$ARGS $FILENAME2"
+  fi
+done
+
+if [ ! -z "$ARGS" ]
+then
+  echo "About to extract:"
+  echo $ARGS
+  /bin/echo -n "Press enter to begin or q to abort: "
+  read a
+  if [ "$a" = "q" ]
+  then
+    echo "Restore aborted."
+    exit 1
+  fi
+  echo "tar -xvzf $FILE $ARGS"
+  tar -xvzf $FILE $ARGS
+fi
+
+for i in $*
+do
+  FILENAME1="stash/`echo $i | cut -c-1`/$i"
+  FILENAME2="PURGED/$i"
+  if [ -f $FILENAME1 ]
+  then
+    /bin/echo -n "$FILENAME1 exists.  Overwrite? "
+    read a
+    if [ "$a" = "y" ]
+    then
+      if [ -f $FILENAME2 ]
+      then
+	mv $FILENAME2 $FILENAME1
+      else
+        echo "Oops... $FILENAME2 does not exist... oh well."
+      fi
+    fi
+  else
+    if [ -f $FILENAME2 ]
+    then
+      mv $FILENAME2 $FILENAME1
+    else
+      echo "$FILENAME2 does not exist."
+    fi
+  fi
+done
+
