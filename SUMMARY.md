@@ -27,7 +27,12 @@ A new session can start from this file alone. Turn-by-turn records are in
 └── SUMMARY.md   (this file)
 ```
 
-`pr-stuff/` is itself a git repo (`origin/main`). `src/`, `world/`, `live/`
+`pr-stuff/` is itself a git repo, `sjatkins/pr-stuff` on GitHub
+(`origin/main`). **Intended to move to `cabarius/pr-stuff`** once the owner
+creates an empty repo there: `git remote set-url origin
+https://sjatkins@github.com/cabarius/pr-stuff.git && git push -u origin
+main`, then fix the clone URL in README.md. Sam lacks permission to create
+it (2026-09-28). `src/`, `world/`, `live/`
 and the `players_*.tar` backups are ignored; the JSONL output is committed
 so it need not be re-extracted.
 
