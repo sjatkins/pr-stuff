@@ -13,7 +13,8 @@
 #      form, which lets git pick that user's stored credential; otherwise
 #      plain https://github.com. Existing checkouts are never pulled.
 #   2. Create the live tree the server expects but does not create.
-#   3. Point live/pr3 at src/pr3.
+#   3. Point live/pr3 at src/pr3; link millie_compile.sh and
+#      restart_pr_server.sh into PR_HOME.
 #   4. Build pr3, tran and Zone/syntax if src/pr3 is absent.
 #   5. Compile the world into live/lib if world.out is absent.
 #   6. Restore the newest Backups/players_*.tar.gz if live has no players.
@@ -52,8 +53,11 @@ done
 mkdir -p "$LIB/RoomSave" "$LIB/WorldSave/Misc" "$LIB/stash" "$LIB/account" \
          "$LIB/LockerSave" "$LIB/PURGED" "$DIR/logs/recent" "$PR_HOME/Backups"
 
-# 3. The binary the server script runs.
+# 3. The binary the server script runs, and the two scripts run by hand
+#    from PR_HOME (as on production, where they were symlinked from ~pr).
 ln -sfn ../src/pr3 "$DIR/pr3"
+ln -sfn scripts/millie_compile.sh    "$PR_HOME/millie_compile.sh"
+ln -sfn scripts/restart_pr_server.sh "$PR_HOME/restart_pr_server.sh"
 
 # 4. Build if there is no binary. serverversion must come first: it is
 #    the only target that produces O/version.o, which pr3 links.
