@@ -1,0 +1,37 @@
+# Caddyfile for perilousrealms.com — exploration, not deployed.
+#
+# Assumes, on the same host (or same docker network, see README.md):
+#   - the game       pr3, listening on a dedicated web port, localhost:2151
+#   - the tty proxy  websocket <-> tcp relay to the game, localhost:7681
+#   - FastAPI        uvicorn, localhost:8000   (/api/*, room images, later pages)
+#   - React build    static files in /srv/pr/web
+#
+# Caddy gets and renews the Let's Encrypt certificate itself and redirects
+# http:// to https://. Nothing else needs a cert.
+
+perilousrealms.com, www.perilousrealms.com {
+	encode gzip
+
+	# Game text: browser websocket -> tty proxy -> pr3 :2151.
+	# Caddy proxies websocket upgrades transparently; no special flags needed.
+	handle /ws {
+		reverse_proxy localhost:7681
+	}
+
+	# Everything non-game: room pictures, landing content, future pages.
+	handle /api/* {
+		reverse_proxy localhost:8000
+	}
+
+	# React single-page app: serve the build, fall back to index.html so
+	# client-side routes (/play, /about, ...) work on reload.
+	handle {
+		root * /srv/pr/web
+		try_files {path} /index.html
+		file_server
+	}
+
+	log {
+		output file /var/log/caddy/perilousrealms.log
+	}
+}
