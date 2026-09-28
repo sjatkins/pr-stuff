@@ -661,10 +661,12 @@ and 4b29ced are the rewrites.
 `PR_HOME="${PR_HOME:-$(pwd)}"` and resolves `src/`, `world/`, `live/`,
 `scripts/` and `Backups/` from it; `PR_LIB` (default `$PR_HOME/live/lib`)
 is the data directory. On production `PR_HOME=/home/pr` reproduces the old
-`$HOME`-relative behaviour; here, run from `pr-stuff/`. Set it once at
-the top of any chain (`PR_HOME=/home/pr scripts/...`, or in the crontab
-line); children inherit both the variable and the working directory, so
-no script needs to export it or change directory. Reviewed all scripts
+`$HOME`-relative behaviour. **Recommended practice (README):** export it
+once in the shell profile to the checkout directory, so every script
+works from anywhere including cron. Running from the checkout with it
+unset also works; only someone with several checkouts sets it per
+command. Children inherit both the variable and the working directory,
+so no script exports it or changes directory. Reviewed all scripts
 2026-09-28 for stale paths after the moves into `scripts/`.
 
 | script | what it does |
