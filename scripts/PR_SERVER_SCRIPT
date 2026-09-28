@@ -22,6 +22,9 @@ export DYLD_LIBRARY_PATH
 #DYLD_PRINT_LIBRARIES=1
 export DYLD_PRINT_LIBRARIES
 
+# Create anything missing from the live tree (no-op once set up).
+"$(dirname "$(readlink -f "$0")")/setup_pr_home.sh" || exit 1
+
 while true
 do
   if [ -f $LIB/CLEAN_EXIT ]
