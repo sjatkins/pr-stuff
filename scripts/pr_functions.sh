@@ -27,7 +27,7 @@ rebuild_index() {
 #   Empty when there are no lockers. (Was LockerSave/build.)
 rebuild_locker_index() {
   local lib=${1:-$PR_LIB}
-  ( cd "$lib/LockerSave" 2>/dev/null && ls *.room 2>/dev/null ) > "$lib/lockers.save"
+  ( cd "$lib/LockerSave" 2>/dev/null && ls *.room 2>/dev/null ) > "$lib/lockers.save" || true
 }
 
 # rebuild_indexes [lib]
