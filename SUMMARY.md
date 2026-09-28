@@ -692,8 +692,8 @@ Production already has `src/pr3`, so the build step is skipped there.
 
 **Collaborator recipe:** clone `pr-stuff`, drop a `players_*.tar.gz` into
 `Backups/` (gitignored), run `scripts/setup_pr_home.sh <github-user>`,
-then `scripts/PR_SERVER_SCRIPT`. The 09-23 tar on this machine still sits
-at `pr-stuff/players_2026-09-23.tar`, not in `Backups/`.
+then `scripts/PR_SERVER_SCRIPT`. On this machine the 09-23 backup is at
+`Backups/players_2026-09-23.tar.gz`.
 
 **Still nothing schedules any of it** on production: no cron, no timer, no
 unit. The auto-restart is the `while true` loop in `PR_SERVER_SCRIPT`.
