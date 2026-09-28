@@ -38,7 +38,10 @@ Lists whose positions carry meaning are named models, not `list[int]`:
 hit location in `Defense`, on both `Mob` and `Player`; `OpenHours`;
 `MinAvgMax`; `SavingThrows` in `SAVING_*` order; `Conditions(drunk, hunger,
 thirst)`; `Resistances` in `*_DAMAGE` order; `Stats` for the class stat
-tables.
+tables. A player's `hit` is `HitPoints(current, rolled)`, since the C's
+`max_hit` is the sum of level-up rolls rather than the maximum, and `mana`,
+`power` and `move` are `Pool(current, bonus)`, since their stored `max_*` is
+the apply bonus the limit functions add to a level-and-class formula.
 
 An object's kind is a class hierarchy: `ItemType` is the base, with one
 subclass per kind or per group of kinds sharing a layout (`WeaponType`,

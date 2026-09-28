@@ -144,6 +144,37 @@ class SavingThrows(Positional):
     spell: int
 
 
+class HitPoints(PRModel):
+    """A character's hit points.
+
+    ``rolled`` is what the C stores as ``max_hit``: the sum of the class hit
+    dice rolled at each level gained (limits.c advance_level), plus any HIT
+    applies from gear worn when the file was saved. It is not the maximum;
+    the effective maximum is ``hit_limit()``, which adds an age term and
+    clamps to the class cap. The player file omits zero values, so a missing
+    ``max_hit`` is 0.
+    """
+
+    current: int
+    rolled: int = 0
+
+
+class Pool(PRModel):
+    """Mana, power or movement.
+
+    ``bonus`` is what the C stores as ``max_mana`` / ``max_power`` /
+    ``max_move``, and it is not a maximum. The game computes the maximum
+    from level, class and race (limits.c mana_limit, power_limit,
+    move_limit) and adds this on top; the only things that write it are the
+    MANA / POWER / MOVE applies of gear and lasting spells (handler.c
+    affect_modify), plus one creation-time roll for movement. The player file
+    omits zero values, so a missing ``max_*`` is 0.
+    """
+
+    current: int
+    bonus: int = 0
+
+
 class Conditions(Positional):
     """``conditions[3]`` of a character: hours of drunkenness, hunger and thirst
     left (DRUNK, HUNGER, THIRST in const.h)."""
@@ -1344,14 +1375,10 @@ class Player(PRModel):
     prompt: Optional[str] = None
     base_stats: Stats = Field(default_factory=Stats)
     stats: Stats = Field(default_factory=Stats)
-    hit: Optional[int] = None
-    max_hit: Optional[int] = None
-    mana: Optional[int] = None
-    max_mana: Optional[int] = None
-    move: Optional[int] = None
-    max_move: Optional[int] = None
-    power: Optional[int] = None
-    max_power: Optional[int] = None
+    hit: Optional[HitPoints] = None                    # the file's hit / max_hit
+    mana: Optional[Pool] = None                        # mana / max_mana
+    move: Optional[Pool] = None                        # move / max_move
+    power: Optional[Pool] = None                       # power / max_power
     rage: Optional[int] = None
     energy: Optional[int] = None
     hit_shield: Optional[int] = None
@@ -1438,6 +1465,15 @@ class Player(PRModel):
         data = dict(data)
         if isinstance(data.get("equipment"), dict):
             data["equipment"] = {k: (v if isinstance(v, list) else [v]) for k, v in data["equipment"].items()}
+        # hit/max_hit -> HitPoints; mana/max_mana etc. -> Pool
+        for name, extra in (("hit", "rolled"), ("mana", "bonus"), ("move", "bonus"), ("power", "bonus")):
+            max_key = f"max_{name}"
+            if max_key not in data:
+                continue
+            current, stored_max = data.get(name), data.pop(max_key)
+            if isinstance(current, dict) or current is None:
+                continue
+            data[name] = {"current": current, **({extra: stored_max} if stored_max is not None else {})}
         for armor_key, stopping_key, target in (("armor", "stopping", "defense"),
                                                 ("base_armor", "base_stopping", "base_defense")):
             if armor_key not in data and stopping_key not in data:
