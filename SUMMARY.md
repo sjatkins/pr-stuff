@@ -676,11 +676,19 @@ restore, `rebuild_indexes` (or a start via `PR_SERVER_SCRIPT`) regenerates
 them. Verified: the function reproduces the 2026-09-23 tar's indexes
 exactly. This is also why the misfiled `alcanzar` is in `account.list`.
 
-**Not yet exercised:** `setup_pr_home.sh` has been syntax-checked only.
-Its clone path is untested (both checkouts exist here), and its build step
-would fail here at `Zone` (gcc C23 / `bool`, see above) until the Zone
-makefile pins a C standard. Production already has `src/pr3`, so the step
-is skipped there.
+**`setup_pr_home.sh` tested on an already set up `PR_HOME`** (here,
+2026-09-28, game running): it skipped the clones, the build and the world
+compile with a message each, created only `Backups/`, `live/lib/PURGED/`,
+an empty `lockers.save` and the `live/pr3` symlink, and rewrote
+`players.new` and `account.list` byte-identical (diffed against copies
+taken first). It exposed one bug: with no lockers, `ls *.room` returns 2
+and `set -e` made the script exit 2 after writing every index. Fixed in
+`pr_functions.sh` (72752c1); rerun exits 0.
+
+**Not yet exercised:** the fresh-directory path, clone and build. The
+build step would fail here at `Zone` (gcc C23 / `bool`, see above) until
+the Zone makefile pins a C standard. Production already has `src/pr3`, so
+the step is skipped there.
 
 **Still nothing schedules any of it** on production: no cron, no timer, no
 unit. The auto-restart is the `while true` loop in `PR_SERVER_SCRIPT`.
