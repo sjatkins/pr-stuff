@@ -1,7 +1,11 @@
 #!/bin/bash
 
+# PR_HOME is the directory that holds live/, scripts/ and Backups/.
+# Defaults to the current directory, so run from that directory or export it.
+PR_HOME="${PR_HOME:-$(pwd)}"
+
 # Path to your restart script
-RESTART_SCRIPT="$HOME/scripts/restart_pr_server.sh"
+RESTART_SCRIPT="$PR_HOME/scripts/restart_pr_server.sh"
 
 # Path to the lock file
 LOCK_FILE="/tmp/check_and_restart_pr_server.lock"

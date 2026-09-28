@@ -1,8 +1,12 @@
 #!/bin/bash
 
+# PR_HOME is the directory that holds live/, scripts/ and Backups/.
+# Defaults to the current directory, so run from that directory or export it.
+PR_HOME="${PR_HOME:-$(pwd)}"
+
 BACKUP_NAME="players_$(date +%F).tar.gz"
-BACKUP_DIR="$HOME/Backups"
-SOURCE_DIR="$HOME/live/lib"
+BACKUP_DIR="$PR_HOME/Backups"
+SOURCE_DIR="$PR_HOME/live/lib"
 
 # Suppress output for tar and mv commands
 tar czf "$BACKUP_NAME" -C "$SOURCE_DIR" stash account >/dev/null 2>&1
