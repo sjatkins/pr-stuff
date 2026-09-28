@@ -709,3 +709,24 @@ then `scripts/PR_SERVER_SCRIPT`. On this machine the 09-23 backup is at
 
 **Still nothing schedules any of it** on production: no cron, no timer, no
 unit. The auto-restart is the `while true` loop in `PR_SERVER_SCRIPT`.
+
+## 14. Web access (https on 80/443) — design notes, nothing built (2026-09-28)
+
+Goal: `https://<game-domain>` shows a browser terminal that behaves like the
+telnet session, alongside the existing telnet ports 2150/5024.
+
+How networking works now (`src/comm.c`): `setup_ports` opens one plain TCP
+listener per port via `init_socket` (binds to `gethostbyname(hostname)`, not
+0.0.0.0); `game_loop` is a `select` loop; `new_id` accepts; per-connection
+telnet option negotiation (IAC, LINEMODE, MXP offer) in `process_input`;
+`write_to_conn` renders `#` colour tags for the connection's terminal type
+(ansi etc.) and `write_to_fd` writes raw bytes. Nothing speaks TLS, HTTP or
+WebSocket, so `-a 443` alone would give browsers garbage (and needs root).
+
+Recommended: keep the game as is; terminate TLS in a reverse proxy (Caddy or
+nginx, auto Let's Encrypt) on 80/443, proxying to a websocket-to-telnet
+bridge on localhost (ttyd running `telnet localhost 2150` serves its own
+xterm.js page and handles IAC; websockify + xterm.js is the alternative).
+Zero C changes. Later option: add a WebSocket listener type inside comm.c
+(HTTP upgrade + framing, ~300-500 lines, per-connection flag, skip telnet
+negotiation) with TLS still terminated in the proxy. Decision pending.
