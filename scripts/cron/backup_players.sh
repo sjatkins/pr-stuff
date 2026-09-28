@@ -2,7 +2,7 @@
 
 # PR_HOME is the directory that holds live/, scripts/ and Backups/.
 # Defaults to the current directory, so run from that directory or export it.
-PR_HOME="${PR_HOME:-$(pwd)}"; export PR_HOME
+PR_HOME="${PR_HOME:-$(pwd)}"
 
 BACKUP_NAME="players_$(date +%F).tar.gz"
 BACKUP_DIR="$PR_HOME/Backups"

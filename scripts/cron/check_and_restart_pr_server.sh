@@ -2,7 +2,7 @@
 
 # PR_HOME is the directory that holds live/, scripts/ and Backups/.
 # Defaults to the current directory, so run from that directory or export it.
-PR_HOME="${PR_HOME:-$(pwd)}"; export PR_HOME
+PR_HOME="${PR_HOME:-$(pwd)}"
 
 # Path to your restart script
 RESTART_SCRIPT="$PR_HOME/scripts/restart_pr_server.sh"

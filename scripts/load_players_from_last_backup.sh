@@ -10,7 +10,7 @@
 # empty stash/: it refuses if live already has players, and refuses while
 # pr3 is running.
 set -e
-PR_HOME="${PR_HOME:-$(pwd)}"; export PR_HOME
+PR_HOME="${PR_HOME:-$(pwd)}"
 . "$(dirname "$(readlink -f "$0")")/pr_functions.sh"
 
 file="$1"
