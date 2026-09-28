@@ -48,6 +48,6 @@ directory, so run them from here or `export PR_HOME=/path/to/pr-stuff`.
 
 ## Other scripts
 
-- `scripts/load_players_from_last_backup.sh [-y] [file]` restores players from a backup.
+- `scripts/load_players_from_last_backup.sh [file]` restores players from a backup into an empty `live/`.
 - `scripts/cron/backup_players.sh` and `backup_full.sh` make backups into `Backups/`.
 - `scripts/restart_pr_server.sh` stops and restarts the game under `screen`.
