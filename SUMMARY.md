@@ -739,5 +739,8 @@ Chosen shape (Sam, 2026-09-28):
 - Pictures: tiers — per sector (~30), per zone (155), per room where wanted.
   World has 26,284 rooms (10,001 sector "Prototype"), 5,450 distinct names.
 
+Sketch of the pieces and a Caddyfile: `explorations/http-server/`.
+Production (checked as `pr`) has nothing on 80/443 and no active Caddy.
+
 Rejected: TLS or WebSocket framing inside the C code; ttyd/websockify bridge
 (no side channel for room id, though fine for a first plain-terminal demo).
