@@ -710,23 +710,34 @@ then `scripts/PR_SERVER_SCRIPT`. On this machine the 09-23 backup is at
 **Still nothing schedules any of it** on production: no cron, no timer, no
 unit. The auto-restart is the `while true` loop in `PR_SERVER_SCRIPT`.
 
-## 14. Web access (https on 80/443) — design notes, nothing built (2026-09-28)
+## 14. Web access (https on 80/443) — direction chosen, nothing built (2026-09-28)
 
-Goal: `https://<game-domain>` shows a browser terminal that behaves like the
-telnet session, alongside the existing telnet ports 2150/5024.
+Goal: `https://<game-domain>` with a landing page and a game page showing an
+optional generated picture of the player's current room above a terminal
+widget that talks to the game.
 
 How networking works now (`src/comm.c`): `setup_ports` opens one plain TCP
 listener per port via `init_socket` (binds to `gethostbyname(hostname)`, not
-0.0.0.0); `game_loop` is a `select` loop; `new_id` accepts; per-connection
-telnet option negotiation (IAC, LINEMODE, MXP offer) in `process_input`;
-`write_to_conn` renders `#` colour tags for the connection's terminal type
-(ansi etc.) and `write_to_fd` writes raw bytes. Nothing speaks TLS, HTTP or
-WebSocket, so `-a 443` alone would give browsers garbage (and needs root).
+0.0.0.0); `game_loop` is a `select` loop; `new_id` accepts and knows the
+listening port; per-connection telnet negotiation (IAC DO LINEMODE at
+connect, MXP offer if the client sends IAC) in `process_input`/`hello_new_conn`;
+`write_to_conn` renders `#` colour tags per terminal type; `write_to_fd`
+writes raw bytes. Nothing speaks TLS, HTTP or WebSocket.
 
-Recommended: keep the game as is; terminate TLS in a reverse proxy (Caddy or
-nginx, auto Let's Encrypt) on 80/443, proxying to a websocket-to-telnet
-bridge on localhost (ttyd running `telnet localhost 2150` serves its own
-xterm.js page and handles IAC; websockify + xterm.js is the alternative).
-Zero C changes. Later option: add a WebSocket listener type inside comm.c
-(HTTP upgrade + framing, ~300-500 lines, per-connection flag, skip telnet
-negotiation) with TLS still terminated in the proxy. Decision pending.
+Chosen shape (Sam, 2026-09-28):
+- Caddy on 80/443 (TLS, Let's Encrypt): `/` → static React build (landing +
+  game page with picture widget and xterm.js terminal widget); `/api/*` and
+  `/ws` → FastAPI/uvicorn.
+- FastAPI: `/ws` is a dumb asyncio relay to a dedicated game port on
+  localhost (`-a 2151`); `/api/room-image/...` picks room → zone → sector
+  picture with fallback; other non-game pages as wanted.
+- Game (small C change, not done): per-port "web" flag set in accept; on such
+  connections skip telnet negotiation and, in `look_room` (`src/look.c:869`,
+  the single room-display entry point), emit an OSC marker like
+  `ESC ] pr;room=<zone>:<num> BEL`. xterm.js `registerOscHandler` catches it
+  in the browser and swaps the picture; nothing is shown in the terminal.
+- Pictures: tiers — per sector (~30), per zone (155), per room where wanted.
+  World has 26,284 rooms (10,001 sector "Prototype"), 5,450 distinct names.
+
+Rejected: TLS or WebSocket framing inside the C code; ttyd/websockify bridge
+(no side channel for room id, though fine for a first plain-terminal demo).
