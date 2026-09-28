@@ -1,6 +1,6 @@
 # Perilous Realms — Project State and Handoff
 
-**Last updated:** 2026-09-28 (JSONL extraction, pydantic models, enum fixes)
+**Last updated:** 2026-09-28 (built master here with production players; use-after-free fix; production host surveyed)
 **Goal:** revive Perilous Realms (`pr3`) and package it as an installable
 Docker image for its maintainer, preserving the existing player base.
 
@@ -552,3 +552,85 @@ immunity bit 19 is `magic` (IMM_MAGIC), and action bits 14/15 are
 - Affect bits 38/39/46 and immunity bit 5 have no names in `constants.c`;
   emitted as `bitN`.
 - Nothing has been loaded into Mongo yet.
+
+
+---
+
+## 13. Local build with production players, and the production host (2026-09-28)
+
+### Building master on this machine
+
+`src` master no longer links Trident (removed on production 2026-09-24,
+commit a7ae330; `src/notes/2026-09-24-rebuild-and-trident-removal.md` is
+the record). The link line is now just `-lPR -lcrypt -lm`, so §3's glibc
+2.38 floor and the bookworm/trixie note apply only to `sam_build`.
+
+The §3 recipe still holds (`serverversion` first, then `pr3`, `tran`,
+`Zone`). One new trap: **`Zone/makefile.linux` calls gcc with no `-std`**,
+and gcc 15+ defaults to C23, where `bool` is a keyword and
+`h/compat.h:27` `typedef char bool;` is an error. The main makefile pins a
+standard so `pr3` is unaffected. Worked around by running the Zone
+makefile's own commands with `-std=gnu11`; the makefile is not changed.
+
+### Player data
+
+Production players were restored from `players_2026-09-23.tar` (kept at
+`pr-stuff/`, gitignored): 697 characters, 280 accounts, both indexes
+inside the tar at `stash/players.new` and `account/account.list`, copied up
+one level exactly as in §5. All 697 load; no invalid-account warnings.
+
+`account/a/alcanzar` is **a character save, not an account record** (3,370
+bytes, February 2023, player-file signature), sitting beside the real
+character in `stash/a/alcanzar`. It is the same on production, so that
+account entry has been broken for over three years. Not touched.
+
+### The crash, and the fix on branch `fix-affect-list-use-after-free`
+
+With these players, boot segfaulted in the `boot_players` scan, first in
+`reset_and_apply_item_set_bonuses` (handler.c) and, after fixing that, in
+`reset_and_apply_remort_bonuses`. Both had the same loop: walk
+`ch->affected`, and on the first match call `affect_from_char`, which
+frees every node of that type, then read `caf->next` from the freed node.
+`affect_from_char` already removes all matching affects in one safe pass,
+so each loop became a single call. Commit e9c14de8, pushed; PR not opened.
+
+The path runs on every login, remove and quit by a player with set gear or
+remort bonuses (257 of 697 players carry those affects), and during every
+boot scan. **Production has run this code for years without crashing.**
+The only build-environment difference found is glibc: production is
+Debian 13 / glibc 2.41, this machine glibc 2.44; compiler (clang) and
+makefile flags are the same. That is inference, not proof; an
+AddressSanitizer build would show every such read at once.
+
+`src` is left checked out on the fix branch. The game runs here from that
+binary: `./pr3 -d ../live/lib`, port 5024.
+
+### Production host (`pr3-pr` in `~/.ssh/config`, user `pr`)
+
+Surveyed read-only. Nothing there was changed.
+
+- Debian 13, glibc 2.41, clang. Game at `~pr/live/pr3`, data `~pr/live/lib`,
+  run as `pr3 -p 179 -d /home/pr/live/lib -a 5024 2150`. Up since
+  2026-09-25 02:21 as of the survey.
+- **No systemd unit and no cron runs or restarts the game.** The `pr` user
+  has no `crontab` command; `/etc/cron.d` has only the distro entry; no
+  timers. `~pr/scripts/cron/check_and_restart_pr_server.sh` exists but
+  nothing invokes it. A unit Sam recalls adding is not present.
+- **Backups:** `~pr/scripts/cron/backup_players.sh` tars `stash` and
+  `account` from `live/lib` into `~pr/Backups/players_<date>.tar.gz`;
+  `backup_full.sh` tars all of `lib` as `full_backup_<date>.tar.gz`.
+  1,995 files there. Player backups run daily until 2026-03-08, then
+  nothing until 2026-09-20..23, consistent with being run by hand.
+  Monthly full backups exist through at least 2025-01.
+- **None of `~pr/scripts/` is under version control** (restart script,
+  backup scripts, check-and-restart). Only copies are on that host. Worth
+  committing to the repo or an ops repo.
+
+### What live/lib holds beyond the player tar
+
+The tar covers `stash/`, `account/` and the two indexes only. Also player
+state, not in the tar: `LockerSave/` (clan lockers), `WorldSave/zone.N`
+and `RoomSave/` (room contents), board files, the auction file, and
+`PURGED/` (deleted characters/accounts, moved there by a shell `mv` the
+server never creates the directory for). `full_backup_*.tar.gz` covers all
+of it.
