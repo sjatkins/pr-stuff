@@ -1,6 +1,6 @@
 # Perilous Realms — Project State and Handoff
 
-**Last updated:** 2026-09-28 (built master here with production players; use-after-free fix; production host surveyed)
+**Last updated:** 2026-09-28 (built master here with production players; use-after-free fix merged; production host surveyed)
 **Goal:** revive Perilous Realms (`pr3`) and package it as an installable
 Docker image for its maintainer, preserving the existing player base.
 
@@ -584,7 +584,7 @@ bytes, February 2023, player-file signature), sitting beside the real
 character in `stash/a/alcanzar`. It is the same on production, so that
 account entry has been broken for over three years. Not touched.
 
-### The crash, and the fix on branch `fix-affect-list-use-after-free`
+### The crash, and the fix (merged to `master`)
 
 With these players, boot segfaulted in the `boot_players` scan, first in
 `reset_and_apply_item_set_bonuses` (handler.c) and, after fixing that, in
@@ -592,7 +592,8 @@ With these players, boot segfaulted in the `boot_players` scan, first in
 `ch->affected`, and on the first match call `affect_from_char`, which
 frees every node of that type, then read `caf->next` from the freed node.
 `affect_from_char` already removes all matching affects in one safe pass,
-so each loop became a single call. Commit e9c14de8, pushed; PR not opened.
+so each loop became a single call. Commit e9c14de8, rebased and
+fast-forwarded onto `master` and pushed; the branch is deleted.
 
 The path runs on every login, remove and quit by a player with set gear or
 remort bonuses (257 of 697 players carry those affects), and during every
@@ -602,8 +603,10 @@ Debian 13 / glibc 2.41, this machine glibc 2.44; compiler (clang) and
 makefile flags are the same. That is inference, not proof; an
 AddressSanitizer build would show every such read at once.
 
-`src` is left checked out on the fix branch. The game runs here from that
-binary: `./pr3 -d ../live/lib`, port 5024.
+`src` is on `master` at e9c14de8. The game runs here from that binary:
+`./pr3 -d ../live/lib`, port 5024. **Production still runs the old code**
+(started 2026-09-25, before the fix); it needs a pull, rebuild and restart
+to pick it up.
 
 ### Production host (`pr3-pr` in `~/.ssh/config`, user `pr`)
 
