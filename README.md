@@ -31,7 +31,16 @@ and 5024 and restarts it whenever it exits. `telnet localhost 5024` should
 show the login banner.
 
 Every script resolves paths from `PR_HOME`, which defaults to the current
-directory, so run them from here or `export PR_HOME=/path/to/pr-stuff`.
+directory. The recommended practice is to set it once in your shell
+profile to the directory you cloned this repo into:
+
+```sh
+export PR_HOME=/path/to/pr-stuff
+```
+
+Then every script works from anywhere, including from cron. Leaving it
+unset and running from the checkout also works. Only someone juggling
+several checkouts needs to set it per command.
 
 ## Layout
 
