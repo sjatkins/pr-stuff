@@ -10,13 +10,10 @@ Run:   uvicorn api_server:app --host 127.0.0.1 --port 8000
 Env:   PR_IMAGES  directory of room pictures (default ./images)
        PR_GAME_HOST / PR_GAME_PORT   passed through to the tty proxy
 
-Pictures are plain files, filled in over time in any order:
-    images/rooms/<zone>/<num>.webp     one specific room
-    images/zones/<zone>.webp           any room in that zone
-    images/sectors/<sector>.webp       any room of that sector type
-    images/default.webp                anything else
-The browser asks for one room and gets the most specific picture that
-exists. Nothing in the game needs to know which pictures exist.
+Pictures are plain files:
+    images/rooms/<zone>/<vnum>.webp    one specific room
+    images/zones/<zone>.webp           the zone
+The page asks for the room picture and, on 404, the zone picture.
 """
 
 import os
@@ -24,7 +21,7 @@ import re
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 
 import tty_proxy
 
@@ -46,40 +43,21 @@ def health() -> dict:
     return {"ok": True}
 
 
-@app.get("/api/room-image/{zone}/{num}")
-def room_image(zone: str, num: int, sector: str | None = None):
-    """Most specific picture for a room; the page passes sector from the
-    game's OSC marker so the API needs no world data of its own."""
-    zone = _safe(zone)
-    candidates = [
-        IMAGES / "rooms" / zone / f"{num}.webp",
-        IMAGES / "zones" / f"{zone}.webp",
-    ]
-    if sector:
-        candidates.append(IMAGES / "sectors" / f"{_safe(sector)}.webp")
-    candidates.append(IMAGES / "default.webp")
-    for p in candidates:
-        if p.is_file():
-            return FileResponse(p, media_type="image/webp",
-                                headers={"Cache-Control": "public, max-age=3600"})
-    raise HTTPException(404, "no picture")
+def _picture(p: Path):
+    if not p.is_file():
+        raise HTTPException(404, "no picture")
+    return FileResponse(p, media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=3600"})
 
 
-@app.get("/api/room-image/{zone}/{num}/tier")
-def room_image_tier(zone: str, num: int, sector: str | None = None) -> JSONResponse:
-    """Which tier would answer; handy for the page and for filling gaps."""
-    zone = _safe(zone)
-    if (IMAGES / "rooms" / zone / f"{num}.webp").is_file():
-        tier = "room"
-    elif (IMAGES / "zones" / f"{zone}.webp").is_file():
-        tier = "zone"
-    elif sector and (IMAGES / "sectors" / f"{_safe(sector)}.webp").is_file():
-        tier = "sector"
-    elif (IMAGES / "default.webp").is_file():
-        tier = "default"
-    else:
-        tier = None
-    return JSONResponse({"zone": zone, "num": num, "sector": sector, "tier": tier})
+@app.get("/api/room-image/{zone}/{vnum}")
+def room_image(zone: str, vnum: int):
+    return _picture(IMAGES / "rooms" / _safe(zone) / f"{vnum}.webp")
+
+
+@app.get("/api/zone-image/{zone}")
+def zone_image(zone: str):
+    return _picture(IMAGES / "zones" / f"{_safe(zone)}.webp")
 
 
 # Later, as wanted: /api/online (the game already writes an online-status

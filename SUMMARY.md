@@ -729,14 +729,14 @@ Chosen shape (Sam, 2026-09-28):
   game page with picture widget and xterm.js terminal widget); `/api/*` and
   `/ws` → FastAPI/uvicorn.
 - FastAPI: `/ws` is a dumb asyncio relay to a dedicated game port on
-  localhost (`-a 2151`); `/api/room-image/...` picks room → zone → sector
-  picture with fallback; other non-game pages as wanted.
+  localhost (`-a 2151`); `/api/room-image/{zone}/{vnum}` and
+  `/api/zone-image/{zone}`, page falls back to zone on 404; other non-game pages as wanted.
 - Game (small C change, not done): per-port "web" flag set in accept; on such
   connections skip telnet negotiation and, in `look_room` (`src/look.c:869`,
   the single room-display entry point), emit an OSC marker like
-  `ESC ] pr;room=<zone>:<num>:<sector> BEL`. xterm.js `registerOscHandler` catches it
+  `ESC ] pr;room=<zone>:<vnum> BEL`. xterm.js `registerOscHandler` catches it
   in the browser and swaps the picture; nothing is shown in the terminal.
-- Pictures: tiers — per sector (~30), per zone (155), per room where wanted.
+- Pictures: per zone (155) and per room where wanted.
   World has 26,284 rooms (10,001 sector "Prototype"), 5,450 distinct names.
 
 Sketch of the pieces and a Caddyfile: `explorations/http-server/`.
