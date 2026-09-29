@@ -9,7 +9,7 @@ nothing on 80/443, and no Caddy service active.
 | piece | what it does | listens on | state |
 |---|---|---|---|
 | Caddy | TLS for perilousrealms.com, routes `/ws`, `/api/*`, static SPA | 80, 443 | `Caddyfile` here |
-| tty proxy | dumb websocket <-> TCP relay to the game | localhost:7681 | not written; ~40 lines of asyncio, or ttyd/websockify |
+| tty proxy | dumb websocket <-> TCP relay to the game | localhost:7681 | `tty_proxy.py` sketch (FastAPI websocket + asyncio) |
 | FastAPI | `/api/room-image/{zone}/{num}` with room -> zone -> sector fallback; later non-game pages | localhost:8000 | not written |
 | React build | landing page; game page = picture widget + xterm.js terminal widget sharing one websocket | static files | not written |
 | pr3 | unchanged, plus `-a 2151` web port; small C change to skip telnet negotiation and emit an OSC room marker on that port | localhost:2151 | not written |
