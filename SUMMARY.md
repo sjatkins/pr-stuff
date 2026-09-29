@@ -734,12 +734,12 @@ Chosen shape (Sam, 2026-09-28):
 - Game (small C change, not done): per-port "web" flag set in accept; on such
   connections skip telnet negotiation and, in `look_room` (`src/look.c:869`,
   the single room-display entry point), emit an OSC marker like
-  `ESC ] pr;room=<zone>:<vnum> BEL`. xterm.js `registerOscHandler` catches it
+  `ESC ] 9001 ; room=<zone>:<vnum> BEL`. xterm.js `registerOscHandler` catches it
   in the browser and swaps the picture; nothing is shown in the terminal.
 - Pictures: per zone (155) and per room where wanted.
   World has 26,284 rooms (10,001 sector "Prototype"), 5,450 distinct names.
 
-Sketch of the pieces and a Caddyfile: `explorations/http-server/`.
+Sketches in `explorations/http-server/`: Caddyfile, `tty_proxy.py`, `api_server.py`, `web/` (Vite + React + xterm.js). None run yet.
 Production (checked as `pr`) has nothing on 80/443 and no active Caddy.
 
 Rejected: TLS or WebSocket framing inside the C code; ttyd/websockify bridge

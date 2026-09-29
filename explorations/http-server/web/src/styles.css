@@ -1,0 +1,12 @@
+:root { color-scheme: dark; }
+body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+.nav { display: flex; gap: 1.5rem; padding: 0.75rem 1rem; background: #1b1b1b; }
+.nav a { color: #e8d8a8; text-decoration: none; }
+.landing { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; text-align: center; }
+.button { display: inline-block; padding: 0.6rem 1.4rem; background: #5a3d1e; color: #fff; border-radius: 4px; text-decoration: none; }
+.small { opacity: 0.7; font-size: 0.9rem; }
+.play { display: flex; flex-direction: column; height: calc(100vh - 3rem); padding: 0 1rem 1rem; box-sizing: border-box; }
+.picture { flex: 0 0 auto; max-height: 40vh; display: flex; justify-content: center; margin-bottom: 0.5rem; }
+.picture img { max-height: 40vh; max-width: 100%; border-radius: 4px; }
+.picture.empty { height: 0; margin: 0; }
+.terminal { flex: 1 1 auto; min-height: 0; background: #000; }
