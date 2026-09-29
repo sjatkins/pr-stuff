@@ -734,7 +734,7 @@ Chosen shape (Sam, 2026-09-28):
 - Game (small C change, not done): per-port "web" flag set in accept; on such
   connections skip telnet negotiation and, in `look_room` (`src/look.c:869`,
   the single room-display entry point), emit an OSC marker like
-  `ESC ] pr;room=<zone>:<num> BEL`. xterm.js `registerOscHandler` catches it
+  `ESC ] pr;room=<zone>:<num>:<sector> BEL`. xterm.js `registerOscHandler` catches it
   in the browser and swaps the picture; nothing is shown in the terminal.
 - Pictures: tiers — per sector (~30), per zone (155), per room where wanted.
   World has 26,284 rooms (10,001 sector "Prototype"), 5,450 distinct names.

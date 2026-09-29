@@ -10,7 +10,7 @@ nothing on 80/443, and no Caddy service active.
 |---|---|---|---|
 | Caddy | TLS for perilousrealms.com, routes `/ws`, `/api/*`, static SPA | 80, 443 | `Caddyfile` here |
 | tty proxy | dumb websocket <-> TCP relay to the game | localhost:7681 | `tty_proxy.py` sketch (FastAPI websocket + asyncio) |
-| FastAPI | `/api/room-image/{zone}/{num}` with room -> zone -> sector fallback; later non-game pages | localhost:8000 | not written |
+| FastAPI | `/api/room-image/{zone}/{num}?sector=` with room -> zone -> sector -> default fallback; mounts the tty proxy at `/ws`; later non-game pages | localhost:8000 | `api_server.py` sketch |
 | React build | landing page; game page = picture widget + xterm.js terminal widget sharing one websocket | static files | not written |
 | pr3 | unchanged, plus `-a 2151` web port; small C change to skip telnet negotiation and emit an OSC room marker on that port | localhost:2151 | not written |
 
@@ -22,9 +22,9 @@ touching the API.
 ## Room marker
 
 On web-port connections `look_room` (`src/look.c`) appends
-`ESC ] pr;room=<zone>:<num> BEL`. xterm.js in the browser registers an OSC
+`ESC ] pr;room=<zone>:<num>:<sector> BEL`. xterm.js in the browser registers an OSC
 handler for it, hides it, and tells the picture widget to fetch
-`/api/room-image/<zone>/<num>`. The proxy never parses game text.
+`/api/room-image/<zone>/<num>?sector=<sector>`. The proxy never parses game text.
 
 ## Docker later
 
