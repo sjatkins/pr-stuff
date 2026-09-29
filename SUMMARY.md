@@ -729,7 +729,7 @@ Chosen shape (Sam, 2026-09-28):
   game page with picture widget and xterm.js terminal widget); `/api/*` and
   `/ws` → FastAPI/uvicorn.
 - FastAPI: `/ws` is a dumb asyncio relay to a dedicated game port on
-  localhost (`-a 2151`); `/api/room-image/{zone}/{vnum}` and
+  localhost (`-a 2151`); `/api/room-image/{vnum}` and
   `/api/zone-image/{zone}`, page falls back to zone on 404; other non-game pages as wanted.
 - Game (small C change, not done): per-port "web" flag set in accept; on such
   connections skip telnet negotiation and, in `look_room` (`src/look.c:869`,

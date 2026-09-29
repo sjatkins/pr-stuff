@@ -11,7 +11,7 @@ Env:   PR_IMAGES  directory of room pictures (default ./images)
        PR_GAME_HOST / PR_GAME_PORT   passed through to the tty proxy
 
 Pictures are plain files:
-    images/rooms/<zone>/<vnum>.webp    one specific room
+    images/rooms/<vnum>.webp           one specific room (vnum is global)
     images/zones/<zone>.webp           the zone
 The page asks for the room picture and, on 404, the zone picture.
 """
@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse
 import tty_proxy
 
 IMAGES = Path(os.environ.get("PR_IMAGES", "images"))
-SAFE = re.compile(r"^[A-Za-z0-9_\-]+$")   # zone/sector names as used in world/ROOM
+SAFE = re.compile(r"^[A-Za-z0-9_\-]+$")   # zone names as used in world/ROOM
 
 app = FastAPI(title="Perilous Realms web")
 app.mount("/ws", tty_proxy.app)           # /ws -> the relay in tty_proxy.py
@@ -50,9 +50,9 @@ def _picture(p: Path):
                         headers={"Cache-Control": "public, max-age=3600"})
 
 
-@app.get("/api/room-image/{zone}/{vnum}")
-def room_image(zone: str, vnum: int):
-    return _picture(IMAGES / "rooms" / _safe(zone) / f"{vnum}.webp")
+@app.get("/api/room-image/{vnum}")
+def room_image(vnum: int):
+    return _picture(IMAGES / "rooms" / f"{vnum}.webp")
 
 
 @app.get("/api/zone-image/{zone}")
