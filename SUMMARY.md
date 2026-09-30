@@ -744,3 +744,27 @@ Production (checked as `pr`) has nothing on 80/443 and no active Caddy.
 
 Rejected: TLS or WebSocket framing inside the C code; ttyd/websockify bridge
 (no side channel for room id, though fine for a first plain-terminal demo).
+
+## 15. Report: `show obj sword` shows no swords on production (2026-09-30)
+
+Investigated from local source and production logs only (no production
+source). Path: `do_show` (`src/show.c:663`) → `is_abbrev("obj","objects")`
+gated on level ≥ I5 (2005) → `show_db` → `hash_iterate2(&obj_db,
+print_index_data_name, sb, "sword")` → `str_str` (case-insensitive) on
+`obj->name` (the keyword list) → `page_string`, 35 lines per page.
+Command lookup is an exact match on "show" (`interpreter.c:101`).
+
+Reproduced the core routine on the local build against a scratch copy of
+`live/lib` under gdb (boot to `game_loop`, call `hash_iterate2` by hand):
+returns 7,659 bytes of sword lines, first vnums 4, 5, 39, 43, 44, 45...
+So search + data are fine here; obj count matches production (4,854).
+
+Production log since the 2026-09-25 boot has no `show` command lines at all
+(only players with the log flag are logged) and no errors, crashes or cores.
+Unresolved; most likely explanations, in order: the reporting immortal is
+below level 2005 and gets the generic Usage text; or the pager is showing
+only the header line (player `page_size`). Need the exact output seen.
+
+Side finding: `hash_find` (hash.c, commit 8c8b558b 2023 "possible fix to
+last crash") stops at any chain entry with key 0, so a lookup that collides
+with vnum 0's bucket can return vnum 0's data. Not the cause of this report.
