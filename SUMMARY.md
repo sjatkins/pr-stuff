@@ -761,9 +761,15 @@ So search + data are fine here; obj count matches production (4,854).
 
 Production log since the 2026-09-25 boot has no `show` command lines at all
 (only players with the log flag are logged) and no errors, crashes or cores.
-Unresolved; most likely explanations, in order: the reporting immortal is
-below level 2005 and gets the generic Usage text; or the pager is showing
-only the header line (player `page_size`). Need the exact output seen.
+Reporter is Nitemare: level 2011 (game-written `lib/IMMORTALS` roster,
+builder range 500000-999999), so the level gate is not it. Neither the
+local object table (max vnum 257,005) nor production's zone list (129 zones
+loaded, none above 257xxx) has anything in that range. In-game `oedit` only
+modifies existing prototypes; nothing creates or persists new ones, so any
+sword made in-game does not survive a reboot (last boot 2026-09-25 02:21).
+Page height is validated 0-255, so the pager cannot be wedged by it.
+Syn (I6, account crow) is the only logged session; no `show` lines.
+Still unresolved; need the exact text Nitemare sees.
 
 Side finding: `hash_find` (hash.c, commit 8c8b558b 2023 "possible fix to
 last crash") stops at any chain entry with key 0, so a lookup that collides
