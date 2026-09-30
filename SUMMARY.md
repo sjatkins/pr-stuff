@@ -1022,3 +1022,53 @@ on the live stream (dupes, gold from nowhere, impossible states, with
 evidence). Scope from the start: player-facing agents confined to that
 player's subgraph, admin agents with an audit trail of what they read;
 scoping is the movie's frame computation, enforced rather than chosen.
+
+**Language.** Sam is also weighing Common Lisp (SBCL) for the rewrite.
+Case for: live image (redefine while players stay connected; every fix
+this week needed a restart), CLOS multiple dispatch for the rules
+(spells, item interactions, modifiers; `:around` methods as the place to
+emit changesets), conditions/restarts instead of "signal trapping" and a
+reboot loop, world files and mob programs as reader/macros replacing the
+Zone/AMPL yacc compilers, native speed, `save-lisp-and-die` as snapshot,
+Sly/SLIME into the running game (inspect the reporting player in place,
+send to their telnet session, puppet an NPC). Cost: NATS — ccQ is the
+Common Lisp client (core pub/sub only, not listed JetStream-enabled);
+JetStream via CFFI to nats.c which has it; Postgres via postmodern is
+first-rate; UOP would be ported (side project). Sam's POV: the running
+image is the truth, the DB/log are what can be reconstructed; the gap is
+exactly the unlogged tick churn. Sam already wrote a Python parser for
+the world/mob-program formats (regular structure, factorable warts) and
+the JSONL extraction (§12) exists, so the path is: JSON → CLOS classes
+via initialize-instance → refactor to Lisp-native representation, pulling
+relations out into the triple store at load.
+
+**Pydantic for live game objects.** Methods are fine on models; the real
+frictions are identity (generated `__eq__` is by value, unhashable unless
+frozen — fix: eq/hash on the id), per-assignment overhead through
+pydantic's `__setattr__` (leave validate_on_assignment off), and cyclic
+object graphs (gone by design since relations live in the triple store,
+objects hold only their own properties). With those, the model doubles as
+the save format (model_dump / model_validate) and schema. Things a
+pydantic model can't do like a plain class: positional construction,
+`__slots__`, unannotated class attributes (need ClassVar), underscore
+field names (become private attrs), `model_` namespace, a second
+metaclass, free `__getattr__`/`__setattr__` overrides; opt-in: extra
+attributes, arbitrary field types, validate-on-assignment, hashing via
+frozen; properties are not fields unless computed_field.
+
+**Ids (UOP pattern).** Every persisted object, and everything in a
+relation, gets a uniform id: class id + instance id, base-62 strings. The
+class id is a 32-bit random number fixed once in source as a ClassVar per
+persisted class (git is the registry; never reuse a retired one; a
+five-line test for duplicates/missing); the instance part is 64 random
+bits. ~17 chars, URL/JSON/subject-safe, a dict key everywhere. The class
+prefix makes the id self-describing: a changeset consumer knows the
+table from the id; dereference = prefix dispatch + PK read; "all
+relations involving any Room" is a left-anchored LIKE, a btree range
+scan in Postgres with C collation or text_pattern_ops; in memory, prefix
+walk or a per-class id set. Distinct from vnum (prototype name); the
+instance→prototype link is a field or triple. Class fixed at birth: an
+object changing class is a new id plus a changeset retiring the old one.
+Collision: 32 bits is fine for hundreds of classes; 64 bits fine for any
+size this game reaches; creation order comes from the changeset stream,
+not the id.
