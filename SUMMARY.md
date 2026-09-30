@@ -774,3 +774,18 @@ Still unresolved; need the exact text Nitemare sees.
 Side finding: `hash_find` (hash.c, commit 8c8b558b 2023 "possible fix to
 last crash") stops at any chain entry with key 0, so a lookup that collides
 with vnum 0's bucket can return vnum 0's data. Not the cause of this report.
+
+Same immortal also reports `where <name>` returning nothing. `do_where`
+(`src/cmds3.c`, subcmd CMD_OWHERE=35, level I5) walks `object_list`,
+matches `str_str(obj->name, arg)` on the whole remaining argument
+(`only_argument`), skips objects whose carrier fails `CAN_SEE`, and prints
+"Couldn't find any such thing." when the string block is empty. Shared with
+`show obj`: `only_argument` + `str_str` + string block + `page_string`.
+Input assembly (`process_input`) drops control chars and bytes >127, so a
+stray CR/tab cannot poison the argument; trailing spaces are kept but would
+only thin the list. Dispatch passes `cmd_info[cmd].num`, so the subcmd is
+right. Per-account/char command revocation exists (`cmd_ok`) but yields
+"Pardon?", not an empty list. No cause found in code; the failure is
+specific to this character or client. Next: exact transcript from Nitemare
+(commands as typed and full reply), their client, and whether Syn (I6) gets
+results for the same `show obj sword` / `where sword`.
