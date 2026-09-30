@@ -1072,3 +1072,19 @@ object changing class is a new id plus a changeset retiring the old one.
 Collision: 32 bits is fine for hundreds of classes; 64 bits fine for any
 size this game reaches; creation order comes from the changeset stream,
 not the id.
+
+**Engine loop documented** (2026-09-30): `explorations/game-engine-loop.org`
+describes `game_loop()` (comm.c:91) pass by pass at 100 pulses/s: select,
+accept, per-connection input with command resolution and priority queue
+at enqueue, one event slot of the 6,000-slot timing wheel per pulse, one
+command per connection per pulse gated by wait state, output/prompt
+states, then periodic work (zone save 10 s, zone reset ageing 60 s,
+sounds 60 s, sector damage 4 s, pulse affects 1 s, class resources 2 s,
+the 60 s tick: long-term scheduler, weather, spell durations, idle
+boots). Event types and producers (mob AI ~1/s per mob, per-attacker
+strikes timed by calc_speed, per-character and per-object tick updates,
+run/travel/fall/river/teleport/door/spell), the tick-granularity
+scheduler, mob AI order, wait states, signals, shutdown, cost model,
+quirks, and rewrite implications (frame + timing wheel + coarse
+scheduler; the per-second character_list walks are the only
+world-size-scaled cost).

@@ -98,8 +98,10 @@ PULSE_PLAYER= selects one of 6,000 event slots.
 
 The short-term event queue is a /timing wheel/: =event_queue[]= has
 =PULSE_PLAYER= slots, one per pulse of a tick. Every event in slot
-=phase= is run now, in insertion order, unless it was tombstoned
-(=EVT_REMOVED=). Events that reschedule themselves (most do) insert into
+=phase= is run now, unless it was tombstoned (=EVT_REMOVED=). Insertion
+is push-to-front (=events.c:384=), so within one slot events fire last-in
+first-out; nothing depends on the order, since events re-check their
+targets when they fire. Events that reschedule themselves (most do) insert into
 a later slot. Fired events are freed after the slot is drained.
 
 See [[*The event system]] for what is in there.
