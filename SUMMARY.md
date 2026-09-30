@@ -911,3 +911,75 @@ PR_SERVER_SCRIPT right after rotating at each start: deletes `*.log`
 older than the earlier of Jan 1 of this year and three months ago (keeps
 whichever is more). Live `log` and `recent/` untouched. Tested on fake
 files; takes effect on production at its next restart after a pull.
+
+## 16. Architecture notes for a Python rewrite (discussion, 2026-09-30)
+
+Sam is considering a clean Python server with a real database instead of
+the binary/text world files. Conclusions from the discussion:
+
+**Performance is not the risk.** Production today: 133 MB RSS, ~12% of one
+core, 21 game entries since boot; world 26k rooms, 4.9k object protos,
+~10k mob instances; ~0.1 s pulse. One asyncio loop (same shape as the C
+select loop) is idle most of the time at 10x the players. Condition: the
+database stays off the hot path. Live state in memory; DB for what must
+survive restart; writes behind the loop, never per tick. The risk is the
+rewrite itself: 106k lines of C in 96 files, mostly game rules. Prefer
+carving (new Python network/persistence layer first, rules ported one
+system at a time with the C code as reference and extracted world data as
+fixtures) over a big-bang rewrite.
+
+**Relationships as triples.** Nearly all live state is a relation
+(in_room, carried_by, worn_by+slot, inside, fighting, follows, affects).
+The C structs embed these as pointers + intrusive lists (obj: in_room,
+carried_by, equipped_by, in_obj, contains, next_content, next; char:
+in_room, fighting, equipment[], carrying, next_in_room, next, master,
+followers, 3 affect lists; room: contents, people) and half the crash
+history is those disagreeing. Replace with an indexed triple set; game
+code inserts/removes triples directly (that is the point), with small
+helpers (move_to, wear, fight) so a stale triple can only come from a
+skipped helper; invariants (one location, one item per slot) become
+assertable. Qualifiers (slot, direction) go beside the triple as edge
+properties, not inside the object slot, so all indexes stay id-keyed.
+Single-valued roles store a value, multi-valued a set.
+
+**Measured at game scale** (26k rooms, 10k mobs, 30k objects, 92k
+relations): dict-indexed triples (spo + ops) 60 MB, ~2 µs per lookup;
+networkx 3.7 DiGraph 85 MB, 2-10 µs per lookup, 9 µs per move (no
+predicate index, so "in room" filters edges; fix: one DiGraph per
+relation). General triple store keeps 3 (SPO/POS/OSP) or 6 permutations;
+the game needs 2, maybe role-first as a third. Script:
+scratchpad/nxbench.py (session-local).
+
+**Stores.** Mongo: triple collection {s,r,o,+qualifiers} with indexes
+{s,r,o},{o,r,s},{r,s,o} mirrors the in-memory permutations; $graphLookup
+for transitive queries; player saves as one document each (snapshot,
+restorable, diffable); round trip ~0.3-1 ms so fine per action, not per
+tick. Neo4j: natural for world/builder queries; node/edge properties are
+schema-free but FLAT (primitives or arrays only; a map/JSON must be a
+string, queryable only after promotion to properties/edges). Kùzu is the
+closest embedded option. Sam's UOP (uniform ids across classes + triple
+table + per-commit changesets with timestamp covering fields, metadata and
+relationships) is the substrate; extend with in-memory indexes and
+on-demand networkx views rather than reimplementing algorithms.
+
+**Changesets.** Would have solved this week's problems: Bunta's deletion
+(revert one commit instead of restoring a tar) and the two-server fork
+(merge two change streams). Journal the durable model (characters,
+accounts, world defs, boards), not tick churn (mob wandering, regen,
+rounds), matching what the C server saves today. Uses: point-in-time
+restore, builder undo, event feed for web/notifications, read-only backup
+DB, "changes since my last update" for a node coming up.
+
+**Distribution.** Zone ownership (one node owns a zone, others mirror)
+avoids most conflicts. NATS core for fast ephemeral traffic (subjects:
+zone.<n>.*, player.<name>.tell, global.chat; sub-ms; no topology to
+maintain). JetStream as the changeset log of record: durable, ordered,
+replayable; consumers track sequence; snapshot + tail for cold start;
+publish-first-apply-on-receipt for all writes so nodes cannot diverge
+(also ends the two-servers problem by construction). KV for presence.
+Stream retention is a working window; an archiver consumer writes the
+complete append-only history to cheap storage (partitioned by time,
+checksummed/hash-chained), a snapshot consumer emits full state images
+with their sequence; other consumers: structured game log (replacing
+2.8 GB of "Reset zone" lines), per-player history, metrics. Cold start =
+snapshot + archive tail + live stream.
