@@ -55,6 +55,8 @@ do
 [ -f $LOGS/log ] && cp $LOGS/log $LOGS/recent/log.1
 [ -f $LOGS/log ] && mv $LOGS/log $LOGS/`date '+%y%m%d%H%M%S'`.log
 
+  prune_logs "$LOGS"
+
   rebuild_indexes "$LIB"
 
 #  if test -f $DIR/prs.new

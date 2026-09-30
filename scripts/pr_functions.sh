@@ -52,3 +52,21 @@ list_all_players() {
     done
   done
 }
+
+# prune_logs [logs-dir]
+#   Delete rotated logs (<logs-dir>/*.log) older than the retention
+#   cutoff: the start of the current year or three months ago, whichever
+#   is earlier, so at least the current year or the last three months is
+#   kept. The live "log" and recent/ are never touched. PR_SERVER_SCRIPT
+#   runs this after rotating at every start.
+prune_logs() {
+  local logs=${1:-$PR_HOME/live/logs} year_start three_months cutoff
+  year_start=$(date +%Y-01-01)
+  three_months=$(date -d '3 months ago' +%Y-%m-%d) || return 1
+  if [[ "$three_months" < "$year_start" ]]; then
+    cutoff=$three_months
+  else
+    cutoff=$year_start
+  fi
+  find "$logs" -maxdepth 1 -name '*.log' -type f ! -newermt "$cutoff" -delete
+}
