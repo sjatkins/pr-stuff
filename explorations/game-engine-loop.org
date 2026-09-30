@@ -335,4 +335,7 @@ the only parts that scale with world size rather than activity, and all
 of them are candidates for per-entity events like the ones the game
 already uses for regen, which would make the idle cost proportional to
 what is actually happening. Combat, movement, casting and mob AI are
-already per-entity events and port as they are.
+already per-entity events and port as they are. Make each slot FIFO: the
+C wheel is LIFO by accident of a headless-tail list, and two related
+events landing in one pulse (a cast completing and a blow) can resolve
+in the opposite order to how they were scheduled.
