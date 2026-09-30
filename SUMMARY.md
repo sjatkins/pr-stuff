@@ -983,3 +983,28 @@ checksummed/hash-chained), a snapshot consumer emits full state images
 with their sequence; other consumers: structured game log (replacing
 2.8 GB of "Reset zone" lines), per-player history, metrics. Cold start =
 snapshot + archive tail + live stream.
+
+**Changesets as the only contract (later in the same discussion).** The
+game publishes semantic changesets, `id: {field: value, ...}` plus
+relationship and metadata adds/removes per commit with timestamp and
+context; it carries no database driver. Consumers keep projections
+(Mongo, Neo4j, files, the game's own boot store) and any store can be
+added later by replaying the archive. No old values in changesets: the
+stream is ordered, appliers only set, so every changeset is idempotent;
+a prior value is found by walking back along changesets for that id and
+field (per-id index of sequences; bounded by the last snapshot; absent
+if never set). Undo = re-emit prior values as a new commit. Consequences:
+every object has a full version history like a git log keyed by id
+("find the changeset that removed the player→sword relation" answers
+"where did my sword go", plus when and why from commit context; the C
+server cannot answer that at all). Subgraph movies: take the subgraph
+reachable from X over chosen relations, scrub forward by applying
+changesets that touch the frame and backward by the prior-value walk,
+with the frame recomputed as relations change (the sword's new holder
+enters the picture). Uses: incident investigation (Bunta, dupes, lost
+items, crashes), builder review of a zone over time, a player's own
+story played back, debugging live data with single-step; also a fix for
+player memory: how they got into their current regrettable state, and
+resurrecting things they learned and forgot. Cost is reads only:
+snapshot + filtered deltas; the web front end's graph view with a time
+slider is the natural renderer.
