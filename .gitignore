@@ -31,3 +31,4 @@ graphify-out/*.sig
 # symlinks setup_pr_home.sh makes into scripts/
 /millie_compile.sh
 /restart_pr_server.sh
+/logs/
