@@ -789,3 +789,117 @@ right. Per-account/char command revocation exists (`cmd_ok`) but yields
 specific to this character or client. Next: exact transcript from Nitemare
 (commands as typed and full reply), their client, and whether Syn (I6) gets
 results for the same `show obj sword` / `where sword`.
+
+Reproduction with Nitemare's own data (2026-09-30): booted a scratch copy of
+`live/lib` under gdb, loaded the character with `load_char` and account
+`bun` with `load_acct` (no password involved), attached a fake connection,
+and called `do_where(ch,"sword",35)` and `do_show(ch,"obj sword",0)`. Both
+return full results (where: swords on mobs with vnums; show: the 4, 5, 39...
+list). Character: level 2011, page_size 0, invis_level 0, no revoked
+commands on char or account, `cmd_ok` true for both. So code + world data +
+this character (as of the 09-23 backup) all work here. Whatever fails on
+production is in its runtime state, its compiled world files, or its binary,
+none of which can be checked from logs, and the logs record nothing.
+Sam: no transcript obtainable; Syn considered too low level to compare.
+
+Correction (2026-09-30): I earlier said Nitemare's commands are not logged.
+Wrong: production has 15,174 Nitemare lines across 2,852 log files. Their
+commands (`[bun]{room}Nitemare:cmd`) were logged up to 2022-10-12; since
+then only events (link loss/reconnect, board/account admin). Last logged
+`show`/`where` by Nitemare: 2020. So no Sept-2026 evidence of either
+command either way. Sept 2026 lines: logins from 94.5.223.226 /
+82.132.x / 195.89.130.8, account deletes (hutt, huttan) on 09-22, board
+removal on 09-21, and "Nitemare tried to make Calista implementor" on 09-22
+14:38:30 followed by a dropped link (same on 03-08 for Countess). That comes
+from `do_set` level I10/I11 in `wizard.c:1027`: actor not in a hardcoded
+name list gets host-wizlocked and disconnected; the list said "Bunta" until
+commit b7bffd4a (2026-09-24) changed it to "Nitemare", so pre-09-25 binaries
+kicked Nitemare for it. No "Reject from" lines followed (wizlock toggles, and
+no `wizlocked` file existed at the 09-25 boot). Production booted 7 times
+between 09-19 and 09-25 (new-host migration). "mod 40 out of range 0 and
+37" is logged at Nitemare's login on production and when loading the
+character locally: an apply/affect index the current tables do not know.
+
+Resolution (2026-09-30): the reporting player's immortal character is Bun,
+i.e. Bunta (level 2011 in Jan 2026, 2010 in Mar 2026), not Nitemare
+(same person, account bun). Local `logs/` (2,852 files, a copy of
+production's) shows on 2026-09-22 04:04:33: "Bunta deleted", "Bunnyboo
+deleted", "Account huttan deleted", "Nitemare deleted account huttan".
+Bunta lived on account huttan; deleting the account deleted the character.
+No `bunta` player file exists in the 09-23 backup or on production now, and
+Bunta is absent from the game-written IMMORTALS roster. `load_char` on the
+backup returns -1; running `show obj sword` as that empty character prints
+the Usage list, `where` nothing. A new level-1 cleric "Buntie" was created
+on 09-22 13:21. So `show`/`where` "fail" because the character running
+them is no longer an immortal (or is a fresh mortal): `show` needs I4,
+`show obj` I5, `where` I5. Fix is administrative: restore Bunta from a
+pre-09-22 player backup (Backups/players_2026-09-20..21) or re-advance a
+character; no code bug. Note `logs/*2026*` matches 4 old files by name
+substring (YYMMDD naming); 2026 logs are `logs/26*.log`.
+
+Correction: "Bun" is the account, not a character (no character Bun
+exists anywhere). Account bun (loaded via `load_acct` in the gdb sandbox,
+char list only) has 17 entries: Nitemare (x2), Kazin, Quorra, Calista,
+Druna, Jet, Fae, Fay, Ichika, Belle, Belletwo, Clara, Gwen, Roux, Elza,
+Bumble; player files in the 09-23 backup exist for nitemare, calista,
+bumble, gwen, roux, elza. Only Nitemare is an immortal (2011). Calista is a
+level-496 Paladin with per-character granted commands "goto, restore,
+chat, transfer" (logged at each save), active 09-21/22, and on 09-22
+14:38 Nitemare tried to set Calista to I10/I11 and was kicked by the old
+Bunta-only guard. So if the player runs `show`/`where` as Calista, both
+answer "Pardon?" (not granted, level < I4/I5). Likely resolution: advance
+Calista (now possible with the 09-25 binary) or grant `show` and `where`.
+The Bunta deletion note above stands as a fact but is not this report.
+
+Telnet-faithful reproduction (2026-09-30): a sandbox instance runs from
+`src/pr3 -d <scratchpad>/gdblib 2151` under gdb (scratchpad = the session
+dir under /tmp/claude-1000/-home-samantha-work-pr-stuff/<session>/).
+`gdblib` is a copy of `live/lib`; in that copy only, account bun's password
+was set to "x" via the game's own `load_acct`/`save_acct` (script
+`setpw.gdb`). `tclient.py <host> <port> <lines...>` is a scripted telnet
+client (strips IAC, prints everything). Logged in as bun → `l nitemare` →
+`show obj sword`: full paged list, identical to production's expected
+output. Observed: a command typed while the pager is waiting at "[Press
+return to continue, q to quit]" is consumed by the pager and never runs.
+The sandbox was left running on 2151 (Sam: "may come in handy").
+
+ROOT CAUSE (2026-09-30). Nitemare's transcript: `show obj sword` prints
+only the header "VNUM    count names"; `show obj 1 100` works. That is the
+search branch matching nothing. Every build tried here (master, production
+commit eb40d673, the pre-Trident commit b7bffd4a, and the NEW host's actual
+binary /home/pr/src/pr3 copied over) lists the swords. Then: the new host's
+log has no login from account bun since its 09-25 boot at all, and DNS
+(perilousrealms.com → 54.219.85.41) only exposes port 5024. The OLD host,
+54.193.215.24 (`Host pr-pr`, Amazon Linux 2, ip-172-31-2-62), is STILL
+RUNNING the game (pid 1291, `-a 5024 2150`, booted 09-25 06:20) and that is
+where Nitemare plays (reconnects 09-28, 09-30 12:22; Calista entered game
+09-30 12:36). Its binary copied here (with its liboqs/openssl and a Debian
+libcrypt) reproduces exactly: header only. gdb inside the callback:
+`str_str("sword small training","sword")` → NULL, even `str_str("abc","b")`
+→ NULL, while `strstr` works. Disassembly of that binary's `str_str`
+(PRLib/utility.c): after the two lowercase loops it does `xor eax,eax; ret`
+— the `strstr(b1,b2)` call is gone (frame even uses the red zone, i.e. it
+was compiled as a leaf). Source at the old host's commit d1bc0db
+(2026-01-04) is identical to today's (`return(strstr(b1,b2));`), and no
+header redefines strstr; the old host's libPR.a/utility.o date from
+2026-01-03/12, built with clang 11.1.0 against glibc 2.26, and the 09-22
+pr3 was only relinked against them. Why that toolchain dropped the call is
+not established (old-glibc string.h inlines or a miscompile are the
+candidates); it is not reproducible with clang 19/22 or gcc. Impact on the
+old host: all 28 `str_str` call sites (show obj/mob search, where, boards,
+auction, stat, reception, bounty hunter, spec_mob) match nothing.
+
+Operational finding: TWO production games are live and diverging since
+09-19/25. Old host since its 09-25 boot: 3 accounts, 50 game entries, 15
+player files saved. New host: 5 accounts, 21 entries, 18 files. Nitemare's
+client evidently has the old IP. Fix for the report: rebuild on the old host
+(or retire it and point players at perilousrealms.com:5024); merging the
+forked player saves is a separate problem. Sandboxes left running here:
+ports 2151 (master), 2152 (eb40d673), 2153 (new-host binary), 2154
+(b7bffd4a), 2155 (old-host binary, gdblib5); worktrees under the scratchpad.
+
+2026-09-30, later: Sam shut down the old host's game instance
+(54.193.215.24). Players who still used that address (Nitemare / account
+bun among them) must now connect to perilousrealms.com:5024. Player saves
+made on the old host between 09-19/25 and the shutdown (15 files since its
+09-25 boot) are not on production; whether to merge them is open.
