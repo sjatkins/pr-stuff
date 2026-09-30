@@ -1008,3 +1008,17 @@ player memory: how they got into their current regrettable state, and
 resurrecting things they learned and forgot. Cost is reads only:
 snapshot + filtered deltas; the web front end's graph view with a time
 slider is the natural renderer.
+
+**AI agent over the stream and log.** The changeset log is already the
+form an agent works best with: discrete, timestamped, semantic facts with
+ids to follow. Tools: history of an id, subgraph at a sequence, diff
+between two sequences, search commits by context/field. Answers cite the
+changeset sequences used, so reported history is checkable. Uses:
+support that knows ("where did my sword go" with commit, time, cause);
+NPCs with real memory (a sage who recounts what the player did and
+reminds them of the clue from three months ago); a builder's assistant
+(explain what an edit did in play, flag rooms nobody reaches); watchers
+on the live stream (dupes, gold from nowhere, impossible states, with
+evidence). Scope from the start: player-facing agents confined to that
+player's subgraph, admin agents with an audit trail of what they read;
+scoping is the movie's frame computation, enforced rather than chosen.
