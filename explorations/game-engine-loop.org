@@ -1,0 +1,336 @@
+#+TITLE: Perilous Realms: the game engine loop
+#+DATE: 2026-09-30
+#+OPTIONS: toc:2
+
+Read from =src/= at commit 94876a77 (master). Line numbers are for that
+commit. Everything below was checked against the code, not the docs; where
+a name is historical or misleading it says so.
+
+* Overview
+
+The server is one process, one thread, one loop. Everything the game does
+happens inside =game_loop()= in =comm.c:91=, which runs 100 times a second.
+Each pass is a /pulse/. Within a pass the order is fixed: read the network,
+run the events due this pulse, execute at most one command per connection,
+write output and prompts, then run whatever periodic work is due at this
+pulse count, then sleep until the next pulse is due.
+
+There are three time scales:
+
+| unit  | length            | what runs on it                                      |
+|-------+-------------------+------------------------------------------------------|
+| pulse | 10 ms (100/s)     | network, one event slot, one command per connection  |
+| second-ish | 1 s, 2 s, 4 s, 10 s | pulse affects, class resources, sector damage, zone save |
+| tick  | 60 s (=PULSE_PLAYER=) | regen, hunger, spell durations, weather, zone ageing, long-term scheduler |
+
+The word "tick" in the code and in player speech means the 60-second one.
+
+* Boot, before the loop
+
+=main()= parses flags (=-d= data dir, =-p= purge days, =-a= extra ports,
+port), chdirs into the data dir, installs signal handlers, opens the
+listening sockets (=init_socket=, one per port, bound to the address
+=gethostbyname(hostname)= returns) and calls =boot_db()=. The boot order
+as the log records it:
+
+1. clans, races, item sets, effects, classes
+2. no-rent list, disable list, sectors
+3. world file (=world.out=, 26,287 rooms), then updated rooms from =UPDATE/=
+4. mob file, global variables, object file (=obj.out=, 4,854 prototypes)
+5. special-procedure assignment for mobs, objects, rooms; shops
+6. =WorldSave/= (persisted room state per zone)
+7. boot-time reset of every zone (=reset_zone=, see below)
+8. no-new, wizlocked and always-allowed host lists
+9. "Entering game loop."
+
+Every mob loaded gets its first =EVT_MOBILE= event at a random delay of 1
+to =PULSE_MOBILE= (12 s) pulses (=mobdb.c:367=). Every character and
+object gets a per-tick update event when created (=limits.c:869,987=).
+Doors with reset timers get an =EVT_DOOR= (=roomdb.c:208=).
+
+* One pulse, in order
+
+All references are =comm.c= unless noted.
+
+** 1. Poll the network (:135-153)
+
+=select()= with a zero timeout over every listening socket and every
+connection's descriptor, for input, output and exceptions. This never
+blocks; sleeping happens at the end of the pass.
+
+** 2. Accept (:158-160)
+
+For each listener with a pending connection, =new_connection()= until
+none remain. A connection from a wizlocked host is refused with a message
+and closed. Otherwise a =connection_data= is allocated, added to
+=connection_list=, and =hello_new_conn= sends the telnet =IAC DO
+LINEMODE= and the login banner. Connection state is a small state machine
+(=nanny.c=) until the character enters the game (=CON_PLYNG=).
+
+** 3. Per-connection input (:162-174)
+
+For each connection:
+
+- With probability 1/10,000 per pulse (about once per 100 s per
+  connection) the character is autosaved (=do_save=).
+- An exception on the socket closes it.
+- Readable input goes to =process_input()= (:885), which reads what is
+  available, handles telnet option negotiation bytes inline (=IAC ...=),
+  strips control characters and bytes above 127, handles backspace, and
+  assembles complete lines. A line longer than =MAX_INPUT_LENGTH= is
+  truncated with a warning. A line of =!= repeats the last input.
+- Each complete line is queued on the connection's /input queue/. If the
+  character is playing and not in the string editor or pager, the command
+  word is resolved right here (=command_interpreter=, :1009) and the
+  line is inserted by priority: =write_to_pq= (=queue.c=) sorts by
+  =cmd_info[cmd].priority= for characters flagged =PLR_PRIORITY=, and a
+  command flagged =CMDF_FLUSH= discards everything queued behind it.
+  Otherwise lines are appended in order.
+
+Nothing is executed yet.
+
+** 4. Advance the pulse counter (:176-180)
+
+=PULSE++=, wrapping at =PULSE_MAX= (600 s worth). =phase = PULSE %
+PULSE_PLAYER= selects one of 6,000 event slots.
+
+** 5. Run this pulse's events (:184-222)
+
+The short-term event queue is a /timing wheel/: =event_queue[]= has
+=PULSE_PLAYER= slots, one per pulse of a tick. Every event in slot
+=phase= is run now, in insertion order, unless it was tombstoned
+(=EVT_REMOVED=). Events that reschedule themselves (most do) insert into
+a later slot. Fired events are freed after the slot is drained.
+
+See [[*The event system]] for what is in there.
+
+** 6. Execute commands (:225-263)
+
+For each connection, in list order:
+
+- If it has a character, decrement the character's /wait state/
+  (=ch->wait=, in pulses). While it is positive the connection is
+  "delayed" and no command runs. =WAIT_STATE(ch, n)= (=h/utils.h:296=)
+  is how commands and spells impose lag; =WAIT_SEC= is 100 pulses.
+- If not delayed, take /one/ entry from the input queue
+  (=get_from_pq=). Running any command sets =wait= to 1, so a
+  connection executes at most one command per pulse even with a full
+  queue; a command that adds =WAIT_STATE= extends that.
+- Dispatch: if the connection is in the string editor (=d->str=), the
+  line goes to =string_add=; if the pager is active (=d->showstr_point=),
+  to =show_string=, which treats a non-empty line as "quit the pager"
+  and /consumes it/ (so a command typed at a =[Press return]= prompt
+  never runs); if playing, to =command_process()= with the command
+  number resolved at enqueue time; otherwise to =nanny()=, the login and
+  menu state machine.
+
+=command_process= (=interpreter.c=) checks wrong-world and leash
+conditions, per-character and per-account revoked and granted commands
+(=cmd_ok=), arena, disabled and no-mob flags, paralysis, confusion,
+position, then calls the handler with =cmd_info[cmd].num= as its
+sub-command.
+
+** 7. Output and prompts (:264-301)
+
+For each connection whose socket is writable and that has queued output
+or has not just printed a prompt:
+
+- Prompt state =need_prompt= is 0 (nothing pending), 1 (print a prompt
+  after output) or 2 (just printed one). A command sets it to 1. If it
+  is 0 and =PULSE_PROMPT= (1 s) has passed since the last prompt, it
+  becomes 1, so an idle connection re-prompts about once a second when
+  something was sent to it.
+- =process_output()= (:639) drains the output queue and the priority
+  output queue (the latter skipped for =PLR_VEG= characters in the
+  editor), copying to any snoopers, and renders each string with
+  =write_to_conn()=: telnet sequences pass through, =#{...}= colour
+  tags become the connection's terminal escape codes, =\n= becomes
+  =\r\n=, and long lines are word-wrapped at the character's page width.
+- Then the prompt: =] = in the editor, =[Press return to continue, q to
+  quit]= in the pager, otherwise =make_prompt()= for a playing
+  character, preceded by a blank line unless =PLR_COMPACT=.
+
+** 8. Periodic work keyed to the pulse count (:304-357)
+
+Each block runs when =PULSE= is a multiple of the interval. Intervals
+are defaults from =h/ticks.h= and can be changed live with the immortal
+=ticks= command (=ticks.c:38=), which also resets them.
+
+| every | constant           | work                                                                  |
+|-------+--------------------+-----------------------------------------------------------------------|
+| 10 s  | =PULSE_ZONE_SAVE=  | =SaveZone()=: write /one/ saveable zone's =WorldSave/zone.N=, round robin; =UpdateStatus()=: rewrite the who-is-online HTML status file |
+| 60 s  | =PULSE_ZONE=       | =zone_update()= (=zone.c=): clear per-zone mob and object counts, then for every zone with a reset type: =age++=; when =age >= reset_freq=, reset if type 2 ("always") or type 1 and the zone is empty of players |
+| 60 s  | =PULSE_AUDIO=      | =MakeSound()=: ambient object noises and mob sounds, 1 in 6 chance per sounding mob |
+| 4 s   | =PULSE_VIOLENCE=   | =perform_special_rooms()= (=fight.c=): sector damage to players standing in fire, water and similar rooms without protection. The name is historical; combat rounds are events now, see below |
+| 1 s   | =PULSE_ABILITY=    | =update_pulse_affects()=: for every character, time-based /pulse affects/: run a proc when its frequency is due, expire it when its duration is up, expire cooldowns and item-set abilities. These use wall-clock =time()=, not the pulse count |
+| 2 s   | =PULSE_MODERN_TIC= | =update_modern_tic()=: class resources, rage decay for warrior/barbarian builds, energy gain for thieves |
+| 60 s  | =PULSE_PLAYER=     | the tick: =event_tick()= (long-term scheduler), =weather_and_time()= (advance one mud hour, change weather), =affect_update()= (spell durations on every character), =update_hates_and_fears()= (players), =boot_idle_conn()= (drop connections that never got past login within 5 min) |
+
+A zone reset (=reset_zone=, =zone.c:834=) logs "Reset zone <name>", zeroes
+the zone's age and executes the zone's command list (=perform_commands=):
+load mobs and objects up to their limits, equip and give, put in
+containers, set doors, purge, with range and list conditions. Boot-only
+command lists exist for zones that should not repopulate later. This is
+the line that fills 99% of the log.
+
+** 9. Housekeeping (:359-366)
+
+Wrap =PULSE= at =PULSE_MAX=; =TICS++= (a liveness counter for the
+compiled-out deadlock checkpoint); if a reboot is scheduled
+(=reboot_time=), =handle_reboot()= sends countdown warnings and, at zero,
+sets the shutdown flag.
+
+** 10. Sleep until the next pulse (:368-413)
+
+The loop keeps an absolute =next_tick= timestamp and advances it by
+=PULSE_TIMEOUT= (10 ms) each pass. It sleeps for the remainder with a
+=select()= on no descriptors. If the pass took longer than a pulse, the
+timeout is zero and a =fall_behind= counter increments; after four
+consecutive late passes (a second behind) the schedule is resynchronised
+to now and, in debug builds, "Game is falling behind" is logged. There is
+no catch-up: missed pulses are simply skipped, so all intervals stretch
+under load.
+
+* The event system
+
+Two schedulers, one for pulses and one for ticks.
+
+** Short-term: the timing wheel (=events.c:335=, =comm.c:184=)
+
+=add_event(delay, type, ch, victim, obj, room, vnum, args, function)=
+creates an =event_t= and puts it in slot =(PULSE + max(1, delay)) %
+PULSE_PLAYER=. Delay is in pulses, so the wheel covers one tick. An event
+is refused if =ch= or =victim= is already dead (except death events). A
+delay of a tick or more is rerouted through the long-term scheduler as an
+=EV_RESCHED= that re-issues =add_event= when its tick arrives (the code
+comments this "Scarrow sucks").
+
+Event types and who creates them:
+
+| type             | created by                                   | what it does when it fires                                                                     |
+|------------------+----------------------------------------------+------------------------------------------------------------------------------------------------|
+| =EVT_MOBILE=     | mob load (=mobdb.c:367=), then itself       | mob AI: =event_mobile= (=mobact.c=) bumps the mob's =pulse_count=, runs =act_state()=, consumes one second of the mob's wait state, and reschedules after the remaining wait or 1 s. So every mob thinks about once a second |
+| =EVT_STRIKE=     | =set_fighting= / =hit= (=fight.c:237,4039=), then itself | one blow: =event_strike= checks the fight is still on and in the same room, runs the mob special or =hit()=, then schedules the next blow after =calc_speed(ch)= pulses, which is =100 * PULSE_PER_SEC / speed_percent= (=limits.c=), so a 100% speed attacker strikes once a second. Combat is therefore per-attacker and asynchronous, not a shared round |
+| =EVT_PLR_UPDATE= | character creation (=limits.c:869=), then itself | the per-character tick, =ev_update_player=: regen hit, mana, power and move for anyone at least stunned (link-dead players do not lose points), a 50% chance per tick to worsen hunger, thirst, drunkenness and fullness (remort sustain reduces it), 5 damage if incapacitated and 1 if mortally wounded, =update_char_objects=, and for players =check_idling=: save at 5 idle ticks, pull into the void at 720 (12 h), extract after 1440 (24 h). New characters get their first one at a random point near the end of the current tick "to discourage enter/exit" |
+| =EVT_OBJ_UPDATE= | object creation (=limits.c:987=), then itself | the per-object tick, =ev_update_obj=: count down =timer2= and phase the object out of existence at zero, plus other timers |
+| =EVT_SPELL=      | =spell_parser.c:1090=                        | a cast completes after its casting delay; the caster also gets =WAIT_STATE= |
+| =EVT_SKILL=      | skills                                       | delayed skill effects                                                                          |
+| =EVT_DEATH=      | =move.c:573= and death handling              | death processing a quarter second after the fact                                               |
+| =EVT_RUN=        | =move.c:1601,1642=                           | the next step of a running character, one room per event, slower when flying                  |
+| =EVT_TRAVEL=     | =utils.c:348,368=                            | animated travel, =PULSE_TRAVELING= (10 pulses) per room                                       |
+| =EVT_FALLING=    | =move.c:493,527=, =spec_obj.c:777=           | falling through fall rooms, faster the further fallen                                          |
+| =EVT_RIVER=      | =handler.c:3428=                             | being carried by a river or water room at its =river_speed=                                    |
+| =EVT_TELEPORT=   | =handler.c:3423=                             | teleport rooms after =tele_time=                                                                |
+| =EVT_DOOR=       | =roomdb.c:208=, =db.c:480=                   | a door returns to its default state after =reset_time=, then re-arms                          |
+| =EVT_REMOVED=    | =remove_event= callers                       | tombstone; skipped when its slot comes round                                                    |
+
+Everything a mob or player is "doing over time" is one of these, which is
+why there is no per-mob or per-fight loop anywhere: the loop only drains
+the slot.
+
+** Long-term: ticks (=events.c= top, =event_tick=)
+
+A sorted list of =event= records keyed by tick number, drained once per
+=PULSE_PLAYER= by =event_tick()=. Types: =EV_FUNC= (call a function),
+=EV_ROOM_FLAG= (set or clear a room flag later, used by relocation magic
+and wizard commands), =EV_CHAR_DATA= and =EV_OBJECT= (validated against
+the live character and object lists before firing, so a freed target is
+skipped rather than dereferenced), and =EV_RESCHED= for the long delays
+handed over from =add_event=. Granularity is one minute.
+
+* Mob AI per event (=act_state=, =mobact.c:180=)
+
+In order, first match wins: group up with a leader if =group_with= is
+set; stop fighting a victim who left the room; run the mob's special
+procedure if it has one (fight specials every third event); every 20th
+event decay hatred; do nothing while lagged, charmed, paralysed or
+confused; healers heal every =PULSE_HEALER=; if fighting, =act_fight=;
+hunters =MobHunt=; aggressive mobs look for a target every 4th event;
+aid friends; scavengers pick things up every 4th event, humanoids spread
+hatred and pick up or discard items on a 5-event cycle; maintain
+position; hateful and afraid behaviour; non-sentinels wander every 5th
+event; guardians. Sleeping mobs may wake on a resistance check. Several
+branches =sendf= debug text to the mob, visible only to an immortal
+switched into it.
+
+* Wait states and lag
+
+=ch->wait= is a pulse count. Commands, spells and skills add to it with
+=WAIT_STATE=. For players it is decremented once per pulse in step 6 and
+blocks command execution while positive. For mobs it is consumed a second
+at a time by =event_mobile=, which also delays the mob's next AI event by
+the remainder, so a lagged mob simply thinks later.
+
+* Time and weather
+
+=weather_and_time(1)= once per tick advances =time_info.hours= by one, so
+a mud hour is one real minute, and rolls days, months and years; then
+=weather_change= moves the sky and pressure. Sunrise and sunset messages
+and light levels come from this clock.
+
+* Signals and shutdown (=signals.c=, =main.c:290=)
+
+- =SIGHUP=, =SIGINT=, =SIGTERM=: save every player, =full_save_world=,
+  exit.
+- =SIGSEGV=, =SIGBUS=, =SIGFPE=, =SIGABRT= and friends: =signal_fatal=,
+  which logs and re-raises for a core (the server script sets =ulimit -c
+  unlimited=). "Signal trapping." in the boot log is this being installed.
+- =SIGUSR1=: =crash_off= (disable the fatal handlers). =SIGUSR2= and
+  =SIGALRM=: wake the =select= sleep early (=EINTR=).
+- A =DEADLOCK= build option adds a checkpoint that aborts if =TICS= has
+  not advanced between alarms. It is compiled out.
+
+The loop exits when =shutdwn= is set (the =shutdown= command, or
+=handle_reboot= reaching zero). =main= then does =full_save_world()= and
+=close_sockets()= and returns. =PR_SERVER_SCRIPT= restarts the binary in a
+=while true= loop unless =lib/CLEAN_EXIT= exists; =lib/BOOT_CLEAN= makes
+the next boot discard =WorldSave/=.
+
+* Cost model
+
+Per pulse: =O(connections)= for select and the three connection walks,
+plus whatever events sit in one of the 6,000 slots. With 10,000 mobs each
+firing about once a second, that is roughly 100 mob events and a handful
+of strikes per pulse.
+
+Per second: a full walk of =character_list= (=update_pulse_affects=),
+another every 2 s (=update_modern_tic=), another every 4 s
+(=perform_special_rooms=, players only).
+
+Per tick: four more full character walks (=affect_update=,
+=update_hates_and_fears=, and every character's and every object's own
+update event spread across the tick's 6,000 slots), one walk of the
+zone list, and however many zones reset.
+
+Measured on production: 133 MB resident, about 12% of one core with a
+handful of players.
+
+* Quirks worth knowing
+
+- A command typed while the pager is waiting is eaten by the pager.
+- Autosave is random, roughly every 100 s per connection, on top of the
+  per-tick idle-save and event-driven saves.
+- =PULSE_VIOLENCE= no longer drives violence; combat is entirely
+  event-driven per attacker.
+- Missed pulses are skipped, not caught up, so under load every interval
+  stretches together and nothing runs twice.
+- Pulse affects and cooldowns use wall-clock seconds; everything else
+  uses pulse counts. A long stall therefore expires pulse affects but
+  freezes spell durations.
+- Long delays cross from the pulse wheel to the tick scheduler and back,
+  so an event scheduled 90 s out fires with up to a minute of slop.
+- The random autosave and =boot_idle_conn= are the only things that
+  touch a connection outside the input, command and output passes.
+
+* Implications for a rewrite
+
+The loop is a 100 Hz frame with a 6,000-slot timing wheel over it and a
+coarse scheduler above that. In an asyncio or Lisp image the same three
+pieces map directly: a fixed-rate frame task; a timing wheel or heap of
+pulse-delayed callbacks; and a minute-granularity scheduler for long
+delays. The per-second and per-tick full walks of =character_list= are
+the only parts that scale with world size rather than activity, and all
+of them are candidates for per-entity events like the ones the game
+already uses for regen, which would make the idle cost proportional to
+what is actually happening. Combat, movement, casting and mob AI are
+already per-entity events and port as they are.
