@@ -894,12 +894,20 @@ Operational finding: TWO production games are live and diverging since
 player files saved. New host: 5 accounts, 21 entries, 18 files. Nitemare's
 client evidently has the old IP. Fix for the report: rebuild on the old host
 (or retire it and point players at perilousrealms.com:5024); merging the
-forked player saves is a separate problem. Sandboxes left running here:
-ports 2151 (master), 2152 (eb40d673), 2153 (new-host binary), 2154
-(b7bffd4a), 2155 (old-host binary, gdblib5); worktrees under the scratchpad.
+forked player saves is a separate problem. The five sandboxes, their data copies, the copied production binaries
+and the two worktrees were removed on 2026-09-30; only `tclient.py`,
+`setpw.gdb` and the session transcripts remain in the scratchpad.
 
 2026-09-30, later: Sam shut down the old host's game instance
 (54.193.215.24). Players who still used that address (Nitemare / account
 bun among them) must now connect to perilousrealms.com:5024. Player saves
 made on the old host between 09-19/25 and the shutdown (15 files since its
 09-25 boot) are not on production; whether to merge them is open.
+
+Log retention (2026-09-30): production `live/logs` was 2.8 GB / 2,850
+files since 2018, ~99% "Reset zone" lines; nothing ever deleted them.
+Added `prune_logs [dir]` to `scripts/pr_functions.sh`, called by
+PR_SERVER_SCRIPT right after rotating at each start: deletes `*.log`
+older than the earlier of Jan 1 of this year and three months ago (keeps
+whichever is more). Live `log` and `recent/` untouched. Tested on fake
+files; takes effect on production at its next restart after a pull.
