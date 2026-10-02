@@ -3,8 +3,10 @@
 #+OPTIONS: toc:2
 
 Everything about non-player characters, read from =src/= at commit
-94876a77. Companion to =game-engine-loop.org=, which covers the loop
+94876a77. Companion to [[file:game-engine-loop.org][game-engine-loop.org]], which covers the loop
 and event wheel that drive mobs.
+
+See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the wheel and the think event), [[file:rooms.org][rooms.org]] (zones, resets, wandering constraints, specials order), [[file:objects.org][objects.org]] (what mobs carry and drop), [[file:players.org][players.org]] (the shared character struct).
 
 * What a mob is
 
@@ -35,7 +37,7 @@ special-procedure pointer =func=. =real_mobp(vnum)= fetches one.
 
 * Loading and limits
 
-Mobs enter the world only through zone resets (=zone.c=, =reset_zone=
+Mobs enter the world only through zone resets ([[file:rooms.org::*Ageing and reset][rooms, "Ageing and reset"]]; =zone.c=, =reset_zone=
 → =perform_commands=), at boot and then whenever a zone's age reaches
 its reset frequency (always, or only when no players are in it). A
 zone's command list says which mob loads in which room, with optional
@@ -79,8 +81,8 @@ Evaluated in order every think; the first branch that acts wins.
 4. Every 20th think, =DecayHatred=.
 5. Do nothing while lagged (=wait=), charmed, paralysed or confused.
 6. =ACT_HEALER=: heal self or friends every =PULSE_HEALER=.
-7. If fighting: =act_fight= (below).
-8. If =ACT_HUNTING=: one step of =MobHunt= (below).
+7. If fighting: =act_fight= ([[*In a fight][below]]).
+8. If =ACT_HUNTING=: one step of =MobHunt= ([[*Hunting: chasing across rooms (=MobHunt=, =mobact.c=)][below]]).
 9. If aggressive (=IS_AGGR=: =ACT_AGGRESSIVE= and not calmed), every
    4th think: =act_aggressive=.
 10. Standing: =aid_friends=, join a fight on the side of a mob with the
@@ -209,7 +211,7 @@ in =default_zone= if =ACT_STAY_ZONE=. Guardians do not wander.
 * In a fight
 
 Combat is per attacker: each fighter has its own =EVT_STRIKE= chain
-timed by =calc_speed= (=game-engine-loop.org=). On each of a mob's
+timed by =calc_speed= ([[file:game-engine-loop.org::*The event system][engine, "The event system"]]). On each of a mob's
 strikes, =DevelopHatred= first, then =mob_attack= rolls against the
 mob's skill and spell lists for a special attack and, failing that, a
 plain =hit=. Independently, the think's =act_fight= branch lets
@@ -297,7 +299,7 @@ limit.
 ** There is no "mob pass" in the engine
 
 The engine never iterates mobs. Each mob owns exactly one =EVT_MOBILE=
-event on the wheel (=game-engine-loop.org=, "The wheel"); when it fires
+event on the wheel ([[file:game-engine-loop.org::*The event system][engine, "The event system"]]); when it fires
 it runs =act_state= once and reschedules itself: after the mob's
 remaining =wait= if it is lagged, else one second (=WAIT_SEC=, 100
 pulses), or always one second for =ACT_SPEC= mobs so their special
@@ -376,4 +378,4 @@ grouping hold pointers validated against the live list before use, and
 "same vnum = friend" stands in for the identity the game lacks. Objects
 are the same: a saved sword in a player file is a copy of its fields,
 not a reference. A rewrite must give every mob and object instance an
-id at creation (see SUMMARY.md §16, ids).
+id at creation (see [[file:../SUMMARY.md][SUMMARY.md]] §16, ids, and [[file:objects.org::*Prototype and instance][objects, "Prototype and instance"]]).

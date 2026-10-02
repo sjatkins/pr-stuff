@@ -6,6 +6,8 @@ Read from =src/= at commit 94876a77 (master). Line numbers are for that
 commit. Everything below was checked against the code, not the docs; where
 a name is historical or misleading it says so.
 
+See also: [[file:mobs.org][mobs.org]] (what the mob think event does), [[file:objects.org][objects.org]] (the per-object tick), [[file:players.org][players.org]] (sessions, saves, idle), [[file:rooms.org][rooms.org]] (zone ageing and resets, room events).
+
 * Overview
 
 The server is one process, one thread, one loop. Everything the game does
@@ -168,7 +170,7 @@ are defaults from =h/ticks.h= and can be changed live with the immortal
 | 2 s   | =PULSE_MODERN_TIC= | =update_modern_tic()=: class resources, rage decay for warrior/barbarian builds, energy gain for thieves |
 | 60 s  | =PULSE_PLAYER=     | the tick: =event_tick()= (long-term scheduler), =weather_and_time()= (advance one mud hour, change weather), =affect_update()= (spell durations on every character), =update_hates_and_fears()= (players), =boot_idle_conn()= (drop connections that never got past login within 5 min) |
 
-A zone reset (=reset_zone=, =zone.c:834=) logs "Reset zone <name>", zeroes
+A zone reset ([[file:rooms.org::*Ageing and reset][rooms, "Ageing and reset"]]; =reset_zone=, =zone.c:834=) logs "Reset zone <name>", zeroes
 the zone's age and executes the zone's command list (=perform_commands=):
 load mobs and objects up to their limits, equip and give, put in
 containers, set doors, purge, with range and list conditions. Boot-only
@@ -211,10 +213,10 @@ Event types and who creates them:
 
 | type             | created by                                   | what it does when it fires                                                                     |
 |------------------+----------------------------------------------+------------------------------------------------------------------------------------------------|
-| =EVT_MOBILE=     | mob load (=mobdb.c:367=), then itself       | one mob's think: =event_mobile= (=mobact.c=) does =pulse_count++=, =act_state()= (the behaviour priority list, see =mobs.org=), =wait -= 1 s= clamped at 0, then reschedules itself after the remaining wait, or 1 s (always 1 s for =ACT_SPEC= mobs). There is no pass over all mobs anywhere: each mob is its own event, only the mobs in this pulse's slot think, and every mob thinks once per second. Its blows are a separate =EVT_STRIKE= chain |
+| =EVT_MOBILE=     | mob load (=mobdb.c:367=), then itself       | one mob's think: =event_mobile= (=mobact.c=) does =pulse_count++=, =act_state()= (the behaviour priority list, see [[file:mobs.org::*The decision list (=act_state=, =mobact.c:180=)][mobs, "The decision list"]]), =wait -= 1 s= clamped at 0, then reschedules itself after the remaining wait, or 1 s (always 1 s for =ACT_SPEC= mobs). There is no pass over all mobs anywhere: each mob is its own event, only the mobs in this pulse's slot think, and every mob thinks once per second. Its blows are a separate =EVT_STRIKE= chain |
 | =EVT_STRIKE=     | =set_fighting= / =hit= (=fight.c:237,4039=), then itself | one blow: =event_strike= checks the fight is still on and in the same room, runs the mob special or =hit()=, then schedules the next blow after =calc_speed(ch)= pulses, which is =100 * PULSE_PER_SEC / speed_percent= (=limits.c=), so a 100% speed attacker strikes once a second. Combat is therefore per-attacker and asynchronous, not a shared round |
-| =EVT_PLR_UPDATE= | character creation (=limits.c:869=), then itself | the per-character tick, =ev_update_player=: regen hit, mana, power and move for anyone at least stunned (link-dead players do not lose points), a 50% chance per tick to worsen hunger, thirst, drunkenness and fullness (remort sustain reduces it), 5 damage if incapacitated and 1 if mortally wounded, =update_char_objects=, and for players =check_idling=: save at 5 idle ticks, pull into the void at 720 (12 h), extract after 1440 (24 h). New characters get their first one at a random point near the end of the current tick "to discourage enter/exit" |
-| =EVT_OBJ_UPDATE= | object creation (=limits.c:987=), then itself | the per-object tick, =ev_update_obj=: count down =timer2= and phase the object out of existence at zero, plus other timers |
+| =EVT_PLR_UPDATE= | character creation (=limits.c:869=), then itself | the per-character tick ([[file:players.org::*A session][players, "A session"]]), =ev_update_player=: regen hit, mana, power and move for anyone at least stunned (link-dead players do not lose points), a 50% chance per tick to worsen hunger, thirst, drunkenness and fullness (remort sustain reduces it), 5 damage if incapacitated and 1 if mortally wounded, =update_char_objects=, and for players =check_idling=: save at 5 idle ticks, pull into the void at 720 (12 h), extract after 1440 (24 h). New characters get their first one at a random point near the end of the current tick "to discourage enter/exit" |
+| =EVT_OBJ_UPDATE= | object creation (=limits.c:987=), then itself | the per-object tick ([[file:objects.org::*The per-object tick (=ev_update_obj=, =limits.c:990=)][objects, "The per-object tick"]]), =ev_update_obj=: count down =timer2= and phase the object out of existence at zero, plus other timers |
 | =EVT_SPELL=      | =spell_parser.c:1090=                        | a cast completes after its casting delay; the caster also gets =WAIT_STATE= |
 | =EVT_SKILL=      | skills                                       | delayed skill effects                                                                          |
 | =EVT_DEATH=      | =move.c:573= and death handling              | death processing a quarter second after the fact                                               |

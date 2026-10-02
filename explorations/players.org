@@ -3,8 +3,10 @@
 #+OPTIONS: toc:2
 
 Accounts and player characters, read from =src/= at commit 94876a77.
-Companion to =game-engine-loop.org= and =mobs.org=. No player data was
+Companion to [[file:game-engine-loop.org][game-engine-loop.org]] and [[file:mobs.org][mobs.org]]. No player data was
 read for this; everything comes from the code and the world data files.
+
+See also: [[file:game-engine-loop.org][game-engine-loop.org]] (one command per pulse, the tick, prompts), [[file:objects.org][objects.org]] (inventory as inline copies), [[file:mobs.org][mobs.org]] (the same struct, identity), [[file:rooms.org][rooms.org]] (load rooms, rentable rooms, the void).
 
 * Two things: accounts and characters
 
@@ -147,7 +149,7 @@ whole inventory and each worn item (tag =WEAR= plus slot) serialised
 inline with =SaveObjectList=, then every affect and pulse affect. A
 character's objects therefore live inside its file as copies; nothing
 references an object anywhere else, and there is no instance identity
-for them (see =mobs.org=, identity). Tag 49 is the room to load into
+for them (see [[file:mobs.org::*No instance identity][mobs, "No instance identity"]] and [[file:objects.org::*Persistence][objects, "Persistence"]]). Tag 49 is the room to load into
 next time, which is why =save_char(ch, room)= takes a room.
 
 Loading is =load_char(ch, name)= → =load_char_with_path=, a switch on
@@ -232,7 +234,7 @@ game" is logged, and the per-tick update event starts.
 ** While playing
 
 One command per pulse, lag by wait states, the pager, the string
-editor: all in =game-engine-loop.org=. Every tick (60 s)
+editor: all in [[file:game-engine-loop.org::*One pulse, in order][engine, "One pulse, in order"]]. Every tick (60 s)
 =ev_update_player= regenerates hit, mana, power and move, worsens
 hunger, thirst and drunkenness with 50% probability, damages the
 incapacitated and mortally wounded, and advances the idle timer.
@@ -262,7 +264,7 @@ keeps the higher value). Reconnecting resumes in place.
 
 ** Leaving
 
-- =camp=: only in a =RENTABLE= room for mortals, not while fighting,
+- =camp=: only in a =RENTABLE= room ([[file:rooms.org::*Room flags (=h/const.h:425=)][rooms, flags]]) for mortals, not while fighting,
   not while hurt, not during a PK cooldown. Junk is removed, the
   character is saved with everything it carries and wears, and leaves.
 - =quit=: anywhere, but the warning is explicit: quitting outside a

@@ -1,75 +1,218 @@
-#+TITLE: Rooms — what the extractor taught us
-#+AUTHOR: notes from building py_json/src/prworld (rooms)
-#+DATE: 2026-09-27
-#+STARTUP: overview
+#+TITLE: Perilous Realms: rooms and zones
+#+DATE: 2026-10-02
+#+OPTIONS: toc:2
 
-* Where rooms live
+The world's geography: rooms, exits, sectors, zones and resets. Read
+from =src/= at commit 94876a77 and =world/=.
 
-- Source: =world/ROOM/*.room=, 149 files, one per area. Driven by
-  =world/ROOM/ALLROOMS=, which =#include=s =area.list= and then every area
-  file in a fixed order.
-- =area.list= is nothing but =#define <Area> <base vnum>= lines, one per
-  area (163 lines). Each area file opens with =#offset <Area>=, which sets
-  the base added to every local room number and exit target in that file.
-- Compiled by =world/ROOM/compile= → =../tran room ALLROOMS world.out=,
-  copied to =live/lib/world.out=. Loaded at boot by =roomdb.c:boot_world= /
-  =read_one_room= into the =room_db= hash table (preallocated for 163,840
-  =room_data= slots).
-- Extracted to =py_json/out/rooms.jsonl=: 26,287 rooms, 148 areas.
+See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the pulse
+that ages zones and fires room events), [[file:mobs.org][mobs.org]]
+(what zone resets load into rooms, wandering and hunting across them),
+[[file:objects.org][objects.org]] (floor objects and zone saves),
+[[file:players.org][players.org]] (load rooms, rentable rooms, the void).
 
-* Record format
+* The numbers
 
-A room is =<local number> { field { value } ... }=. Absolute vnum = local +
-area base. Fields (schema =room_fields= in =PRLib/fields.c=):
+| rooms loaded at boot        | 26,287 (=world.out=)            |
+| zone files                  | 136 in =world/ZONE=              |
+| zones loaded                | 129 ("loaded." lines in the log) |
+| sector types                | 30 in code, with world data per sector |
+| room specials               | 18 in =spec_rooms.c=             |
 
-| token                | type | notes                                                  |
-|----------------------+------+--------------------------------------------------------|
-| name                 | STR  |                                                        |
-| description / desc   | STR  | leading =\"= is a convention and is stripped           |
-| sector               | E32  | name from the *sector* table, which is data-driven     |
-| flags                | BIT  | =room_bits=: dark, death, no_mob, indoors, mapable ... |
-| river                | RVR  | =dir, speed=                                           |
-| teleport / tele      | TEL  | =time, look, target-room=                              |
-| max_people           | S8   |                                                        |
-| size                 | VEC  | 3 doubles; unused in the sources                       |
-| map                  | ASTR | unused in the sources                                  |
-| extra                | SUB  | keyword/desc pairs; several pairs may share one block  |
-| exits                | SUB  | see below                                              |
+* A room (=room_data=, =h/structs.h:391=)
 
-Exits: inside =exits { }= each =to { dir, room }= starts a new exit and the
-lines that follow (=desc=, =keywords=, =info=, =start=, =key=, =reset=) attach
-to it. Directions may be names, abbreviations (=n=, =sw=) or numbers 0–9.
-Room references are a bare local number (same area) or =Area:n=. The
-=info= / =start= flags come from =exit_bits= (door, closed, locked, secret,
-pickproof, knockable, hidden, message, autoclose, autolock, crackable).
+| group      | fields                                                                                   |
+|------------+------------------------------------------------------------------------------------------|
+| identity   | =number= (the vnum; rooms are hashed in =room_db= by it), =name=, =description=, =ex_description= (keyword extras), =zone= |
+| kind       | =sector_type= (below), =room_flags= (below), =size=, =max_people= (0 = unlimited), =parent= |
+| light      | =light= (count of lit light sources present), =dark= (magical darkness count); see [[*Light and dark]] |
+| movement   | =exits= (linked list of =room_exit=), =river_speed= and =river_dir=, =tele_targ=, =tele_time=, =tele_look= |
+| tracking   | =track[]= (ring of up to =max_tracks= footprints: who, when, which way) |
+| live state | =contents= (objects on the floor), =people= (characters here), =visited=, =map= (cached minimap), =funct= (special procedure) |
 
-* Things learned
+As with mobs and objects, the occupant lists are intrusive singly linked
+lists threaded through the characters and objects themselves
+([[file:mobs.org::*No instance identity][mobs.org, "No instance identity"]]).
 
-- The sector name table is *not* in the C sources. =sector.c= builds
-  =sector_types[]= at boot from =sector.out=, so validation of =sector {}=
-  needs =world/SECT/sectors.current=. The extractor loads it first and emits
-  canonical spellings (=road= → =Road=). 6,450 rooms have no sector at all.
-- =tran='s =#define= name runs to the first space or ~=~, so =PR-Entrance= is
-  a legal area name.
-- =var_insert= rejects a duplicate *value*, not a duplicate name, and
-  =var_lookup= returns the lowest value for a name. =_Unknown9= is defined
-  twice in =area.list= (124800 and 129000) and resolves to 124800.
-- The room struct's =zone= is not in the source; it is computed at boot from
-  the zone ranges in =zone.out=. =funct= (special procedure) comes from a
-  hard-coded table in =spec_assign.c=. Everything else in =room_data= that
-  is not runtime state (light, people, contents, track) comes from the file.
-- Field id 13 is used twice in =room_fields=: =sector= (E32) and =size=
-  (VEC). Harmless only because =size= is never written.
-- =room_fields= has four field types (RVR, TEL, ROM, EXI) the schema-driven
-  reader in =PRLib/Schema.c= cannot handle, which is why rooms still go
-  through the hand-coded =read_one_room=.
+** Exits (=room_exit=)
 
-* Caveats in the data
+Direction =num= (north, east, south, west, up, down and more; =go= and
+=enter= use named exits), =to_room=, =keyword= and
+=general_description= for =look <dir>=, =exit_info= flags (below),
+=default_state= and =reset_time= for doors that reset, =key= (object
+vnum), a position and width used by the map, and the Mastermind
+=mm_crack_code= for crackable doors (same minigame as containers,
+[[file:objects.org::*Flags][objects.org, container flags]]).
 
-- 62 exits point at vnums that do not exist in any source file.
-- 14 rooms set =flags=, =sector= or =tele= twice; the server keeps the last
-  value and so does the extractor.
-- =Nether.zon= and =OnikumasClanRooms.zon= have room ranges but are not in
-  =zone.list=, so those rooms have no zone at runtime.
-- The extracted vnum set was checked against =world.out= byte-walked with
-  the same field sizes: exact match on all 26,287 vnums.
+Exit flags (=EX_*=, =h/const.h:472=): door, closed, locked, secret,
+pickproof, knockable, hidden, message, autoclose, autolock, crackable.
+A door with a =reset_time= gets an =EVT_DOOR= event at boot and after
+every change, returning it to =default_state= when the time is up
+([[file:game-engine-loop.org::*The event system][engine, "The event system"]]).
+
+In the world file:
+
+#+begin_example
+  exits {
+    to { n, 0 }
+    to { 11, Wasteland:12 }       ; a named direction into another zone
+      key { 4514 }
+      info { door, closed, autoclose, locked, autolock }
+      keywords { Greece }
+  }
+#+end_example
+
+Room numbers in a zone file are offsets from the zone's range start;
+=Zone:N= reaches into another zone.
+
+** Room flags (=h/const.h:425=)
+
+| flag                           | effect                                                     |
+|--------------------------------+------------------------------------------------------------|
+| =DARK=                         | dark unless a light is present                             |
+| =DEATH=                        | death trap: entering kills (=death_trap=)                  |
+| =NO_MOB=                       | mobs will not wander in                                    |
+| =INDOORS=                      | no weather, no sunlight                                    |
+| =PEACEFUL=                     | no fighting; aggression and hunting stop here ([[file:mobs.org::*Aggression and victim choice][mobs]]) |
+| =NOSTEAL=, =NO_SUM=, =NO_MAGIC=, =NO_GOTO= | the obvious restrictions                       |
+| =POINT_OF_INTEREST=            | marked on the map                                          |
+| =PRIVATE=                      | at most two people                                         |
+| =ANTI_GOOD=, =ANTI_NEUTRAL=, =ANTI_EVIL=, =LORD_ONLY= | entry restrictions by alignment or rank |
+| =RENTABLE=                     | may =camp= here ([[file:players.org::*Leaving][players, "Leaving"]]) |
+| =ARENA=                        | arena rules; the arena is a grid of rooms from 900         |
+| =FAST_MANA=, =FAST_HIT=, =FAST_MOVE= | regeneration bonuses                                 |
+| =MAPABLE=, =NOSHOWEXIT=        | map and exit display                                       |
+| =FALL=                         | falling room: an =EVT_FALLING= chain carries you down      |
+| =GOOD_ALTAR=, =NEUTRAL_ALTAR=, =EVIL_ALTAR= | altars for remort and sacrifice               |
+
+** Sectors (=SECT_*=, =world/SECT/sectors.current=)
+
+Thirty types in code (inside, city, field, forest, hills, mountain,
+swimmable and unswimmable water, air, underwater, fire, cold, desert,
+arctic, road, bracken, thicket, prototype, beach, temple, bridge, the
+winter variants, swamp, swamp road, mud, astral) and a data file per
+sector giving, for normal and flying movement, the move-point cost,
+the delay in pulses before the next move, the base chance of leaving
+tracks, flags such as =water_breath= and =no_weather=, an entry damage
+formula, and the minimap glyphs and colours. Sector 83 is =noshowmap=.
+Fire, cold and similar sectors also hurt unprotected players every 4 s
+([[file:game-engine-loop.org::*8. Periodic work keyed to the pulse count (:304-357)][engine, periodic work]]).
+
+Of the 26,284 rooms in the source files, 10,001 are sector
+=Prototype=, builders' placeholders.
+
+* Light and dark
+
+=IS_DARK(room)= is "no lit light source here, and the room is flagged
+=DARK= or has magical darkness". =light= is a counter: a character
+entering with a lit light in the light slot increments it
+(=handler.c:3418=), leaving decrements it, lights burning out
+decrement it ([[file:objects.org::*The per-object tick][objects, per-object tick]]).
+Outdoor rooms also follow the sun through =weather_and_time=.
+
+* What you see (=look_room=, =look.c:869=)
+
+Room name (coloured), a blue-glow marker, flags for immortals, the
+description, the minimap if =CONFIG_MAP= (=do_map auto=, drawn from
+exit geometry and the sector glyphs), objects on the floor, characters
+present, then the exit list unless =NOSHOWEXIT=, and the freshest set
+of tracks if the viewer can track ("Some very fresh tracks lead
+west."). This is the single room-display entry point, which is why the
+web plan hangs its room marker there ([[file:../SUMMARY.md][SUMMARY §14]]).
+
+* Moving between rooms (=do_move=, =move.c:735=)
+
+In order: refuse while falling, held by vines, or in too crowded a
+room to flee; run the room's and the mobs' =SPEC_MOVE= specials, which
+may block ([[file:mobs.org::*Special procedures][mobs, specials]]);
+check the exit exists and is not closed or secret; check sector
+requirements (boats on unswimmable water, water breathing underwater,
+flight for air); check the target's =max_people= and =PRIVATE= limits
+including followers; charge move points by sector and impose the
+sector's delay; leave tracks with the sector's probability;
+=char_from_room= / =char_to_room=, which bumps the light count and, on
+arrival, schedules the room's teleport or river event if it has one
+(=handler.c:3422=); then =look=. Followers move after the leader. A
+=DEATH= room ends the trip with =death_trap=; a =FALL= room with an
+open exit down starts an =EVT_FALLING= chain that speeds up the further
+you fall.
+
+Teleport rooms move everyone who stands in them to =tele_targ= after
+=tele_time= quarter-seconds, with =tele_look= deciding whether they
+look on arrival. River rooms push occupants =river_dir= every
+=river_speed= quarter-seconds.
+
+* Zones (=Zone=, =h/zone.h:70=; =world/ZONE/*.zon=)
+
+A zone is a name, a vnum =range=, an optional =save= range, a
+=reset_type= and =reset_freq=, a current =age=, a =zone_limit= list
+(maximum of each mob vnum alive in this zone), a =boot_only= command
+list, and the reset =cmds=.
+
+#+begin_example
+ZONE "Abyss"
+  range (25000-25125)
+  save (25000-25125)
+  reset (always, 27)
+  zone_limit { 10 mob 25005  7 mob 25016 ... }
+  boot_only { in 101 load obj 25102 }
+  in (0 & 25 & 27 & 29) load mob 25005
+  in (3 & 11) load atmost 2 mob 25017 with { 10% obj 25017 }
+  in 12 load mob 25014 with { 15% obj 25016  obj 25050  1% obj 25018 }
+#+end_example
+
+The grammar (=Zone/parser.y=) has =in= with single rooms, lists and
+ranges, =load=, =loadgroup=, =atmost= and =upto= counts, =with= and
+=containing= for equipment and contents chains, per-item
+probabilities, =requires=, =repeat=, and =chain=.
+
+** Ageing and reset
+
+Every 60 s =zone_update= ([[file:game-engine-loop.org::*8. Periodic work keyed to the pulse count (:304-357)][engine, periodic work]])
+increments every zone's =age=; when it reaches =reset_freq= the zone
+resets if its type is /always/ (2), or /ifempty/ (1) and no player is
+in it; type /never/ (0) only resets at boot. =reset_zone= (=zone.c:834=)
+logs "Reset zone <name>" (the line that is 99% of the log), zeroes the
+age, and runs the commands: for each, count what is already there,
+load the shortfall up to the limits, roll each probability
+([[file:mobs.org::*Loading and limits][mobs, loading]],
+[[file:objects.org::*Where objects come from][objects, where from]]).
+=zreset= does it on demand; =show zones= lists ages and lifespans.
+
+** Saving (=world.save.c=, =SaveZone=)
+
+Every 10 s one zone with a =save= range is written to
+=WorldSave/zone.N=: the rooms in that range with their floor objects
+and the per-prototype world counts. At boot these load after the world
+file, so dropped items and door states in saveable zones survive a
+reboot. =lib/BOOT_CLEAN= makes the next boot discard them.
+
+** Live room edits
+
+Builders edit rooms in game with =redit= (=I2=) and write a range of
+rooms to a file with =rsave <file> <lo> <hi>=. Files placed in
+=lib/UPDATE/= are loaded at boot after =world.out= and override those
+rooms ("Loading updated rooms", "UPDATE/NewWarg100410:32 rooms"),
+which is how a room change reaches production without recompiling the
+world. The world repo is still the source of truth for everything
+else.
+
+* Room specials
+
+18 C functions in =spec_rooms.c=, bound by vnum in =assign_rooms=. A
+room special is the first thing consulted for any command issued in
+the room ([[file:mobs.org::*Special procedures][dispatch order]]), so it
+can intercept movement, speech, or anything else.
+
+* Quirks
+
+- =light= is a counter maintained by hand on every enter, leave, wear,
+  remove and burn-out; a mismatch leaves a room permanently lit or
+  dark until reboot.
+- Sector 17, =Prototype=, is 38% of all rooms.
+- Tracks are a small ring per room; busy rooms forget quickly.
+- The map is cached per room in =map= and regenerated on demand.
+- =max_people= counts followers against the leader, so a group can be
+  refused a room that one of them could enter.
+- Room specials, like mob and object specials, are C functions by
+  vnum; there is no scripting for rooms either.

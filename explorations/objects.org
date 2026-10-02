@@ -4,7 +4,9 @@
 
 Items: prototypes, instances, where they live, how they load, change,
 persist and die. Read from =src/= at commit 94876a77 and the world data
-files. Companion to =game-engine-loop.org=, =mobs.org=, =players.org=.
+files. Companion to [[file:game-engine-loop.org][game-engine-loop.org]], [[file:mobs.org][mobs.org]], [[file:players.org][players.org]].
+
+See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the per-object tick event), [[file:rooms.org][rooms.org]] (zone resets and zone saves), [[file:players.org][players.org]] (the player file that carries objects), [[file:mobs.org][mobs.org]] (identity, specials dispatch).
 
 * Prototype and instance
 
@@ -17,8 +19,7 @@ pointer. 4,854 prototypes load from =obj.out= at boot.
 
 An /instance/ is an =obj_data= made by =get_obj(vnum, ...)= as a copy
 of the template. It has no identity beyond its memory address and its
-vnum: two long swords are two copies of prototype 3022 (see =mobs.org=,
-"No instance identity"). Instance-only state is the location pointers,
+vnum: two long swords are two copies of prototype 3022 (see [[file:mobs.org::*No instance identity][mobs, "No instance identity"]]). Instance-only state is the location pointers,
 timers, contents, sockets, mutations, provenance strings and anything
 an immortal changed.
 
@@ -41,8 +42,8 @@ an immortal changed.
 Exactly one of the location pointers is meaningful at a time, and the
 code maintains the room, character and container lists by hand
 (=obj_to_room=, =obj_from_char=, ...). The whole "where is it" question
-is these five pointers plus the intrusive lists; see =mobs.org= for why
-that matters.
+is these five pointers plus the intrusive lists; see [[file:mobs.org][mobs.org]] for why
+that matters ([[file:mobs.org::*No instance identity][mobs, identity]]).
 
 * Item types (=item_types[]=, =constants.c=)
 
@@ -128,7 +129,7 @@ rarity can rise with net karma. Applies are capped at 15 per object.
 ** Zone resets (=zone.c=)
 
 The only source of new instances other than immortals and a few
-specials. A zone command loads an object into a room (=O=), gives it to
+specials ([[file:rooms.org::*Ageing and reset][rooms, "Ageing and reset"]]). A zone command loads an object into a room (=O=), gives it to
 a mob (=G=), equips it (=E=), puts it in a container (=P= / =I=), or
 chains loads. =load_obj= (=zone.c:441=) counts how many of that vnum
 are already in the room, loads the difference up to the command's
@@ -163,7 +164,7 @@ on wear.
 ** The per-object tick (=ev_update_obj=, =limits.c:990=)
 
 Every object instance has its own =EVT_OBJ_UPDATE= event once per
-60-second tick (see =game-engine-loop.org=), which:
+60-second tick ([[file:game-engine-loop.org::*The event system][engine, "The event system"]]), which:
 
 - counts down =timer2= and, at zero, drops a carried item to the floor
   or deletes one inside a container, with "phases out of existence"
@@ -186,8 +187,7 @@ Objects with noises make them every 60 s on the audio pulse
 13 object special procedures in =spec_obj.c=, bound by vnum in
 =assign_objects=. They run with the same trigger types as mob specials
 (=SPEC_CMD=, =SPEC_MOVE=, ...) and are checked for every object the
-acting player wears or carries, then every object on the floor, after
-the room special and before the mobs (=interpreter.c:314=).
+acting player wears or carries, then every object on the floor, after the room special and before the mobs (=interpreter.c:314=; order in [[file:mobs.org::*Special procedures][mobs, "Special procedures"]]).
 
 ** Shops (=shop.c=, =world/SHOP=)
 
@@ -223,7 +223,7 @@ takes the current template's value.
 ** In rooms (=world.save.c=, =SaveZone=)
 
 Every 10 s one saveable zone (those with a =save= range in the zone
-file) has its rooms in that range written to =WorldSave/zone.N=,
+file) has its rooms in that range written to =WorldSave/zone.N= ([[file:rooms.org::*Saving (=world.save.c=, =SaveZone=)][rooms, "Saving"]]),
 including objects on the floor, and the world count per prototype. At
 boot these are reloaded after the world file, so dropped items in a
 saveable zone survive a reboot. =lib/BOOT_CLEAN= discards them.
@@ -251,7 +251,7 @@ stamps =stringed_by_imm=), =oedit= (=I10=, add, remove, list, fix
 applies; stamps =edited_by_imm=), =mutateobj= (=I9=), =mutateinfo=,
 =stat= / =ostat=, =show obj= (search, range, limited), =owhere=,
 =identify=. The =show obj= search is the one that failed on the old
-host (=SUMMARY.md= §15).
+host ([[file:../SUMMARY.md][SUMMARY.md]] §15).
 
 * Quirks
 
