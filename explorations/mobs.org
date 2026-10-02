@@ -1,73 +1,293 @@
-#+TITLE: Mobs — what the extractor taught us
-#+AUTHOR: notes from building py_json/src/prworld (mobs)
-#+DATE: 2026-09-27
-#+STARTUP: overview
+#+TITLE: Perilous Realms: mobs
+#+DATE: 2026-10-02
+#+OPTIONS: toc:2
 
-* Where mobs live
+Everything about non-player characters, read from =src/= at commit
+94876a77. Companion to =game-engine-loop.org=, which covers the loop
+and event wheel that drive mobs.
 
-- Source: =world/MOB/*.mob=, 114 files, driven by =world/MOB/ALLMOB= (plain
-  =#include= list, no defines, no offsets: mob vnums are written absolute).
-- Compiled by =world/MOB/compile= → =../tran mob ALLMOB mob.out=. Loaded by
-  =mobdb.c:boot_mob= into the =mob_db= hash of =index_mem= prototypes; the
-  prototype is copied when a mob is spawned by a zone reset.
-- Extracted to =py_json/out/mobs.jsonl=: 3,450 prototypes.
+* What a mob is
 
-* Record format
+A mob is a =char_data= like a player, with =ACT_ISNPC= set and no
+connection (unless an immortal has switched into it). There is no
+separate mob struct; the player-only and mob-only fields live side by
+side in =h/structs.h=. Fields that matter only for mobs:
 
-Schema =mob_fields= (85 entries). The commonly used fields:
+| field              | meaning                                                      |
+|--------------------+--------------------------------------------------------------|
+| =vnum=             | the prototype it was loaded from                             |
+| =act=              | behaviour flags (=ACT_*=, below)                             |
+| =default_pos=      | position it returns to when idle                             |
+| =default_zone=     | zone it was loaded into, for =ACT_STAY_ZONE=                 |
+| =group_with=       | vnum of a mob it joins as follower if seen                   |
+| =hatefield=, =hates= | what it hates by category, and a list of individuals       |
+| =fearfield=, =fears= | same for fear                                              |
+| =persist=, =old_room=, =last_direction= | hunting state                             |
+| =pulse_count=      | incremented on each think; drives the "every Nth think" cycles |
+| =sounds=           | ambient sound text, played at random                         |
+| =skills=, =spells= | lists used by =mob_attack= to pick special attacks           |
+| =wait=             | lag, consumed a second at a time by the think event          |
 
-| token                | type | notes                                                     |
-|----------------------+------+-----------------------------------------------------------|
-| name, namelist       | STR  | display name and keyword list                             |
-| shortdesc / short    | STR  | room line                                                 |
-| longdesc / long      | STR  | look description                                          |
-| race                 | E32  | =race_list=                                               |
-| class                | E8   | =class_list=; also inferred at boot when absent           |
-| sex                  | E8   | =sexes= = neuter, male, female                            |
-| level, alignment     | S32  |                                                           |
-| gold, experience     | U32/S32 |                                                        |
-| hp, damage           | DIC  | three ints: dice, sides, bonus                            |
-| move, mana, power    | U32  |                                                           |
-| hit_bonus, dam_bonus | S32  |                                                           |
-| attacks_per_round    | DBL  |                                                           |
-| head/body/arms/legs/feet | T32 | two ints per body part: armor, stopping              |
-| immune/resistant/susceptible | BIT | =immunity_names= (incl. "plus 1".."plus 4")     |
-| affected             | IDV  | extended bitvector over =affected_bits=                  |
-| act                  | BIT  | =action_bits= (sentinel, aggressive, special, wimpy ...) |
-| skills, spells       | L16  | name lists resolved against =skills[]= / =spells[]=      |
-| caster               | U8   |                                                           |
-| world_limit          | S32  | max existing at once                                      |
-| group_with           | U32  |                                                           |
-| story_teller         | STR  | file name for the story-teller special                    |
-| resist_*, *_penetration, spell_power, life_steal, spell_vamp, *_regen, hit_shield, remort_count, rage, energy | | newer combat tuning fields |
+Prototypes live in =mob_db=, a hash of =index_mem= keyed by vnum, each
+holding the prototype =char_data=, counts (=world_count=, =game_count=,
+=num_destroyed=), limits (=max_exist=, =zone_limit=) and an optional
+special-procedure pointer =func=. =real_mobp(vnum)= fetches one.
 
-* Things learned
+* Loading and limits
 
-- Macros are used here. =Void.mob= defines =@GuildMaster= and
-  =@GenericGuildMaster= (which itself expands =@GuildMaster=); macro text is
-  the raw block contents and expansion is recursive. Macros are global for
-  the rest of the =ALLMOB= run, and a mob that uses one typically overrides
-  fields afterwards, which is why most "duplicate field" warnings are in
-  =Midgard.mob=.
-- =tran='s E8 case has a bug: it tests the wrong variable after the lookup,
-  so an unknown value is written as 255 without complaint. Roughly 30 mobs
-  have =sex { none }= or =sex { memale }= and run with sex = 255.
-- =mob_fields= has duplicate ids with different names: 57/58 appear twice,
-  59 is both =resist_light= and (earlier) =resist_all=, 60 is both
-  =resist_darkness= and =resist_energy=. The last spelling in the table wins
-  for the binary id; the extractor keeps whichever token the source used.
-- =boot_mob= does real post-processing: appends newlines to descriptions,
-  defaults the description, sets =ACT_ISNPC=, copies base stats, and infers
-  =job= (SCHOLAR if it has spells and =magic_use=, else WARRIOR) unless the
-  mob has an assassin skill. A JSON record from the source therefore differs
-  from the runtime prototype in those derived fields.
-- Immunity names include weapon-plus immunities spelled with a space
-  ("plus 1"), which is why =split_names= splits only on commas.
+Mobs enter the world only through zone resets (=zone.c=, =reset_zone=
+→ =perform_commands=), at boot and then whenever a zone's age reaches
+its reset frequency (always, or only when no players are in it). A
+zone's command list says which mob loads in which room, with optional
+equipment, inventory and chained loads (=M=, =O=, =C=, =G= for group,
+=L= for load, =I= for in-container), subject to the prototype's
+=max_exist= and per-zone limits. Counts are recomputed before each
+zone pass (=clear_count= over =mob_db=).
 
-* Caveats in the data
+On creation (=mobdb.c:367=) a mob gets its first think event at a
+random 1 to 1,200 pulses, and like every character a per-tick update
+event (=limits.c=): regen of hit, mana, power and move, hunger and
+thirst changes, suffering damage when incapacitated. So mobs heal
+between fights on the same schedule players do.
 
-- 205 warnings, almost all macro-then-override duplicates. Two files contain
-  top-level lines starting with =#= that are not directives (=#3903=); =tran=
-  ignores them and so does the extractor.
-- Vnum set checked against =mob.out= by walking the binary with the same
-  schema sizes: exact match on 3,450.
+* The think: what triggers a mob
+
+Nothing happens to a mob because a player /arrived/. Mobs act from
+exactly two sources:
+
+1. Their own think event, =EVT_MOBILE=, about once a second
+   (=mobact.c=, =event_mobile= → =act_state=).
+2. A player's command in the same room, which runs the mob's special
+   procedure /before/ the command executes (=interpreter.c:289=,
+   =special()=), and =tell= to a mob, which goes straight to its
+   special.
+
+So reaction time to a player walking in is "the mob's next think that
+takes the relevant branch": within a second for a hateful mob that
+remembers them, within about four for an aggressive one, never for a
+plain one.
+
+** The decision list (=act_state=, =mobact.c:180=)
+
+Evaluated in order every think; the first branch that acts wins.
+
+1. If =group_with= is set and that mob is here, become its follower.
+2. If fighting someone who is no longer in the room, stop fighting.
+3. If =ACT_SPEC= and the prototype has a special, call it with
+   =SPEC_IDLE=, or =SPEC_FIGHT= every third think while fighting; if
+   it returns true, done.
+4. Every 20th think, =DecayHatred=.
+5. Do nothing while lagged (=wait=), charmed, paralysed or confused.
+6. =ACT_HEALER=: heal self or friends every =PULSE_HEALER=.
+7. If fighting: =act_fight= (below).
+8. If =ACT_HUNTING=: one step of =MobHunt= (below).
+9. If aggressive (=IS_AGGR=: =ACT_AGGRESSIVE= and not calmed), every
+   4th think: =act_aggressive=.
+10. Standing: =aid_friends=, join a fight on the side of a mob with the
+    same vnum or in the same group.
+11. Awake, every 4th think: scavengers that are not humanoid pick up
+    items. Humanoids: =spread_hatred=, and on a 5-think cycle
+    =find_items= then =discard_items=.
+12. =maintain_pos=: return to =default_pos= (wake, stand).
+13. =ACT_HATEFUL=: attack anyone present it hates.
+14. =ACT_AFRAID=, every 10th think: flee from anyone present it fears.
+15. Not =ACT_SENTINEL=, every 5th think: =mobile_wander=.
+16. =ACT_GUARDIAN=: stay with master.
+
+Several branches =sendf= debug text to the mob ("Attacking X",
+"wandering...", "Not acting aggressive because I'm wounded more than
+my enemy"); it is visible only to an immortal switched into the mob.
+
+* Behaviour flags (=ACT_*=, =h/const.h:777=)
+
+| flag             | effect                                                                 |
+|------------------+------------------------------------------------------------------------|
+| =ACT_SPEC=       | has a special procedure; run it on think, fight, commands, death     |
+| =ACT_SENTINEL=   | never wanders                                                          |
+| =ACT_SCAVENGER=  | picks up objects lying around                                          |
+| =ACT_ISNPC=      | it is a mob (set on all)                                               |
+| =ACT_NICE_THIEF= | thief special does not attack                                          |
+| =ACT_AGGRESSIVE= | attacks players on sight (subject to =FindVictim=)                     |
+| =ACT_STAY_ZONE=  | wandering never leaves =default_zone=                                  |
+| =ACT_WIMPY=      | flees when hurt; never initiates; aggression and hunting skip it       |
+| =ACT_ANNOYING=   | will also attack other mobs                                            |
+| =ACT_HATEFUL=    | attacks anyone it hates, on sight                                      |
+| =ACT_AFRAID=     | flees anyone it fears                                                  |
+| =ACT_IMMORTAL=   | natural event mob (not killable in the usual way)                      |
+| =ACT_HUNTING=    | currently tracking someone (set by =SetHunting=)                       |
+| =ACT_DEADLY=     | deadly poison                                                          |
+| =ACT_POLYSELF=, =ACT_POLYOTHER= | a polymorphed player                                     |
+| =ACT_GUARDIAN=   | guards and follows its master                                          |
+| =ACT_CITIZEN=    | protects others, spreads hatred, calls for help                        |
+| =ACT_HEALER=     | heals self or friends on an interval                                   |
+| =ACT_NOSUMMON=   | cannot be summoned                                                     |
+| =ACT_FAR_HUNT=   | hunting may cross zones                                                |
+| =ACT_TRAVELING=  | currently in an animated travel                                        |
+| =ACT_NO_WEAR=    | will not wear equipment it finds                                       |
+
+* Aggression and victim choice
+
+=act_aggressive= (=mobact.c=): pick a victim with =FindVictim=; refuse
+if the mob is below half health /and/ worse off than the victim, or if
+the room is peaceful, or if the victim is stone-encased; shout or growl
+(humanoid or animal); =mob_initiate= then =hit=.
+
+=FindVictim= (=fight.c=): if already fighting, that opponent. Charmed
+and wimpy mobs never pick. Otherwise every character in the room that
+is not the mob itself, is awake, is visible to the mob (=CAN_SEE=), is
+not sneaking, prowling or shimmered (unless already fighting), is not a
+mob (unless the attacker is =ACT_ANNOYING=), and is not a player with
+=PLR_NOHASSLE=. Candidates are weighted by class (fighter, cleric,
+mage, thief) and a random roll picks one, skewed toward the better
+target as the mob's intelligence rises.
+
+* Memory: hatred and fear (=opinion.c=, =utils.c=)
+
+Each mob has an =Opinion= for hates and one for fears: a bitfield of
+categories plus category values and a list of individuals with expiry.
+
+=Hates(ch, v)= is true if =v= is on the individual list, or matches a
+set category: race, sex, alignment above the "good" threshold, below
+the "evil" threshold, class, or vnum. Paralysed and confused mobs hate
+no one. =Fears= is the same shape.
+
+=DevelopHatred(ch, v)= runs on every blow a mob lands
+(=event_strike=): if the mob does not already hate =v=, compute the
+alignment gap divided by 5 against the mob's "patience" (its current
+health percentage plus a roll of ±20); when patience is lower than the
+gap, =AddHated(ch, v, HOUR)= for one real hour. Low health and
+opposing alignment make a mob remember you.
+
+=spread_hatred=: once a minute, a humanoid police or citizen mob tells
+every awake humanoid mob it can see in the room about each individual
+it hates, so they hate them too. Reputations travel through a town.
+
+=DecayHatred=: every 20th think, expired entries drop off.
+
+* Hunting: chasing across rooms (=MobHunt=, =mobact.c=)
+
+=SetHunting(mob, target)= (=utils.c:304=) sets =ACT_HUNTING= with a
+persistence budget of the mob's level plus 1 to 50 steps and remembers
+=old_room=. It is called when:
+
+- a player flees from the mob (=do_flee=, =offensive.c:631=)
+- a fear spell drives a mob off (=magic.c:4269=)
+- a mob special asks for it (=spec_mob.c:5941=)
+- the game marks a player as hunted by a set of vnums or for notoriety
+  (=SetHuntedBy=, =SetHunted=, =utils.c:382,403=)
+
+Each think while hunting: =persist--=; at zero, stop and clear the
+flag. Otherwise find the quarry (the first hated individual still in
+the game), and unless =ACT_FAR_HUNT=, give up if it is in another
+zone. Take one step along a shortest path to it (=choose_exit=,
+bounded at 2,000 rooms, humanoid-aware for doors), avoiding
+immediately doubling back. On reaching the quarry, attack if the mob
+can see it and still hates it, unless stone-encased or the room is
+peaceful. Hunting is therefore persistent for a bounded number of
+rooms, roughly the mob's level in steps, and zone-bound by default.
+
+* Wandering (=mobile_wander=)
+
+Every 5th think for non-sentinels: pick a random exit index 0 to 15,
+walk the exit list that far, give up if there is no such exit, refuse
+no-mob and death rooms, require the mob to be standing, require the
+exit to be passable (humanoids can open doors, others cannot), avoid
+walking straight back the way it came two thirds of the time, and stay
+in =default_zone= if =ACT_STAY_ZONE=. Guardians do not wander.
+
+* Grouping, assisting, citizens
+
+- =group_with=: a mob loaded with a leader vnum joins that leader as a
+  follower when it sees it, and gets =AFF_GROUP=.
+- =aid_friends=: a standing mob joins any fight in its room on the side
+  of a mob of its own vnum or group, if it can fight the opponent.
+  Charmed mobs do not.
+- =ACT_CITIZEN= and police: besides spreading hatred, a fighting
+  humanoid citizen may call for help every 10th think, and
+  =IS_POLICE= / =IS_CITIZEN= gate who listens.
+
+* In a fight
+
+Combat is per attacker: each fighter has its own =EVT_STRIKE= chain
+timed by =calc_speed= (=game-engine-loop.org=). On each of a mob's
+strikes, =DevelopHatred= first, then =mob_attack= rolls against the
+mob's skill and spell lists for a special attack and, failing that, a
+plain =hit=. Independently, the think's =act_fight= branch lets
+humanoids cast (=act_caster=) or call for help every 10th think, wakes
+a sleeping mob on a resistance check, and stands a sitting one.
+
+=ACT_WIMPY= mobs flee when hurt (=fight.c:1765,2236=) and are skipped
+by aggression and hunting. A fleeing player triggers =SetHunting= on
+the mob left behind.
+
+* Special procedures (=spec_mob.c=, =spec_assign.c=)
+
+117 C functions, bound to mob vnums at boot by a table in
+=spec_assign.c= ("Assigning function pointers: Mobiles."; a duplicate
+vnum logs "already assigned"). There is no scripted mob-program
+language in the current source; AMPL is a separate tool. A special is
+=func(type, mob, actor, argument, cmd)= and returns true to say it
+handled the event. Trigger types (=h/const.h:1495=):
+
+| type            | when                                                               |
+|-----------------+--------------------------------------------------------------------|
+| =SPEC_IDLE=     | the mob's own think                                                |
+| =SPEC_FIGHT=    | every third think while fighting                                   |
+| =SPEC_CMD=      | a player in the room issued any command; runs before the command  |
+| =SPEC_MOVE=     | same, for movement commands (direction, =go=, =enter=)             |
+| =SPEC_OPP_DIES= | its opponent died                                                  |
+| =SPEC_INIT=     | creation                                                           |
+| =SPEC_DEATH=    | its own death (=fight.c:1927,2400=)                                |
+
+For a player's command, =special()= (=interpreter.c:314=) tries, in
+order: the room's special, each item the player wears, each item the
+player carries, each mob in the room, each object on the floor. The
+first to return true consumes the command. This is the only way a mob
+reacts to a player instantly, and it reacts to what the player does,
+not to their presence. Shopkeepers, guildmasters, guards, bankers,
+receptionists and the like are all specials.
+
+* Sounds
+
+Every 60 s (=PULSE_AUDIO=, =MakeSound=), each awake mob with a
+=sounds= string has a 1 in 6 chance of making it in its room, and
+objects with noises do likewise.
+
+* Death
+
+=die= → =raw_kill= → =make_corpse=: the prototype's =num_destroyed=
+is incremented (=fight.c:655=) and =game_count= decremented on extract
+(=handler.c:3990=), equipment and inventory go to the corpse, the
+special gets =SPEC_DEATH=, hunters and haters forget it, and the
+=EVT_MOBILE= chain ends because the next =add_event= is refused for a
+dead character. The zone's next reset reloads it if it is below its
+limit.
+
+* Immortal tools
+
+- =show mob <name>= / =show mob lo hi=: prototype search by keyword or
+  range; =show mob limited= shows limits and counts; =show mob kills=
+  sorts by =num_destroyed=.
+- =show rank=: mobs ranked.
+- =mwhere <name>=: every instance and where it is.
+- =switch=: become a mob; the think's debug =sendf= lines then show
+  what it is deciding.
+- =stat=, =set= on mobs as on players.
+
+* Quirks and things to know
+
+- Aggression is checked every 4th think, so an aggressive mob takes 1
+  to 4 seconds to notice you, depending on where its phase is.
+- Hatred lasts a real hour and spreads; a bad reputation in a town is
+  real and times out on its own.
+- Hunting persistence is in steps, not time; a level-30 mob follows
+  for 31 to 80 room-steps and then stops wherever it is, far from home.
+- Count Buntavic (vnum 112100) hunts at half speed by a hardcoded
+  coin flip (=mobact.c=).
+- A mob's think and its strike chain run on separate events; a mob can
+  be striking every second and wandering every 5th think only because
+  =act_state= checks =fighting= before =wander=.
+- The mob think, like everything else, stretches under load; nothing
+  catches up.
+- Mobs get the same per-tick regen event as players, so a fled-from mob
+  is healing while it hunts you.
