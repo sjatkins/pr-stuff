@@ -454,3 +454,71 @@ grouping hold pointers validated against the live list before use, and
 are the same: a saved sword in a player file is a copy of its fields,
 not a reference. A rewrite must give every mob and object instance an
 id at creation (see [[file:../SUMMARY.md][SUMMARY.md]] §16, ids, and [[file:objects.org::#prototype-and-instance][objects, "Prototype and instance"]]).
+
+* Special procedures: how they bind and what they override (2026-10-02)
+:PROPERTIES:
+:CUSTOM_ID: specials-binding-and-override
+:END:
+
+** Binding
+:PROPERTIES:
+:CUSTOM_ID: specials-binding
+:END:
+
+There is no naming convention linking a mob to its C function. The
+binding is a hardcoded table in =src/spec_assign.c= (=assign_mobiles=,
+386 rows of =(vnum, function)=), applied at boot: for each row the
+prototype is looked up by vnum, its =func= pointer set, and =ACT_SPEC=
+set on it. Example: =92028, eot_zain= (the row's comment says
+"Guardian beholder", which is wrong; comments in the table drift).
+
+The =special= word in a mob file's =act { ... }= is therefore not what
+connects them: the table sets the flag regardless, and a mob whose
+vnum is absent from the table has no special even if the builder
+wrote =special=. Renumbering or copying a mob to a new vnum silently
+drops its behaviour; the only warning is the boot line "mob_assign:
+Mobile N not found in database."
+
+The function is plain C keyed on trigger type, e.g. =eot_zain=
+(=spec_mob.c:2301=): answers only idle, fight and death triggers;
+hard-codes neighbouring vnums 92035 and 92036 for who reacts to his
+death; scripts his escape through the Maelstrom with timed =act=
+messages and =mob_proc_delay=. Everything about such a mob that is not
+numbers and flags lives there, next to 116 other functions.
+
+** What a special does to the canned behaviour
+:PROPERTIES:
+:CUSTOM_ID: specials-override
+:END:
+
+It runs first and may pre-empt; it never replaces anything by itself.
+In [[#the-decision-list][the decision list]], step 3: if the mob has a
+special, call it with =SPEC_IDLE=, or =SPEC_FIGHT= every third think
+while fighting. Return true: the think is over, nothing canned runs
+this second. Return false: the think continues down the normal list
+(hatred decay, healer, fight reactions, hunting, aggression, assist,
+scavenge, wander, ...) exactly as for any mob. So, per think:
+
+- always true: the special /is/ the behaviour; no wandering or
+  aggression unless the special does it;
+- sometimes true: the special takes over on the thinks where it has
+  something to do and the stock behaviour fills the rest (Zain:
+  idle/fight/death only, false otherwise, so his =aggressive= and
+  =sentinel= flags work normally between scripted moments);
+- always false: purely additive side effects.
+
+Not touched by the special: the blows, which are the =EVT_STRIKE=
+chain at weapon speed with =mob_attack= rolling the spell and skill
+lists (a special can start or stop a fight but delivers hits only by
+calling =hit= itself); the other trigger paths are separate:
+=SPEC_CMD= / =SPEC_MOVE= run before a /player's/ command in the room
+and returning true swallows that command, not the mob's think;
+=SPEC_DEATH= fires once on death in addition to normal death handling.
+
+Side effect of =ACT_SPEC=: the think reschedules every second
+regardless of the mob's lag (=event_mobile=), so the special keeps
+getting its idle call while the mob is stunned or waiting.
+
+For the rewrite: behaviour should be named in the mob definition and
+resolved by name at load, with a loud error for an unknown name, not a
+vnum table in the engine.
