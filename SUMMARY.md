@@ -1113,3 +1113,127 @@ pointers validated against live lists, and "same vnum = friend". Every
 mob and object instance must get an id at creation (UOP form, class
 prefix + instance part), kept for life; prototype becomes a field; all
 relations, memory, saves and changesets reference the id.
+
+**Players documented** (2026-10-02): `explorations/players.org`. Accounts
+(acct_data, A_ flags, tagged-binary file under account/<l>/, creation
+prompts, menu, 64-char limit, warehouse, granted/revoked) vs characters
+(char_data with ACT_ISNPC clear; identity is the case-folded name;
+tagged-binary file under stash/<l>/ with version marker 245 / v6, every
+field by tag, inventory and equipment serialised inline as copies,
+affects; load room in tag 49). Creation: S/C/R methods → do_start
+(level 1, exp 1, 10 hp, class spells/skills, bread/water/map/recalls).
+Progression: mortal 1-500, per-class exp table, remort resets to level
+1 with a stat bonus and remort_count++, apex levels beyond; immortals
+2001-2011 with I9/I10 gating most wiz commands, owner list hardcoded
+for I10/I11. Sessions: reconnect to a link-dead char, autosave ~100 s,
+idle save/void/extract at 5/720/1440 ticks, link loss saves and keeps
+the char in world, camp needs a RENTABLE room, quit elsewhere loses
+gear, PK cooldown blocks both. Death: exp penalty, <20 spared, >100
+years becomes a ghost, corpse, respawn LOAD_ROOM_MORTAL. Purge: -p
+parsed, purge code fully commented out. Quirks: pw hash and email in
+both files; objects are copies with no identity.
+
+**Objects documented** (2026-10-02): `explorations/objects.org`.
+Prototype (obj_db index_mem: template, counts, max_exist/max_for_player,
+special) vs instance (a copy with no identity; five mutually exclusive
+location pointers plus intrusive lists). 31 item types with per-type
+value[] meanings named in the world files; wear flags and 22 wear slots;
+extra flags (15 unused bits); CONT_ flags with a Mastermind crack game.
+Rarity (5 levels, colours), tiers, mutate_object (random karma'd applies
+with name modifiers, cap 15 applies), sockets (gems add socket_apply[]),
+item sets (two-piece+ bonuses; the 09-28 crash site). Sources: zone
+resets only (load_obj: count-to-needed, probability per copy, >100 =
+~0.1%, max_exist), imm load, corpses, specials, shops. Per-object tick:
+timer2 phase-out, biodegrade, corpse decay with spill, lights. 13 object
+specials. Persistence: inline in player files as a diff against the
+prototype (unmodified items are ~just the vnum; prototype edits change
+saved copies), WorldSave/zone.N every 10 s for saveable zones, lockers,
+account warehouse. extract_obj frees with no log.
+
+**Rooms documented, docs cross-linked** (2026-10-02):
+`explorations/rooms.org`: room_data (vnum-hashed, light/dark counters,
+exits list with door flags/keys/reset timers/crack codes, river and
+teleport fields, tracks ring, max_people, cached map, special), 26
+room flags, 30 sectors with per-sector move cost/delay/tracks/damage and
+minimap glyphs from world/SECT, look_room contents, the do_move flow,
+zones (range, save range, reset type/freq, zone_limit, boot_only, the
+load grammar), ageing/reset every 60 s, WorldSave every 10 s for
+saveable zones, live room edits via redit/rsave into lib/UPDATE, 18 room
+specials. All five exploration docs (engine, mobs, players, objects,
+rooms) now carry "See also" lines and org links to each other's files
+and headings (`[[file:x.org::*Heading]]`).
+
+**Policy (2026-10-02): no behaviour changes in the C code.** Changes to
+`src/` are only bug fixes or added functionality; gameplay rule changes
+go into the Python/CL rewrite. First item on that list: `quit` outside a
+RENTABLE room drops all carried and worn gear on the floor
+(`do_quit`, other.c:538; under level 10 bounced once, above it needs
+`quit yes`, immortals exempt); link-dead players keep everything, so
+the rule only bites those who type quit. Rewrite: quit means quit,
+inventory saved; keep the fighting/PK-cooldown/charm refusals and the
+die-if-stunned rule. Also noted: `quit +N` is a hardcoded debugging
+back door for an owner account and two names.
+
+## 17. Rewrite: the semantic layer first (discussion, 2026-10-02)
+
+The docs in `explorations/` (engine loop, mobs, players, objects, rooms,
+all cross-linked with CUSTOM_ID anchors) describe a frozen artefact; the
+C code gets bug fixes and new features only. The rewrite (Python or CL;
+CL favoured) is not "port 106k lines" but: build a small semantic layer
+of CLOS classes and generics for this kind of MUD, then say the game in
+it. The JSON/pydantic extraction is the import path, not the model.
+
+**Findings that shape it.** Mob and object instances have no identity
+(prototype vnum + memory address; objects are inline copies in whatever
+holds them; mobs are never persisted at all, so a mob cannot learn or
+grow). The prototype is genotype, the incarnation a runtime phenotype,
+and there is no "individual" layer between. Specials bind by a hardcoded
+vnum→C-function table (386 rows, 94 functions: 38 reused behaviours on
+330 rows, 56 one-off set pieces); the `special` act flag is not the
+link. A special runs first in the think and either consumes it (return
+true) or falls through to the canned list, which is a hand-rolled method
+combination. The canned behaviours (aggression, wander, hunt, hate,
+assist, scavenge, citizen, healer) are themselves rules of the same
+shape; `ACT_*` flags are just which are attached. Many rules have no
+natural owner (damage between attacker, weapon, victim; key vs door;
+visibility), which is the case for multiple dispatch over receiver
+tables.
+
+**The layer** (each a few hundred lines, testable alone):
+- Engine: clock, event wheel (FIFO slots), per-pulse step (fire due
+  events, one command per session, periodic work), single mutator,
+  injectable clock for tests/replay.
+- World: kinds / individuals / incarnations with UOP-style ids,
+  prototype link as a field, the indexed relation store with move/wear/
+  fight helpers; `where`, `contents`, `occupants`, `holder` as generics.
+- Event + Scene: event vocabulary (enter, leave, command, say, hurt,
+  death, timer, think, tick); Scene = roles (bound to kinds or
+  individuals), triggers, guards, actions (message, move, spawn, give,
+  fight, flag, set phase, schedule), phase; a kind or individual carries
+  an ordered scene list (head runs, may call next — the "cheap
+  call-next"; push to override, pop to roll back). Specials are scenes
+  with fixed participants; canned mob behaviours are scenes with none;
+  flags disappear. Behaviours are named in the mob definition and
+  resolved by name at load, loud error if unknown. A persistent mob
+  individual (NPC-player) is the player save path pointed at a mob;
+  which kinds spawn individuals is per-kind.
+- Rules: generics (`damage`, `affect`, `can-see`, `can-enter`, `price`)
+  specialised on participant classes (class, race, item type, sector,
+  alignment as types); the 450 spell functions collapse to a dozen
+  patterns plus table rows; "semantically the same" as the C, not
+  transcript-identical.
+- Journal: changesets emitted from the mutation generics, publish path,
+  snapshot/restore.
+- Session: connection with queues and a renderer (telnet or bot),
+  accounts and login state machine. Bots: a connection whose far end is
+  a program; scripted bots as test harness/load; rule-driven NPC
+  players; model-driven characters consulted on events, not per think,
+  rate-limited like anyone. An LLM+harness playing by telnet with its
+  own memory/map/notebook, told almost nothing, measured against what a
+  good player knows (not the engine docs), is a planned experiment.
+
+**Estimate** (semantic equivalence, not transcript diff): core world you
+can walk in, 1–2 weeks of sessions; rules 3–4 weeks; long tail (56
+scenes as builder-notation data, boards, mail, clans, arena, builder
+tools) a few weeks, triaged by zones people play. Order: identity and
+relation model first; nothing above it until it exists.
