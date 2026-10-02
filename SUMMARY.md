@@ -1237,3 +1237,32 @@ can walk in, 1–2 weeks of sessions; rules 3–4 weeks; long tail (56
 scenes as builder-notation data, boards, mail, clans, arena, builder
 tools) a few weeks, triaged by zones people play. Order: identity and
 relation model first; nothing above it until it exists.
+
+**C code quality notes (2026-10-02).** 106,237 lines by purpose: rules
+(combat/magic/spells/skills/limits) 29%, commands/UI 17%, mob AI +
+specials 12%, storage/formats 11%, pointer bookkeeping (handler.c,
+utils.c) 7%, imm/builder tools 7%, network/sessions 5%, shops/boards/
+mail/clans 4%, tables 3%, leftovers 5%. Structural housekeeping is ~25%
+by file, but inside the rules files most lines are repeated guard
+checks, act() message variants, affect-struct filling and type
+switches, so lines that state a game rule are on the order of 20k:
+"80% drivel" is about right by content. No list type: every struct
+carries its own `next` (objects two: global list and container/room
+chain; characters `next` and `next_in_room`), each chain has its own
+insert/walk/remove code, nothing shared, no macro. The unlink idiom
+`prev->next = cur->next` is hand-written 25 times in 12 files;
+membership (loop + pointer compare) ~18 times (9 in magic.c);
+validate_char/validate_obj scan the whole global lists before firing
+scheduled events; removal is one function per relation (char_from_room,
+obj_from_char, obj_from_obj, affect_from_char, ...). Only ten functions
+take a function pointer at all; the only iteration helpers are
+hash_iterate(_range) over the vnum hashes and for_each_char (copies the
+list first); no find_if/remove_if/member-with-predicate for any chain,
+so conditions like "can see" are re-inlined per call site. The 09-28
+use-after-free was this idiom. If the C had a future, the best refactor
+is a small chain library (find/for-each/unlink with the head case done
+once) plus typed predicates: safe, mechanical, and still a simulation
+of lambdas with void* contexts — hence not worth a month given the
+rewrite. In CL all of it is member/find-if/remove/dolist and the
+relation store; the `next` fields and most of handler.c have no
+counterpart.
