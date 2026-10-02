@@ -1,85 +1,323 @@
-#+TITLE: Players — what the extractor taught us
-#+AUTHOR: notes from building py_json/src/prworld (players)
-#+DATE: 2026-09-27
-#+STARTUP: overview
+#+TITLE: Perilous Realms: players
+#+DATE: 2026-10-02
+#+OPTIONS: toc:2
 
-* Where players live
+Accounts and player characters, read from =src/= at commit 94876a77.
+Companion to =game-engine-loop.org= and =mobs.org=. No player data was
+read for this; everything comes from the code and the world data files.
 
-- Runtime: =live/lib/stash/<first letter>/<lowercased name>=, one binary file
-  per character, indexed by the line list =live/lib/players.new=. Written by
-  =player.save.c:save_char=, read by =load_char_with_path=.
-- Backups: =players_<date>.tar= at the repo root holds =stash/= and
-  =account/= (697 players, 280 accounts on 2026-09-23). The tar has no index
-  files. It is git-ignored; the extracted JSONL is committed.
-- Extracted to =py_json/out/players.jsonl=: 697 records, all file version 6.
+* Two things: accounts and characters
 
-* Record format
+A person has an /account/; an account owns up to 64 /characters/. The
+account is what logs in (name and password at the =login:= prompt); a
+character is what enters the world. Both are keyed by name, case-folded,
+and stored as one file each:
 
-Tagged binary: u16 id then a payload sized by the C field. Markers from
-=player.save.c=: 255 EOF, 254 SUB_OBJECT (inventory follows), 253 OBJECT,
-252 END_OF_OBJECT, 251 END_OF_LIST, 250 WEAR, 249/248 AFFECT, 246 MAIL,
-245 file-version marker, 244/243 PULSE_AFFECT, 242/241 PULSE_AFFECT_COOLDOWN,
-240/239 ITEM_SET_ABILITY. Strings are u16 length (including NUL) then bytes.
-Arrays are a u16 byte count then raw structs.
+| thing     | file                        | index file          | struct       |
+|-----------+-----------------------------+---------------------+--------------|
+| account   | =lib/account/<a-z>/<name>=  | =lib/account.list=  | =acct_data=  |
+| character | =lib/stash/<a-z>/<name>=    | =lib/stash/players.new= | =char_data= |
 
-Field ids 1–134 cover: sex, class, name, descriptions, title, level,
-bindpoint, max_level, base and current stats (7 each), mana/hit/move/power
-and maxima, gold, bankgold, exp, apex_exp, questpoints, resist/immune/susc
-flags, extended =affected_by= bitvector, position, act flags, config and
-log bits, timers, saving throws, conditions, armor/stopping arrays (and base
-versions), alignment, clan and rank, invis level, wimpy level, skills,
-spells, remort bonuses, kill list, granted/revoked commands, times (birth,
-logon, logout, motd, password, played, first_login), email, plan, prompt,
-last site, page settings, lockout, account link, weight/height, rage,
-energy, hit_shield, assassinate.
+The index files are plain lists of names the server appends to and the
+ops scripts rebuild from the directory (=scripts/pr_functions.sh=,
+=rebuild_indexes=). There is no database; the name is the identity.
 
-Sub-records: affects (type, duration, modifier, location, bitvector), pulse
-affects (59 fields), pulse cooldowns, item set abilities, mail. Equipment:
-=WEAR pos SUB_OBJECT objlist= per worn slot. Inventory: =SUB_OBJECT objlist=.
-Warehouse: id 86.
+* Accounts (=account.c=, =h/structs.h:783=)
 
-Saved objects (=objdb.c:ReadObject=, a *different* id set from the prototype
-file): value array, wear/extra flags, weight, cost, timers, bitvector,
-name/description/short/action, eq_pos, in_room, type, vnum, min_level,
-time_stamp, volume, material, dimensions, applies (three generations: id 20
-old struct, id 27 u8 pairs, id 62 tagged), real_cost, contents weight and
-volume, touch messages, owner, held_for, rarity, mutation_count, fixed,
-cooldowns, imm audit strings (loaded/edited/mutated/stringed by), created
-date, pulse applies, item set fields, crack code, tier, sockets, socket
-applies. Nested contents follow as SUB_OBJECT lists.
+** Fields
 
-* Things learned
+name, password hash (=crypt= with the account name as salt), mother's
+maiden name, email, real name, the last four sites connected from, last
+login and logout, the character name list, an account balance,
+=flags=, when the MOTD was last read, roll-limiting timestamps and
+counts, default terminal type, per-account granted and revoked
+commands, free-text notes, an ignore list, and the /warehouse/, an
+object list shared by all the account's characters.
 
-- Field sizes cannot be guessed from the C types by eye. =tools/layout.c=
-  compiles against =h/structs.h= (with =-fsigned-char=, as the makefile does)
-  and emits =player_layout.json= with the exact size and signedness of every
-  field the readers touch. Examples that would have been wrong otherwise:
-  =sex= and =position= are signed 8-bit, =attacks_per_round= is a double at
-  id 125 but a s32 at the old id 41, the =affected= array (id 54) is raw
-  56-byte =affected_type= structs including an 8-byte =next= pointer.
-- The version upgrades in =finish_char= are part of the format: version 0
-  files store weight in pounds and height in cm; version ≤2 files carry a
-  wimpy act bit that becomes =whimpy_level=; version ≤5 files get clan 1/2
-  assigned. All current files are version 6 so none applied, but the
-  extractor implements them.
-- Skill numbers ≥ 5000 are weapon proficiencies (=PROF_BASE=) and ≥ 10000
-  skills (=SKILL_BASE=); the JSON carries =kind= and the resolved name.
-- The spell name table has 240 entries and =MAX_EXIST_SPELL= is 240, yet 83
-  learned-spell entries carry numbers 242–246. They are legitimate to the
-  server, which only compares numbers; emitted as =\"#246\"=.
-- 13 files hold only creation-time fields (no level or class): abandoned
-  character creations.
-- Empty strings on saved objects mean "use the prototype text"; emitted as
-  =null=. 59,354 saved objects in total, most under 60 KB per player, the
-  largest file 255 KB.
-- =SendMail= appends to a player file by seeking back over the EOF marker;
-  hence MAIL records can appear after everything else.
-- Password hashes (id 56) are dropped unless =--include-secrets=.
+** Flags (=A_*=, =h/const.h:1405=)
 
-* Caveats
+=A_VALID=, =A_NONEW= (may not create characters), =A_SILENCE=,
+=A_STUPID=, =A_BANISHED=, =A_LOG= (every command logged), =A_NOPURGE=,
+=A_NOSHOUT=, and three email-verification states (=A_VER_EXEMPT=,
+=A_VER_MAILED=, =A_VERIFIED=).
 
-- The old command-list fields (ids 99/100) held numeric command ids that
-  the server now discards; the extractor keeps them as =legacy_granted= /
-  =legacy_revoked= only when non-empty.
-- Equipment slot names come from =equipment_types[]=, which has two entries
-  spelled "Worn as trinket"; the JSON keys them by name so the two collapse.
+** File
+
+Tagged binary written by =save_acct= (=account.c:33=): one numbered
+field at a time, strings length-prefixed, the character list as a
+count plus names, command lists, times. =load_acct= reads it back by
+tag, so fields can be added without breaking old files.
+
+** Creating one
+
+At =login:= type =new=. The states (=nanny.c=): account name, password
+twice, default terminal type, mother's maiden name, email address
+(required; the game threatens verification), real name, a welcome
+message, then the account menu. A host on the =no-new= list cannot
+create accounts; a host on =wizlocked= cannot connect at all.
+
+** The account menu
+
+=A= add an existing character to this account (needs its password),
+=C= create a character, =D= delete the account or a character, =H=
+help, =L= log in as a character, =N= set no-purge, =E= change email,
+=P= change password, =T= default terminal, =W= list characters, =M=
+read the MOTD, =X= turn MXP on for the session, =Q= quit. =L= is
+refused until the MOTD has been read once (=motd= timestamp).
+Deleting an account deletes every character on it (this is how Bunta
+was lost on 2026-09-22).
+
+* Characters
+
+** The struct
+
+A player is a =char_data= (=h/structs.h:565=), the same struct as a
+mob, with =ACT_ISNPC= clear. The player-relevant fields, grouped:
+
+- /identity and text/: =name=, =title=, =description=, =full_name=,
+  =plan=, =email=, =account_name=, =pw= (a second copy of a password
+  hash, used when adding a character to an account), =prompt=.
+- /progression/: =level=, =max_level=, =exp=, =remort_count=,
+  =remortInfo= (per-remort stat bonuses), =apex_level=, =apex_exp=,
+  =apex_points=, =questpoints=, =spells_to_learn=.
+- /body/: =base_stats= and =stats= (strength, intelligence, wisdom,
+  dexterity, constitution, charisma, luck), =hit/max_hit=,
+  =mana/max_mana=, =power/max_power=, =move/max_move=, =hit_shield=,
+  armour and stopping by six body parts (base and current),
+  resistances, immunities, susceptibilities, spell penetration, regen
+  bonuses, =alignment= and =base_alignment=, =sex=, =race=, =height=,
+  =weight=, =age= (from =time.birth=).
+- /combat/: =hit_bonus=, =dam_bonus=, =attacks_per_round=, melee and
+  spell haste/penetration/power/vamp doubles, =rage=, =energy=,
+  =assassinate=, =whimpy_level=, =aimloc=, =hitloc=, =fighting=.
+- /skills and spells/: arrays of (number, learned%) pairs.
+- /affects/: the spell affect list, pulse affects, cooldowns, item-set
+  abilities, =affected_by= bits.
+- /possessions/: =carrying=, =equipment[MAX_WEAR]=, =gold=,
+  =bankgold=, =carry_weight/volume/items=, =warehouse= (account's).
+- /social/: =clan=, =clan_rank=, =master=, =followers=, =consent=,
+  =mail_list=, =kills= (a kept list of mob vnum and count), ignore via
+  the account.
+- /settings/: =act= (=PLR_*= flags), =config_bits=, =log_bits=,
+  =page_size=, =page_width=, =page_min_width=, =prompt=, =tmp_term=.
+- /state/: =in_room=, =was_in_room= (link-dead or voided), =bindpoint=
+  (hometown zone), =position=, =conditions[3]= (drunk, hunger,
+  thirst), =fullness=, =timer= (idle ticks), =wait= (lag), =invis_level=,
+  =rent_disable= (PK cooldown), =lockout_till= and message.
+- /builder and immortal/: =build_lo/build_hi= (vnum range they may
+  edit), =test_lo/test_hi=, =offset=, per-character =granted= and
+  =revoked= commands.
+- /times/: birth, logon, logout, played, MOTD read, password changed,
+  first login.
+
+** Flags (=PLR_*=, =h/const.h:807=)
+
+| flag           | meaning                                                   |
+|----------------+-----------------------------------------------------------|
+| =PLR_BRIEF=, =PLR_COMPACT= | display preferences                          |
+| =PLR_NOSHOUT=, =PLR_NOTELL=, =PLR_SILENCE=, =PLR_DEAF= | channel restrictions |
+| =PLR_GOSSIP=, =PLR_AUCTION=, =PLR_NOSPORTS= | channels heard             |
+| =PLR_ECHO=     | own tells and shouts echoed back                          |
+| =PLR_NOHASSLE= | aggressive mobs ignore (immortal convenience)             |
+| =PLR_STEALTH=  | immortal moves without messages                           |
+| =PLR_HUNTING=  | track on every look                                       |
+| =PLR_LOG=      | every command logged (=[acct]{room}Name:cmd=)             |
+| =PLR_NOVIEWLOG=| may not view logs                                         |
+| =PLR_BANISHED=, =PLR_CRIMINAL=, =PLR_STUPID=, =PLR_BADNAME=, =PLR_RENAME= | punishments; rename forces a new name at login |
+| =PLR_VEG=      | in the string editor (output discarded)                   |
+| =PLR_DEBUG=    | sees "Tick." and other debug lines                        |
+| =PLR_NOEXITS=  | hide exits                                                |
+| =PLR_QUESTING= | on a quest                                                |
+| =PLR_POLICE=   | counts as police for citizen calls                        |
+| =PLR_TESTER=   | may enter test content                                    |
+| =PLR_REGEN=    | regen while offline (see link-dead regen below)           |
+| =PLR_PRIORITY= | input queue sorted by command priority                    |
+| =PLR_LEASH=    | a misbehaving immortal confined to allowed rooms          |
+| =PLR_ANON=     | class, level and race hidden on =who=                     |
+
+=config_bits= (=CONFIG_*=): map, manual unlock, auto split, short
+descriptions, timestamps, keywords, hunger display, channel names.
+
+** File (=player.save.c=, =save_char= at :198)
+
+Tagged binary, like the account file: a version marker (tag 245,
+current version 6) then every field above by tag, then the kept kills,
+skills and spells as counted arrays, remort records, times, then the
+whole inventory and each worn item (tag =WEAR= plus slot) serialised
+inline with =SaveObjectList=, then every affect and pulse affect. A
+character's objects therefore live inside its file as copies; nothing
+references an object anywhere else, and there is no instance identity
+for them (see =mobs.org=, identity). Tag 49 is the room to load into
+next time, which is why =save_char(ch, room)= takes a room.
+
+Loading is =load_char(ch, name)= → =load_char_with_path=, a switch on
+tags, tolerant of missing ones. The "mod 40 out of range 0 and 37"
+line in the logs is this loader meeting an apply index the current
+tables do not know.
+
+** Creating a character (=nanny.c=)
+
+From the menu, =C=, unless the account is =A_NONEW= or has 64
+characters. Three methods:
+
+- =S= Standard: the game helps pick a class.
+- =C= Class: pick the class first (a list of the 40 classes), then sex,
+  race (restricted by class), alignment, confirm. Stats come from the
+  class template.
+- =R= Rolling, "old school": roll sets of stats, re-roll as often as
+  the account's roll budget allows (=num_rolls= against
+  =last_roll_start=), then class, sex, race, alignment, confirm.
+
+Name first in all cases, checked for legality and uniqueness. On
+confirm, =do_start= (=wizard.c:2333=) sets level 1, experience 1, base
+hit points 10, a title, the class's starting spells and skills with the
+class proficiency at 90, and hands over two bread, two water, a newbie
+map and two recall scrolls. The character is added to the account and
+enters the world.
+
+** Classes, races, clans (world data)
+
+- =world/CLASSES/classes=: 40 records. Each has a name and two-letter
+  abbreviation, allowed alignment, hit dice, stat minimum, maximum,
+  base and extra budgets in the order STR INT WIS DEX CON CHR LCK,
+  allowed races, resistances, starting items, to-hit and speed
+  progressions, an experience multiplier, flags, a "build" code list
+  (e.g. =Th As=) that the engine tests with =strstr= for class-family
+  behaviour such as rage, energy and casting, and a description and
+  title.
+- =world/RACE=: name, abbreviation, height and weight ranges,
+  intrinsic abilities (infravision, regeneration, fast heal),
+  immunities, resistances and susceptibilities, and more per
+  =race.doc=.
+- =world/CLAN/clans.current=: numbered clans with a name, an
+  experience multiplier and a minimum join level; Newbie and
+  Protected are clans 0 and 1. Players join, leave, invite, evict and
+  talk on a clan channel; the character stores =clan= and =clan_rank=.
+
+** Levels, experience, remort, apex
+
+- Mortal levels run 1 to 500 (=MAX_ACHIEVABLE=). Experience needed per
+  level comes from a per-class table (=EXP_NEEDED=); =gain_exp=
+  (=limits.c:691=) adds and calls =advance_level= as thresholds pass.
+- At 500 a character may /remort/ (=do_remort=, =wizard.c:2632=,
+  normally reached through a priest and a sacrificed token as the
+  comment at =wizard.c:2729= describes): level and max level reset to
+  0 and then 1, experience 1, base hit points 10, all skills and
+  spells unlearned, =remort_count= incremented, and a chosen stat
+  bonus recorded in =remortInfo=. Remort bonuses also unlock remort
+  effects such as increased sustain. The code mentions a cap of 30
+  remorts for non-implementors.
+- Beyond full remort there are /apex/ levels (=apex_level=, "levels
+  gained after fully remorted + 500"), with their own experience and a
+  points distribution.
+- Immortals are levels 2001 to 2011, =I1= to =I11=. Command minimum
+  levels in =h/inter.h= cluster at =I9= (57 commands) and =I10= (23);
+  =I11= gates two. Setting someone to =I10= or =I11= is allowed only
+  for a hardcoded owner list (=wizard.c:1027=). Immortals also carry
+  =invis_level=, build and test vnum ranges, and per-character
+  granted/revoked commands, which is how a mortal such as Calista has
+  =goto=, =restore=, =chat= and =transfer=.
+
+* A session
+
+** Logging in
+
+Account name and password at =login:=; the banner, MOTD nag, menu;
+=L <name>= loads the character file, and if that character is already
+in the game (link-dead or on another connection) =check_reconnect=
+attaches the new connection to it instead of loading a second copy.
+Otherwise the character is placed in the saved load room, "entered
+game" is logged, and the per-tick update event starts.
+
+** While playing
+
+One command per pulse, lag by wait states, the pager, the string
+editor: all in =game-engine-loop.org=. Every tick (60 s)
+=ev_update_player= regenerates hit, mana, power and move, worsens
+hunger, thirst and drunkenness with 50% probability, damages the
+incapacitated and mortally wounded, and advances the idle timer.
+
+** Saving
+
+=save_char= is called on: quit and camp; link loss; death; level
+gain; the random autosave in the loop (about every 100 s per
+connection); the 5th idle tick; immortal =set= and =restore=; and
+=save=. Saves always write the whole file, objects included.
+
+** Idle
+
+=check_idling= (=limits.c=) per tick for mortals: save at 5 idle
+ticks, pull into "the void" (room 1) at 720 (12 hours) with the
+previous room remembered, extract from the game after 1440 (24
+hours). A connection that never gets past login is dropped after 5
+minutes (=boot_idle_conn=).
+
+** Losing the link
+
+=close_socket= logs "Losing link", adds 15 minutes to a running PK
+cooldown, detaches the connection, accumulates played time, and saves.
+The character stays in the world, link-dead, and keeps taking its tick
+updates; regen while link-dead never /reduces/ points (the update
+keeps the higher value). Reconnecting resumes in place.
+
+** Leaving
+
+- =camp=: only in a =RENTABLE= room for mortals, not while fighting,
+  not while hurt, not during a PK cooldown. Junk is removed, the
+  character is saved with everything it carries and wears, and leaves.
+- =quit=: anywhere, but the warning is explicit: quitting outside a
+  rentable room loses all equipment. Level 10 and below are bounced to
+  a safe room once with an explanation; others must type =QUIT YES=.
+- =rent_disable= is set when a player attacks another player; for its
+  duration they can neither quit nor camp.
+
+** Death (=fight.c=, =dieWithXPPenalty= at :531)
+
+A player who dies loses experience: a quarter of current experience or
+a level-scaled amount, whichever is smaller, times a penalty factor;
+below level 20 the gods spare the loss with a message. A character
+over 100 years old who dies is left with experience 1 and told they
+are now a ghostly spirit. A corpse with the inventory is made, druids
+revert form, and the character is saved into =LOAD_ROOM_MORTAL=, where
+they continue.
+
+* Purging
+
+=-p <days>= is parsed by =main.c= into =purge_days=, and the boot-time
+purge in =db.c:395= is entirely commented out, as is the =A_NOPURGE=
+check. Nothing deletes inactive characters; the =PURGED= directory and
+the =unpurge= script are from when it did. The 1,440-tick idle extract
+removes a character from the running game, not from disk.
+
+* Other per-player things
+
+- /Mail/: =mail_list= on the character; the =mail= command.
+- /Boards/: board posts are world data, not character data, but
+  =new_notes= counts unread ones.
+- /Lockers/: =LockerSave/*.room= per player, indexed by =lockers.save=;
+  object storage in a room.
+- /Warehouse/: an object list on the account, shared by its characters.
+- /Kills/: a kept list of (mob vnum, count) in the character file,
+  shown by =show mob kills= aggregates and in player stats.
+- /Consent/: a name the player has consented to for corpse retrieval and
+  similar.
+- /Quests/, /arena/, /contests/: flags and counters, mostly outside
+  this file's scope.
+
+* Quirks
+
+- Identity is the name string. Renaming a character means a new file;
+  everything that refers to a player by name (consent, mail, clan
+  invites, hatred lists in memory) is a string compare.
+- The password hash appears twice, in the account file and in the
+  character file (tag 56), the latter only for "add existing character"
+  verification.
+- Email lives in both files too.
+- The account "huttan" was excluded from login logging by name in
+  =nanny.c= and =comm.c=.
+- Objects are copies in the file. Two characters can hold "the same"
+  unique item after a restore from different backups, and nothing can
+  tell.
+- =-p= is accepted and ignored.
+- A character may have at most =MAX_KILL_KEEP= kill records, so the
+  kills list is a sample, not a history.
