@@ -291,3 +291,89 @@ limit.
   catches up.
 - Mobs get the same per-tick regen event as players, so a fled-from mob
   is healing while it hunts you.
+
+* Clarifications (2026-10-02)
+
+** There is no "mob pass" in the engine
+
+The engine never iterates mobs. Each mob owns exactly one =EVT_MOBILE=
+event on the wheel (=game-engine-loop.org=, "The wheel"); when it fires
+it runs =act_state= once and reschedules itself: after the mob's
+remaining =wait= if it is lagged, else one second (=WAIT_SEC=, 100
+pulses), or always one second for =ACT_SPEC= mobs so their special
+keeps running. In a given pulse only the mobs whose events sit in that
+slot think, about one percent of them; over one second every mob
+thinks once. The phase each mob thinks on is fixed by its random
+1..1,200 pulse first delay at load and only shifts when lag delays it.
+
+Per think, in order: =pulse_count++=; =act_state= (the priority list
+above); =wait -= WAIT_SEC=, clamped at 0; reschedule. Blows are not
+part of the think: a fighting mob also has its own =EVT_STRIKE= chain
+at its weapon speed, independent of the think phase.
+
+** Swarms
+
+Two mechanisms. A prototype with =group_with= set attaches to that
+leader vnum as a follower on sight and fights its fights. Independently
+=aid_friends= makes any standing mob join a fight in its room on the
+side of a mob with the same vnum or in the same group. "Friend" means
+only that: same vnum or same group; there is no friend list.
+
+** =act_aggressive= vs =act_fight=
+
+=act_aggressive= decides to /start/ a fight and runs only when the mob
+is not fighting: =FindVictim=, the worth-it and peaceful checks, shout
+or growl, =mob_initiate=, =hit=. =act_fight= runs only /while/ fighting
+and is not the blows: wake if asleep (resistance check), stand if
+sitting, and for humanoids every 10th think a citizen may shout "Help!
+Guards! <name> is a murderer!" and =CallForGuard=, or a scholar-class
+mob may cast at its opponent (=act_caster=). A warrior mob's =act_fight=
+does nothing; its strikes are its fight.
+
+** A hunting step
+
+One room through a real exit. =choose_exit= is a breadth-first search
+over up to 2,000 rooms that returns the exit from the mob's current
+room lying on a shortest path to the quarry; the mob walks through it
+like a player (humanoids open doors). No teleporting. One step per
+think, so about a room per second, until the step budget runs out.
+
+** Citizens and police
+
+A citizen is any mob whose builder set =ACT_CITIZEN=: a townsperson
+that calls guards when attacked, spreads its hatreds to other citizens
+once a minute, and protects others. Police are a hardcoded list of
+guard vnums (=IS_POLICE=, =h/utils.h:409=) that answer the call.
+Together they make a town defend itself and remember offenders.
+
+** Hate without attack
+
+Every mob accumulates hatred from being hit, but only =ACT_HATEFUL=
+mobs attack on sight because of it. Others use hatred to choose targets
+and to decide whether to hunt when a player flees. A shopkeeper
+remembers being hit without becoming an attacker; a guard flagged
+hateful comes for the player on sight.
+
+** Builders' view
+
+A mob is a text block in =world/MOB/<zone>.mob= (names, descriptions,
+race, level, alignment, stats, attacks per round, armour by body part,
+spell and skill lists, immunities, affects, and the =act= flag list
+such as =act { sentinel, npc, aggressive }=), plus the zone's reset
+commands that say where it loads and what it carries. The world
+compiler produces =mob.out=; the game loads it at boot. Tuning is edit,
+recompile, reset the zone, observe: =switch= into the mob to see its
+debug thoughts, =mstat=, =set= fields live. No in-game mob editor, no
+scripting in current =src=; behaviour beyond the flags is a C special
+procedure bound to the vnum.
+
+** No instance identity
+
+A vnum names the prototype. Three wolves loaded by a zone are three
+=char_data= with the same vnum and nothing to tell them apart but their
+memory address, which is reused after death. Hatred, hunting and
+grouping hold pointers validated against the live list before use, and
+"same vnum = friend" stands in for the identity the game lacks. Objects
+are the same: a saved sword in a player file is a copy of its fields,
+not a reference. A rewrite must give every mob and object instance an
+id at creation (see SUMMARY.md §16, ids).
