@@ -339,3 +339,113 @@ already per-entity events and port as they are. Make each slot FIFO: the
 C wheel is LIFO by accident of a headless-tail list, and two related
 events landing in one pulse (a cast completing and a blow) can resolve
 in the opposite order to how they were scheduled.
+
+* Clarifications from discussion (2026-10-02)
+
+** What a pass really is
+
+The six steps, with what is rationed and what is not:
+
+1. Read everything waiting on every socket into per-connection input
+   queues. Fully drained.
+2. Fire every event in this pulse's wheel slot. Fully drained.
+3. Execute /one/ command per connection that has input and is not lagged.
+   This is the only rationed step and the only fairness mechanism.
+4. Send /all/ pending output to every connection whose socket is
+   writable, then a prompt where one is owed. Output is never written
+   during steps 2, 3 or 5; handlers only append to the output queue.
+5. Run every periodic block whose interval divides =PULSE= (100, 200,
+   400, 1000, 6000). One counter, divisibility tests, not nested
+   counters; pulse 6,000 runs all of them in one pass.
+6. Sleep until the deadline, if any time is left.
+
+So a pass is unbounded: every hot socket, every event in the slot, one
+command for every connection, every zone that resets, in a single thread.
+
+** The pacing
+
+No timer, no alarm. =next_tick= is an absolute deadline set to =now +
+10 ms= at start and advanced by exactly 10 ms every pass regardless of
+how long the pass took. The pass sleeps for =next_tick - now= if
+positive. A 2 ms pass sleeps 8 ms; a 30 ms pass sleeps nothing and leaves
+the deadline 20 ms in the past, so following passes run back to back
+until caught up; after four consecutive zero-sleep passes the deadline is
+reset to =now= and the backlog forgotten. "100 pulses per second" is a
+target; under load it is whatever the work allows, and every interval
+stretches by the same factor. =SIGALRM= / =SIGUSR2= handlers exist only
+so that the =alarm(5)= guards around =accept= / =getsockname= interrupt
+the call with =EINTR= instead of killing the process; they are not part
+of the pacing.
+
+** The wheel
+
+=event_queue[6000]=, one slot per pulse of a tick; advances one slot per
+pass, so a full turn is 60 s at nominal rate. Slot = =(PULSE + delay) %
+6000=, nothing else; "now" is the one global counter, so everything
+scheduled during one pass with the same delay shares a slot. Delays
+of 6,000 or more are never put on the wheel (they go to the minute
+scheduler), so a slot only ever holds events due in the same pulse; the
+modulo causes no cross-time collisions. Insertion is push-to-front
+(LIFO within a slot). Delays actually used: mob think 100 (or remaining
+wait), strike =100*100/speed%= (100 at normal speed), per-character and
+per-object tick update 5,999 (drifts one slot back per tick), spell cast
+time, death 25, run/travel 10 per room, door timer*100. Related events
+colliding in one slot is about 1 in 100 per cast-in-combat; a mob's
+think and its own strike at normal speed, if they ever share a slot, stay
+phase-locked for the fight and alternate order every cycle because each
+re-pushes to the front. Rare, systematic when it happens, never
+diagnosed. The only deliberate spreading is the random 1..1,200 first
+think at mob load.
+
+** The minute scheduler
+
+A single sorted linked list keyed by tick (=events.c:60=), FIFO among
+equal ticks, drained once per tick by =event_tick=, targets validated by
+walking the whole character/object list before firing. Its entire
+customer list: delayed teleport (=magic_relo.c:84=), the arena monitor
+re-arming itself every minute (=wizard.c:247,263,317=), and wheel
+events with delays >= 1 tick parked until their minute. The two-scheduler
+arrangement is the wheel having been added later for fine-grained
+events, with the reroute so it never overflows.
+
+** Commands and the wheel
+
+Commands never go on the wheel. They sit in the connection's queue and
+step 3 pulls one per pass. A command that must continue later does its
+immediate part and schedules a separate wheel event (=cast= adds lag and
+an =EVT_SPELL=). Input is queued in step 1 and executed in step 3 of the
+same pass, so a line arriving to an empty queue runs within the pass it
+was read in; there is no good reason for that, it is a side effect of the
+pass layout, and "always queue, pop one per pass" would be the cleaner
+uniform rule (one pulse of latency, invisible). Neither rule smooths a
+burst across passes; the per-connection cap bounds a pass, a per-pass
+budget would smooth it.
+
+** Output
+
+Handlers never write to sockets; =sendf= / =act= / =SEND_TO_Q= append
+blocks to the connection's output queue. Step 4 drains the whole queue
+per connection (not one block), then prompts. Prompt states: 1 = a
+command ran, flush then prompt; 2 = prompt showing, unsolicited text gets
+a leading newline, is flushed, and a prompt is owed; 0 = owed, printed
+after =PULSE_PROMPT= (1 s) or with the next command. =write_to_fd= loops
+on =write=; on =EWOULDBLOCK= it stops and reports success, dropping the
+unsent remainder of that block. The second output queue =pri_out= is for
+the string editor: while =PLR_VEG= is set, ordinary output is discarded
+(not queued) and only messages prefixed with byte =\5= are held in
+=pri_out= until the player leaves the editor. In a rewrite that is a
+flag on the block, not a second queue.
+
+** Mapping to asyncio
+
+Steps 1 and 4 are pure I/O and become per-connection reader and writer
+tasks on asyncio streams: readers append lines to the input queue,
+writers drain the output queue (and a stalled socket then just waits
+instead of dropping text). Steps 2, 3 and 5 mutate the world and stay
+together in one pulse task, so there is still exactly one mutator at a
+time; it fires due events, runs one command per connection, runs the
+periodic blocks, sleeps to the next deadline. Readers and writers never
+touch game state. Keep: the tick as a game concept, no await inside
+state-mutating code, an injectable clock so tests and replays are
+deterministic. Drop: the wheel/minute split and its LIFO, the alarm
+guards, the inline socket writes.
