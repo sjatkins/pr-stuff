@@ -1266,3 +1266,24 @@ of lambdas with void* contexts — hence not worth a month given the
 rewrite. In CL all of it is member/find-if/remove/dolist and the
 relation store; the `next` fields and most of handler.c have no
 counterpart.
+
+**GenericDiku (idea, 2026-10-02).** The semantic layer in §17 is mostly
+Diku-generic: every Diku descendant (Circle, ROM, Smaug, PR) shares
+vnums, zones with reset commands, rooms/exits/flags, the mob and object
+prototype field set, affects/applies, the pulse loop, intrusive lists
+and vnum-table specials; what differs is rules tables, class/spell
+lists and one-off scenes. So: a generic CL package (engine, world model
+with identity and relations, events and scenes, journal, sessions,
+importers for Diku/Circle and PR world formats; the exploration docs
+are near enough its spec) and a per-game package on top (rules as
+methods and tables, scenes, builder notation, content), with PR as the
+reference implementation. Audience is small but the common case out
+there is a 1995 C codebase one person still understands; a package that
+re-expresses such a game in a few thousand lines, keeps its world
+files, and adds live editing and real persistence could carry a dozen
+of them through their next decade. Historical aside recorded: the
+genre's object model is Zork's (MDL/Lisp, 1977–79) but the multiplayer
+line was assembler→BCPL→C (MUD1, Aber, Diku 1990), rebuilding Lisp
+machinery by hand ever since; this code even carries a dead Ruby
+embedding (ruby_cmds.c, -DNO_RUBY). Guile scripting on the C base is
+possible but spends effort on the layer the rewrite replaces.
