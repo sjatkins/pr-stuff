@@ -209,7 +209,7 @@ with the skill as the type (so hit location is the body and messages
 are the skill's). Backstab needs a wielded weapon and at most two
 other attackers. Each skill's number, position requirement and
 minimum level come from the skill table (=world/SKILL=,
-[[file:players.org::#classes-races-clans-world-data][effects and skills]]).
+[[file:players.org::#classes-races-clans][effects and skills]]).
 
 * Spells in combat
 :PROPERTIES:
