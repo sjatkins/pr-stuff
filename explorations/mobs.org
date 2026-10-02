@@ -6,7 +6,7 @@ Everything about non-player characters, read from =src/= at commit
 94876a77. Companion to [[file:game-engine-loop.org][game-engine-loop.org]], which covers the loop
 and event wheel that drive mobs.
 
-See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the wheel and the think event), [[file:rooms.org][rooms.org]] (zones, resets, wandering constraints, specials order), [[file:objects.org][objects.org]] (what mobs carry and drop), [[file:players.org][players.org]] (the shared character struct). Earlier extractor notes: [[file:zones.org][zones.org]] (what loads where), [[file:effects_skills.org][effects_skills.org]] (what =mob_attack= draws on), [[file:commands.org][commands.org]] (every command, including the immortal tools below).
+See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the wheel and the think event), [[file:rooms.org][rooms.org]] (zones, resets, wandering constraints, specials order), [[file:objects.org][objects.org]] (what mobs carry and drop), [[file:players.org][players.org]] (the shared character struct). Earlier extractor notes: [[file:zones.org][zones.org]] (what loads where), [[file:effects_skills.org][effects_skills.org]] (what =mob_attack= draws on), [[file:commands.org][commands.org]] (every command, including the immortal tools below), [[file:combat.org][combat.org]] (blows, mob_attack, death).
 
 * What a mob is
 :PROPERTIES:

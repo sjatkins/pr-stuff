@@ -6,7 +6,7 @@ Items: prototypes, instances, where they live, how they load, change,
 persist and die. Read from =src/= at commit 94876a77 and the world data
 files. Companion to [[file:game-engine-loop.org][game-engine-loop.org]], [[file:mobs.org][mobs.org]], [[file:players.org][players.org]].
 
-See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the per-object tick event), [[file:rooms.org][rooms.org]] (zone resets and zone saves), [[file:players.org][players.org]] (the player file that carries objects), [[file:mobs.org][mobs.org]] (identity, specials dispatch). Earlier extractor notes: [[file:item_sets.org][item_sets.org]], [[file:shops.org][shops.org]], [[file:locker.org][locker.org]], [[file:warehouse.org][warehouse.org]].
+See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the per-object tick event), [[file:rooms.org][rooms.org]] (zone resets and zone saves), [[file:players.org][players.org]] (the player file that carries objects), [[file:mobs.org][mobs.org]] (identity, specials dispatch). Earlier extractor notes: [[file:item_sets.org][item_sets.org]], [[file:shops.org][shops.org]], [[file:locker.org][locker.org]], [[file:warehouse.org][warehouse.org]], [[file:combat.org][combat.org]] (item damage, weapon dice, stopping).
 
 * Prototype and instance
 :PROPERTIES:

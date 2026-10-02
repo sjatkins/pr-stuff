@@ -1,0 +1,273 @@
+#+TITLE: Perilous Realms: combat
+#+DATE: 2026-10-02
+#+OPTIONS: toc:2
+
+How fights start, how a blow is resolved, what reduces it, what happens
+at zero, and who gets the experience. Read from =src/fight.c= (5,494
+lines), =offensive.c=, =limits.c= at commit 94876a77.
+
+See also: [[file:game-engine-loop.org::#the-event-system][engine, the event system]]
+(strikes are events), [[file:mobs.org::#in-a-fight][mobs, in a fight]]
+(what mobs do between blows), [[file:players.org::#death][players, death]],
+[[file:objects.org::#applies-sockets-sets][objects, applies]] (where
+hit and damage bonuses come from), [[file:rooms.org::#room-flags][rooms, flags]]
+(peaceful and arena rooms).
+
+* Shape of a fight
+:PROPERTIES:
+:CUSTOM_ID: shape
+:END:
+
+There is no round. Each combatant has its own chain of =EVT_STRIKE=
+events on the wheel; each blow schedules the next one after that
+attacker's own speed (=calc_speed=, below). Two fighters with
+different speeds simply interleave. A fight is the pair of =fighting=
+pointers plus whatever strike chains exist; it ends when one side
+stops (=stop_fighting=), leaves the room, flees, or dies.
+
+Starting: =hit=, =kill=, a skill, a spell, mob aggression or a hunt
+arriving all end up in =set_fighting(ch, victim)= (=fight.c=), which
+refuses self, dead victims and mobs flagged =ACT_IMMORTAL=, caps a
+mob's simultaneous attackers at six, records =fighting= both ways, and
+schedules the first strike after =calc_speed(ch)= pulses. If the
+attacker is the aggressor against a player, =make_criminal= is called
+([[#pk][PK]]).
+
+Per strike (=event_strike=): bail if the fight is over or the victim
+left the room; a mob develops hatred for its target
+([[file:mobs.org::#memory-hatred-and-fear][mobs, memory]]); a mob tries
+=mob_attack= first, a roll against its =magic_use= chance that picks a
+random known skill or spell to use instead of a plain blow; otherwise
+=hit=; then schedule the next strike.
+
+Limits: =ok_to_fight= refuses fights in =PEACEFUL= rooms, across rooms,
+and when a victim already has 10 attackers or the attacker 12.
+
+* Speed (=calc_speed=, =calc_speed_percent=, =limits.c=)
+:PROPERTIES:
+:CUSTOM_ID: speed
+:END:
+
+One blow per second is par (100%). Delay in pulses is =100 ×
+PULSE_PER_SEC / percent=.
+
+- players: =100 + 10 × level / class speed_level= (default 500), times
+  the weapon's speed value (=value[4]=, 10 = bare hands) over 10,
+  times a dexterity factor, capped at =10 × class speed_max=;
+- mobs: =attacks_per_round × 100=, times a half-strength dexterity
+  factor;
+- then =melee_haste= from items and affects.
+
+So a level 500 player with a speed-15 weapon and good dexterity strikes
+about twice a second; a mob with =attacks_per_round { 3 }= strikes
+three times a second.
+
+* Dual wield
+:PROPERTIES:
+:CUSTOM_ID: dual-wield
+:END:
+
+After the main-hand blow, if both hands hold weapons the held one can
+wear =ITEM_WIELD= (and =ITEM_DUAL_WIELD= unless the attacker is a
+thief), a roll under the dual-wield skill lets the off-hand strike in
+the same event, at a 1-in-(speed difference) chance when the off-hand
+weapon is slower. Off-hand to-hit is 10 worse; off-hand damage gets
+the remort dual-wield multiplier.
+
+* To hit (=hit=, =calc_thac0=, =effective_ac=)
+:PROPERTIES:
+:CUSTOM_ID: to-hit
+:END:
+
+1. =set_hitaim_loc=: the attacker's =aimloc= (default body) is hit if
+   =d20 < dexterity - victim intelligence/2=; otherwise a random
+   location from a table indexed by the height-class difference
+   (tall attackers hit heads, short ones feet). Skills always hit the
+   body.
+2. Attacker's THAC0: for players =THACO(ch) - 7 × hitroll=, where
+   =THACO= is =max(200 - 10 × level / class thaco_level, class
+   thaco_min × 10)=; for mobs =200 - 10 × hitroll= (or a flat -40 for
+   mobs above level 500 with low hitroll). Plus half of the missing
+   weapon proficiency (=100 - skill= over 2), minus the strength to-hit
+   bonus, plus 10 for the off-hand. Floor -75.
+3. Victim's AC at that location: =armor[loc]= plus the dexterity
+   defensive bonus if standing, clamped to ±100.
+4. Roll =d200=. Hit if the roll is over 196, or the victim is not
+   awake, or =thac0 - ac <= roll=. A roll under 5 always misses.
+
+A miss still calls =damage= with 0 so messages and bookkeeping run; a
+missed backstab or assassination has its own consequences.
+
+* Damage of a blow (=hit_landed=, =base_attack_damage=)
+:PROPERTIES:
+:CUSTOM_ID: blow-damage
+:END:
+
+Base: the strength damage bonus, plus the weapon's dice
+(=value[1]= d =value[2]=) scaled by the attacker's proficiency in that
+weapon type (=value[0]=) for players, or the mob's own damage dice
+plus =extradam=; bare hands add 0 to 2. Then =dam_bonus=, remort
+bonuses and criticals: a critical threat built from remort count and
+precision decides, on a d200, between normal, improved and "sprays
+blood" criticals, with ninjas and the crit remort effect widening the
+window.
+
+Multipliers: victims below fighting position take more; location
+multiplies head 1.11, body 1.07, arms 1.04, legs 1.02, feet 1.0;
+off-hand blows get the dual-wield remort bonus.
+
+* Resolution (=damage=)
+:PROPERTIES:
+:CUSTOM_ID: resolution
+:END:
+
+Every source of harm, blows, skills, spells, room damage, poison,
+suffering, goes through =damage(ch, victim, dam, type)=. In order:
+
+1. =ok_to_fight=; start the fight both ways if it is not already on.
+2. Spell damage may be absorbed by a globe shield, saved against
+   (=MakeResistanceCheck=), or modified by spell power.
+3. =CheckResistanceAttackType=: map the attack to a damage type (fire,
+   cold, water, electricity, poison, acid, force, magic, light,
+   darkness, plus the physical kinds) and apply immunity (zero),
+   resistance and susceptibility from the victim's =resistances= and
+   =M_resist= / =M_immune= / =susc= bits, with a saving roll where the
+   type allows one. For melee, =PreProcDam=.
+4. Stopping: =stopping[hitloc] + worn stopping bonus - attacker's
+   melee penetration=, scaled, is subtracted; sanctuary adds a flat
+   stopping bonus (with a class and wisdom modifier) rather than
+   halving; susceptibility reduces stopping.
+5. Pulse-affect absorbs (a percentage shield) take their cut; damage
+   dealt may heal the attacker through life steal or weapon vamp.
+6. =DamageStuff=: unless in the arena, heavy blows may damage a random
+   worn item (=DamageOneItem=, never pouches, indestructibles, or vnum
+   25; remort durability resists).
+7. =hit_shield= absorbs before hit points; then =hit -= dam=.
+8. =update_pos=: hit points above 0 keep or restore the position
+   (stunned if paralysed); 0 to -2 stunned, -3 to -5 incapacitated,
+   -6 to -10 mortally wounded, -11 and below dead.
+9. Messages from the =messages= file by damage keyword and band, to
+   attacker, victim and room; the victim's condition message when
+   below sleeping.
+10. Wimpy: a player whose =whimpy_level= is set flees at that
+    threshold; =ACT_WIMPY= mobs flee when hurt.
+11. If the victim died: =die=.
+
+Position matters afterwards: incapacitated and mortally wounded
+characters lose hit points every tick until they die or are healed
+([[file:game-engine-loop.org::#the-event-system][the per-character tick]]).
+
+* Death (=die=, =raw_kill=, =make_corpse=, =group_gain=)
+:PROPERTIES:
+:CUSTOM_ID: death
+:END:
+
+=die=: the mob special gets =SPEC_DEATH=; a player's death actions and
+experience penalty ([[file:players.org::#death][players, death]]);
+alignment shifts for the killer (=change_alignment=); =death_cry= to
+neighbouring rooms; experience to the killer's group; then
+=raw_kill=: =make_corpse= (a container with everything the dead one
+carried and wore, a decay timer shorter when empty,
+[[file:objects.org::#the-per-object-tick][objects, per-object tick]]),
+mobs are extracted, players are moved to =LOAD_ROOM_MORTAL= standing
+with 1 hit point. Prototype =num_destroyed= increments.
+
+Experience (=group_gain=): the victim's experience value is divided by
+the sum of levels of the group members present in the room (or just
+the killer), multiplied by a gain multiplier and the clan multiplier,
+then given to each member scaled by their level through the per-class
+=EXP_NEEDED= curve. No experience for killing players.
+
+* Fleeing (=do_flee=, =offensive.c=)
+:PROPERTIES:
+:CUSTOM_ID: fleeing
+:END:
+
+Refused while falling, paralysed, badly lagged, held by clinging
+vines, berserking, or below stunned. A sitting or resting character
+first scrambles up with two seconds of lag. Then a roll: a bad one
+means "you blindly run into something" and lag; otherwise a random
+exit is chosen among the room's open ones, "panics, and attempts to
+flee", and the move is attempted, failing if too exhausted. Outside the
+arena a successful flee costs experience, and a mob left behind
+starts hunting ([[file:mobs.org::#hunting-chasing-across-rooms][mobs, hunting]]).
+
+* Skills (=offensive.c=)
+:PROPERTIES:
+:CUSTOM_ID: skills
+:END:
+
+Thirty-odd commands: hit, kill, backstab, bash, kick, batter, pummel,
+rescue, assist, vital stab, execute, berzerk, sunder armour,
+preparation, slice'n'dice, vanish, daze, ambush, cheapshot, garrote,
+mute strike, whirlwind, crippling strike, strike, holy strike, breath,
+shadowform, assassinate, and =wimp= to set the flee threshold. The
+common shape: find the target, refuse in peaceful rooms, refuse while
+berserking, refuse self, check position and height class, roll against
+the skill percentage, apply lag with =WAIT_STATE=, and call =damage=
+with the skill as the type (so hit location is the body and messages
+are the skill's). Backstab needs a wielded weapon and at most two
+other attackers. Each skill's number, position requirement and
+minimum level come from the skill table (=world/SKILL=,
+[[file:players.org::#classes-races-clans-world-data][effects and skills]]).
+
+* Spells in combat
+:PROPERTIES:
+:CUSTOM_ID: spells
+:END:
+
+A cast is a command that lags the caster and schedules =EVT_SPELL=
+for the completion ([[file:game-engine-loop.org::#the-event-system][engine]]).
+Damage spells arrive at =damage= with the spell as the type; the
+victim's saving roll is =MakeResistanceCheck(attacker, victim,
+modifier, damage type, minimum, scale)=, a d100 against a resistance
+score derived from level, stats and the victim's resistances, clamped
+to 95. Mobs cast through =mob_attack= on their strikes and through
+=act_caster= on their thinks.
+
+* PK
+:PROPERTIES:
+:CUSTOM_ID: pk
+:END:
+
+PK is global: the old world-based restriction is commented out in
+=ok_to_fight= ("MAKING IT GLOBAL PK"); only =PEACEFUL= rooms and the
+arena rules apply. Attacking a player you are not already fighting
+makes you a criminal (=crime.c=, =find_criminal= / =make_criminal=):
+police mobs and charmed followers are exempt, the arena is exempt, and
+the aggressor gets a =rent_disable= of 15 minutes (extended on
+repeat), during which they cannot quit or camp
+([[file:players.org::#leaving][players, leaving]]) and link loss adds
+more. Immortals do not count. Arena rooms suspend item damage and
+experience loss and have their own contest handling.
+
+* Constants worth knowing
+:PROPERTIES:
+:CUSTOM_ID: constants
+:END:
+
+| =PULSE_VIOLENCE= | 4 s; now only sector damage, not rounds       |
+| strike cap       | 6 attackers on a mob at start; 10/12 in =ok_to_fight= |
+| to-hit die       | d200 main hand, d100 off-hand                  |
+| auto-hit / miss  | roll > 196 hits; roll < 5 misses               |
+| AC range         | -100 to 100 per location                       |
+| positions        | dead 0, mortally wounded 1, incap 2, stunned 3, sleeping 4, resting 5, praying 6, sitting 7, fighting 8, standing 9, running 10 |
+| death threshold  | hit points -11                                 |
+| messages         | =lib/messages=, by damage keyword and band     |
+
+* Quirks
+:PROPERTIES:
+:CUSTOM_ID: quirks
+:END:
+
+- A fight is two pointers; if either side's pointer is cleared without
+  the other's, one combatant keeps swinging at nothing until the next
+  strike notices. =SwitchTargets= and =FindAnAttacker= exist to patch
+  this up.
+- The six-attacker cap is enforced in =set_fighting=, the ten and
+  twelve in =ok_to_fight=; they disagree.
+- "Bonecruncher won't let you" is a hardcoded weapon check in flee.
+- Object vnum 25 can never be damaged, by number.
+- =PULSE_VIOLENCE= survives in name only.
+- Level 500+ mobs with hitroll under 20 get a flat THAC0 of -40, a
+  patch for a tuning problem rather than a rule.

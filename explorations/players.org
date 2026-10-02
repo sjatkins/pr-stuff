@@ -6,7 +6,7 @@ Accounts and player characters, read from =src/= at commit 94876a77.
 Companion to [[file:game-engine-loop.org][game-engine-loop.org]] and [[file:mobs.org][mobs.org]]. No player data was
 read for this; everything comes from the code and the world data files.
 
-See also: [[file:game-engine-loop.org][game-engine-loop.org]] (one command per pulse, the tick, prompts), [[file:objects.org][objects.org]] (inventory as inline copies), [[file:mobs.org][mobs.org]] (the same struct, identity), [[file:rooms.org][rooms.org]] (load rooms, rentable rooms, the void). Earlier extractor notes: [[file:accounts.org][accounts.org]], [[file:classes.org][classes.org]], [[file:races.org][races.org]], [[file:clans.org][clans.org]], [[file:effects_skills.org][effects_skills.org]], [[file:locker.org][locker.org]], [[file:warehouse.org][warehouse.org]]; every command in [[file:commands.org][commands.org]].
+See also: [[file:game-engine-loop.org][game-engine-loop.org]] (one command per pulse, the tick, prompts), [[file:objects.org][objects.org]] (inventory as inline copies), [[file:mobs.org][mobs.org]] (the same struct, identity), [[file:rooms.org][rooms.org]] (load rooms, rentable rooms, the void). Earlier extractor notes: [[file:accounts.org][accounts.org]], [[file:classes.org][classes.org]], [[file:races.org][races.org]], [[file:clans.org][clans.org]], [[file:effects_skills.org][effects_skills.org]], [[file:locker.org][locker.org]], [[file:warehouse.org][warehouse.org]]; every command in [[file:commands.org][commands.org]], [[file:combat.org][combat.org]] (to-hit, damage, PK, death).
 
 * Two things: accounts and characters
 :PROPERTIES:
