@@ -9,7 +9,7 @@ See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the pulse
 that ages zones and fires room events), [[file:mobs.org][mobs.org]]
 (what zone resets load into rooms, wandering and hunting across them),
 [[file:objects.org][objects.org]] (floor objects and zone saves),
-[[file:players.org][players.org]] (load rooms, rentable rooms, the void).
+[[file:players.org][players.org]] (load rooms, rentable rooms, the void). Earlier extractor notes: [[file:zones.org][zones.org]], [[file:sectors.org][sectors.org]].
 
 * The numbers
 
@@ -98,7 +98,7 @@ formula, and the minimap glyphs and colours. Sector 83 is =noshowmap=.
 Fire, cold and similar sectors also hurt unprotected players every 4 s
 ([[file:game-engine-loop.org::*8. Periodic work keyed to the pulse count (:304-357)][engine, periodic work]]).
 
-Of the 26,284 rooms in the source files, 10,001 are sector
+Per-sector values as extracted are tabulated in [[file:sectors.org][sectors.org]]. Of the 26,284 rooms in the source files, 10,001 are sector
 =Prototype=, builders' placeholders.
 
 * Light and dark
@@ -143,6 +143,8 @@ look on arrival. River rooms push occupants =river_dir= every
 =river_speed= quarter-seconds.
 
 * Zones (=Zone=, =h/zone.h:70=; =world/ZONE/*.zon=)
+
+The extracted zone data and its shape are in [[file:zones.org][zones.org]].
 
 A zone is a name, a vnum =range=, an optional =save= range, a
 =reset_type= and =reset_freq=, a current =age=, a =zone_limit= list

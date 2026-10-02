@@ -6,7 +6,7 @@ Read from =src/= at commit 94876a77 (master). Line numbers are for that
 commit. Everything below was checked against the code, not the docs; where
 a name is historical or misleading it says so.
 
-See also: [[file:mobs.org][mobs.org]] (what the mob think event does), [[file:objects.org][objects.org]] (the per-object tick), [[file:players.org][players.org]] (sessions, saves, idle), [[file:rooms.org][rooms.org]] (zone ageing and resets, room events).
+See also: [[file:mobs.org][mobs.org]] (what the mob think event does), [[file:objects.org][objects.org]] (the per-object tick), [[file:players.org][players.org]] (sessions, saves, idle), [[file:rooms.org][rooms.org]] (zone ageing and resets, room events). The full command table is in [[file:commands.org][commands.org]].
 
 * Overview
 

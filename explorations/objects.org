@@ -6,7 +6,7 @@ Items: prototypes, instances, where they live, how they load, change,
 persist and die. Read from =src/= at commit 94876a77 and the world data
 files. Companion to [[file:game-engine-loop.org][game-engine-loop.org]], [[file:mobs.org][mobs.org]], [[file:players.org][players.org]].
 
-See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the per-object tick event), [[file:rooms.org][rooms.org]] (zone resets and zone saves), [[file:players.org][players.org]] (the player file that carries objects), [[file:mobs.org][mobs.org]] (identity, specials dispatch).
+See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the per-object tick event), [[file:rooms.org][rooms.org]] (zone resets and zone saves), [[file:players.org][players.org]] (the player file that carries objects), [[file:mobs.org][mobs.org]] (identity, specials dispatch). Earlier extractor notes: [[file:item_sets.org][item_sets.org]], [[file:shops.org][shops.org]], [[file:locker.org][locker.org]], [[file:warehouse.org][warehouse.org]].
 
 * Prototype and instance
 
@@ -117,7 +117,7 @@ rarity can rise with net karma. Applies are capped at 15 per object.
   =socket_apply[]= and are remembered by vnum and name; =socket
   combine= merges gems, =socket destroy= and =remove= undo. =where=
   searches socket names too.
-- /Item sets/: =world/ITEM_SETS/item_sets.current= defines named sets
+- /Item sets/ ([[file:item_sets.org][item_sets.org]]): =world/ITEM_SETS/item_sets.current= defines named sets
   with two-piece and higher bonuses (applies) and a rarity; a "set
   item" carries =item_set= and its piece number, and wearing enough
   pieces applies the set bonus (=reset_and_apply_item_set_bonuses=,
@@ -191,6 +191,8 @@ acting player wears or carries, then every object on the floor, after the room s
 
 ** Shops (=shop.c=, =world/SHOP=)
 
+Extracted shop data: [[file:shops.org][shops.org]].
+
 A shop is a keeper mob vnum, a room (0 for a travelling salesman),
 lists of types and vnums it buys, what it produces, buy and sell profit
 percentages, temper messages and opening hours. Prices scale from
@@ -199,6 +201,8 @@ price tag" (=real_cost=) cannot be sold back; limited items respect
 =max_for_player= at the counter.
 
 ** Auction, lockers, warehouse
+
+Details: [[file:locker.org][locker.org]], [[file:warehouse.org][warehouse.org]].
 
 =auction= is a player market channel. Lockers are per-player object
 storage rooms persisted in =LockerSave/*.room= and indexed by

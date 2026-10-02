@@ -6,7 +6,7 @@ Accounts and player characters, read from =src/= at commit 94876a77.
 Companion to [[file:game-engine-loop.org][game-engine-loop.org]] and [[file:mobs.org][mobs.org]]. No player data was
 read for this; everything comes from the code and the world data files.
 
-See also: [[file:game-engine-loop.org][game-engine-loop.org]] (one command per pulse, the tick, prompts), [[file:objects.org][objects.org]] (inventory as inline copies), [[file:mobs.org][mobs.org]] (the same struct, identity), [[file:rooms.org][rooms.org]] (load rooms, rentable rooms, the void).
+See also: [[file:game-engine-loop.org][game-engine-loop.org]] (one command per pulse, the tick, prompts), [[file:objects.org][objects.org]] (inventory as inline copies), [[file:mobs.org][mobs.org]] (the same struct, identity), [[file:rooms.org][rooms.org]] (load rooms, rentable rooms, the void). Earlier extractor notes: [[file:accounts.org][accounts.org]], [[file:classes.org][classes.org]], [[file:races.org][races.org]], [[file:clans.org][clans.org]], [[file:effects_skills.org][effects_skills.org]], [[file:locker.org][locker.org]], [[file:warehouse.org][warehouse.org]]; every command in [[file:commands.org][commands.org]].
 
 * Two things: accounts and characters
 
@@ -25,6 +25,8 @@ ops scripts rebuild from the directory (=scripts/pr_functions.sh=,
 =rebuild_indexes=). There is no database; the name is the identity.
 
 * Accounts (=account.c=, =h/structs.h:783=)
+
+What the account files look like in practice: [[file:accounts.org][accounts.org]].
 
 ** Fields
 
@@ -179,6 +181,8 @@ enters the world.
 
 ** Classes, races, clans (world data)
 
+Extracted tables: [[file:classes.org][classes.org]], [[file:races.org][races.org]], [[file:clans.org][clans.org]]; the skill and effect system in [[file:effects_skills.org][effects_skills.org]].
+
 - =world/CLASSES/classes=: 40 records. Each has a name and two-letter
   abbreviation, allowed alignment, hit dice, stat minimum, maximum,
   base and extra budgets in the order STR INT WIS DEX CON CHR LCK,
@@ -296,9 +300,9 @@ removes a character from the running game, not from disk.
 - /Mail/: =mail_list= on the character; the =mail= command.
 - /Boards/: board posts are world data, not character data, but
   =new_notes= counts unread ones.
-- /Lockers/: =LockerSave/*.room= per player, indexed by =lockers.save=;
+- /Lockers/ ([[file:locker.org][locker.org]]): =LockerSave/*.room= per player, indexed by =lockers.save=;
   object storage in a room.
-- /Warehouse/: an object list on the account, shared by its characters.
+- /Warehouse/ ([[file:warehouse.org][warehouse.org]]): an object list on the account, shared by its characters.
 - /Kills/: a kept list of (mob vnum, count) in the character file,
   shown by =show mob kills= aggregates and in player stats.
 - /Consent/: a name the player has consented to for corpse retrieval and
