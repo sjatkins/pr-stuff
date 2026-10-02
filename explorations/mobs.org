@@ -9,6 +9,9 @@ and event wheel that drive mobs.
 See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the wheel and the think event), [[file:rooms.org][rooms.org]] (zones, resets, wandering constraints, specials order), [[file:objects.org][objects.org]] (what mobs carry and drop), [[file:players.org][players.org]] (the shared character struct). Earlier extractor notes: [[file:zones.org][zones.org]] (what loads where), [[file:effects_skills.org][effects_skills.org]] (what =mob_attack= draws on), [[file:commands.org][commands.org]] (every command, including the immortal tools below).
 
 * What a mob is
+:PROPERTIES:
+:CUSTOM_ID: what-a-mob-is
+:END:
 
 A mob is a =char_data= like a player, with =ACT_ISNPC= set and no
 connection (unless an immortal has switched into it). There is no
@@ -36,8 +39,11 @@ holding the prototype =char_data=, counts (=world_count=, =game_count=,
 special-procedure pointer =func=. =real_mobp(vnum)= fetches one.
 
 * Loading and limits
+:PROPERTIES:
+:CUSTOM_ID: loading-and-limits
+:END:
 
-Mobs enter the world only through zone resets ([[file:rooms.org::*Ageing and reset][rooms, "Ageing and reset"]]; =zone.c=, =reset_zone=
+Mobs enter the world only through zone resets ([[file:rooms.org::#ageing-and-reset][rooms, "Ageing and reset"]]; =zone.c=, =reset_zone=
 → =perform_commands=), at boot and then whenever a zone's age reaches
 its reset frequency (always, or only when no players are in it). A
 zone's command list says which mob loads in which room, with optional
@@ -53,6 +59,9 @@ thirst changes, suffering damage when incapacitated. So mobs heal
 between fights on the same schedule players do.
 
 * The think: what triggers a mob
+:PROPERTIES:
+:CUSTOM_ID: the-think-what-triggers-a-mob
+:END:
 
 Nothing happens to a mob because a player /arrived/. Mobs act from
 exactly two sources:
@@ -70,6 +79,9 @@ remembers them, within about four for an aggressive one, never for a
 plain one.
 
 ** The decision list (=act_state=, =mobact.c:180=)
+:PROPERTIES:
+:CUSTOM_ID: the-decision-list
+:END:
 
 Evaluated in order every think; the first branch that acts wins.
 
@@ -81,8 +93,8 @@ Evaluated in order every think; the first branch that acts wins.
 4. Every 20th think, =DecayHatred=.
 5. Do nothing while lagged (=wait=), charmed, paralysed or confused.
 6. =ACT_HEALER=: heal self or friends every =PULSE_HEALER=.
-7. If fighting: =act_fight= ([[*In a fight][below]]).
-8. If =ACT_HUNTING=: one step of =MobHunt= ([[*Hunting: chasing across rooms (=MobHunt=, =mobact.c=)][below]]).
+7. If fighting: =act_fight= ([[#in-a-fight][below]]).
+8. If =ACT_HUNTING=: one step of =MobHunt= ([[#hunting-chasing-across-rooms][below]]).
 9. If aggressive (=IS_AGGR=: =ACT_AGGRESSIVE= and not calmed), every
    4th think: =act_aggressive=.
 10. Standing: =aid_friends=, join a fight on the side of a mob with the
@@ -101,6 +113,9 @@ Several branches =sendf= debug text to the mob ("Attacking X",
 my enemy"); it is visible only to an immortal switched into the mob.
 
 * Behaviour flags (=ACT_*=, =h/const.h:777=)
+:PROPERTIES:
+:CUSTOM_ID: behaviour-flags
+:END:
 
 | flag             | effect                                                                 |
 |------------------+------------------------------------------------------------------------|
@@ -128,6 +143,9 @@ my enemy"); it is visible only to an immortal switched into the mob.
 | =ACT_NO_WEAR=    | will not wear equipment it finds                                       |
 
 * Aggression and victim choice
+:PROPERTIES:
+:CUSTOM_ID: aggression-and-victim-choice
+:END:
 
 =act_aggressive= (=mobact.c=): pick a victim with =FindVictim=; refuse
 if the mob is below half health /and/ worse off than the victim, or if
@@ -144,6 +162,9 @@ mage, thief) and a random roll picks one, skewed toward the better
 target as the mob's intelligence rises.
 
 * Memory: hatred and fear (=opinion.c=, =utils.c=)
+:PROPERTIES:
+:CUSTOM_ID: memory-hatred-and-fear
+:END:
 
 Each mob has an =Opinion= for hates and one for fears: a bitfield of
 categories plus category values and a list of individuals with expiry.
@@ -167,6 +188,9 @@ it hates, so they hate them too. Reputations travel through a town.
 =DecayHatred=: every 20th think, expired entries drop off.
 
 * Hunting: chasing across rooms (=MobHunt=, =mobact.c=)
+:PROPERTIES:
+:CUSTOM_ID: hunting-chasing-across-rooms
+:END:
 
 =SetHunting(mob, target)= (=utils.c:304=) sets =ACT_HUNTING= with a
 persistence budget of the mob's level plus 1 to 50 steps and remembers
@@ -189,6 +213,9 @@ peaceful. Hunting is therefore persistent for a bounded number of
 rooms, roughly the mob's level in steps, and zone-bound by default.
 
 * Wandering (=mobile_wander=)
+:PROPERTIES:
+:CUSTOM_ID: wandering
+:END:
 
 Every 5th think for non-sentinels: pick a random exit index 0 to 15,
 walk the exit list that far, give up if there is no such exit, refuse
@@ -198,6 +225,9 @@ walking straight back the way it came two thirds of the time, and stay
 in =default_zone= if =ACT_STAY_ZONE=. Guardians do not wander.
 
 * Grouping, assisting, citizens
+:PROPERTIES:
+:CUSTOM_ID: grouping-assisting-citizens
+:END:
 
 - =group_with=: a mob loaded with a leader vnum joins that leader as a
   follower when it sees it, and gets =AFF_GROUP=.
@@ -209,9 +239,12 @@ in =default_zone= if =ACT_STAY_ZONE=. Guardians do not wander.
   =IS_POLICE= / =IS_CITIZEN= gate who listens.
 
 * In a fight
+:PROPERTIES:
+:CUSTOM_ID: in-a-fight
+:END:
 
 Combat is per attacker: each fighter has its own =EVT_STRIKE= chain
-timed by =calc_speed= ([[file:game-engine-loop.org::*The event system][engine, "The event system"]]). On each of a mob's
+timed by =calc_speed= ([[file:game-engine-loop.org::#the-event-system][engine, "The event system"]]). On each of a mob's
 strikes, =DevelopHatred= first, then =mob_attack= rolls against the
 mob's skill and spell lists for a special attack and, failing that, a
 plain =hit=. Independently, the think's =act_fight= branch lets
@@ -223,6 +256,9 @@ by aggression and hunting. A fleeing player triggers =SetHunting= on
 the mob left behind.
 
 * Special procedures (=spec_mob.c=, =spec_assign.c=)
+:PROPERTIES:
+:CUSTOM_ID: special-procedures
+:END:
 
 117 C functions, bound to mob vnums at boot by a table in
 =spec_assign.c= ("Assigning function pointers: Mobiles."; a duplicate
@@ -250,12 +286,18 @@ not to their presence. Shopkeepers, guildmasters, guards, bankers,
 receptionists and the like are all specials.
 
 * Sounds
+:PROPERTIES:
+:CUSTOM_ID: sounds
+:END:
 
 Every 60 s (=PULSE_AUDIO=, =MakeSound=), each awake mob with a
 =sounds= string has a 1 in 6 chance of making it in its room, and
 objects with noises do likewise.
 
 * Death
+:PROPERTIES:
+:CUSTOM_ID: death
+:END:
 
 =die= → =raw_kill= → =make_corpse=: the prototype's =num_destroyed=
 is incremented (=fight.c:655=) and =game_count= decremented on extract
@@ -266,6 +308,9 @@ dead character. The zone's next reset reloads it if it is below its
 limit.
 
 * Immortal tools
+:PROPERTIES:
+:CUSTOM_ID: immortal-tools
+:END:
 
 - =show mob <name>= / =show mob lo hi=: prototype search by keyword or
   range; =show mob limited= shows limits and counts; =show mob kills=
@@ -277,6 +322,9 @@ limit.
 - =stat=, =set= on mobs as on players.
 
 * Quirks and things to know
+:PROPERTIES:
+:CUSTOM_ID: quirks-and-things-to-know
+:END:
 
 - Aggression is checked every 4th think, so an aggressive mob takes 1
   to 4 seconds to notice you, depending on where its phase is.
@@ -295,11 +343,17 @@ limit.
   is healing while it hunts you.
 
 * Clarifications (2026-10-02)
+:PROPERTIES:
+:CUSTOM_ID: clarifications
+:END:
 
 ** There is no "mob pass" in the engine
+:PROPERTIES:
+:CUSTOM_ID: there-is-no-mob-pass-in-the-engine
+:END:
 
 The engine never iterates mobs. Each mob owns exactly one =EVT_MOBILE=
-event on the wheel ([[file:game-engine-loop.org::*The event system][engine, "The event system"]]); when it fires
+event on the wheel ([[file:game-engine-loop.org::#the-event-system][engine, "The event system"]]); when it fires
 it runs =act_state= once and reschedules itself: after the mob's
 remaining =wait= if it is lagged, else one second (=WAIT_SEC=, 100
 pulses), or always one second for =ACT_SPEC= mobs so their special
@@ -314,6 +368,9 @@ part of the think: a fighting mob also has its own =EVT_STRIKE= chain
 at its weapon speed, independent of the think phase.
 
 ** Swarms
+:PROPERTIES:
+:CUSTOM_ID: swarms
+:END:
 
 Two mechanisms. A prototype with =group_with= set attaches to that
 leader vnum as a follower on sight and fights its fights. Independently
@@ -322,6 +379,9 @@ side of a mob with the same vnum or in the same group. "Friend" means
 only that: same vnum or same group; there is no friend list.
 
 ** =act_aggressive= vs =act_fight=
+:PROPERTIES:
+:CUSTOM_ID: act-aggressive-vs-act-fight
+:END:
 
 =act_aggressive= decides to /start/ a fight and runs only when the mob
 is not fighting: =FindVictim=, the worth-it and peaceful checks, shout
@@ -333,6 +393,9 @@ mob may cast at its opponent (=act_caster=). A warrior mob's =act_fight=
 does nothing; its strikes are its fight.
 
 ** A hunting step
+:PROPERTIES:
+:CUSTOM_ID: a-hunting-step
+:END:
 
 One room through a real exit. =choose_exit= is a breadth-first search
 over up to 2,000 rooms that returns the exit from the mob's current
@@ -341,6 +404,9 @@ like a player (humanoids open doors). No teleporting. One step per
 think, so about a room per second, until the step budget runs out.
 
 ** Citizens and police
+:PROPERTIES:
+:CUSTOM_ID: citizens-and-police
+:END:
 
 A citizen is any mob whose builder set =ACT_CITIZEN=: a townsperson
 that calls guards when attacked, spreads its hatreds to other citizens
@@ -349,6 +415,9 @@ guard vnums (=IS_POLICE=, =h/utils.h:409=) that answer the call.
 Together they make a town defend itself and remember offenders.
 
 ** Hate without attack
+:PROPERTIES:
+:CUSTOM_ID: hate-without-attack
+:END:
 
 Every mob accumulates hatred from being hit, but only =ACT_HATEFUL=
 mobs attack on sight because of it. Others use hatred to choose targets
@@ -357,6 +426,9 @@ remembers being hit without becoming an attacker; a guard flagged
 hateful comes for the player on sight.
 
 ** Builders' view
+:PROPERTIES:
+:CUSTOM_ID: builders-view
+:END:
 
 A mob is a text block in =world/MOB/<zone>.mob= (names, descriptions,
 race, level, alignment, stats, attacks per round, armour by body part,
@@ -370,6 +442,9 @@ scripting in current =src=; behaviour beyond the flags is a C special
 procedure bound to the vnum.
 
 ** No instance identity
+:PROPERTIES:
+:CUSTOM_ID: no-instance-identity
+:END:
 
 A vnum names the prototype. Three wolves loaded by a zone are three
 =char_data= with the same vnum and nothing to tell them apart but their
@@ -378,4 +453,4 @@ grouping hold pointers validated against the live list before use, and
 "same vnum = friend" stands in for the identity the game lacks. Objects
 are the same: a saved sword in a player file is a copy of its fields,
 not a reference. A rewrite must give every mob and object instance an
-id at creation (see [[file:../SUMMARY.md][SUMMARY.md]] §16, ids, and [[file:objects.org::*Prototype and instance][objects, "Prototype and instance"]]).
+id at creation (see [[file:../SUMMARY.md][SUMMARY.md]] §16, ids, and [[file:objects.org::#prototype-and-instance][objects, "Prototype and instance"]]).

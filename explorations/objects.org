@@ -9,6 +9,9 @@ files. Companion to [[file:game-engine-loop.org][game-engine-loop.org]], [[file:
 See also: [[file:game-engine-loop.org][game-engine-loop.org]] (the per-object tick event), [[file:rooms.org][rooms.org]] (zone resets and zone saves), [[file:players.org][players.org]] (the player file that carries objects), [[file:mobs.org][mobs.org]] (identity, specials dispatch). Earlier extractor notes: [[file:item_sets.org][item_sets.org]], [[file:shops.org][shops.org]], [[file:locker.org][locker.org]], [[file:warehouse.org][warehouse.org]].
 
 * Prototype and instance
+:PROPERTIES:
+:CUSTOM_ID: prototype-and-instance
+:END:
 
 A /prototype/ is an entry in =obj_db=, a hash keyed by vnum of
 =index_mem= records (=objdb.c:910=), each holding a template =obj_data=,
@@ -19,11 +22,14 @@ pointer. 4,854 prototypes load from =obj.out= at boot.
 
 An /instance/ is an =obj_data= made by =get_obj(vnum, ...)= as a copy
 of the template. It has no identity beyond its memory address and its
-vnum: two long swords are two copies of prototype 3022 (see [[file:mobs.org::*No instance identity][mobs, "No instance identity"]]). Instance-only state is the location pointers,
+vnum: two long swords are two copies of prototype 3022 (see [[file:mobs.org::#no-instance-identity][mobs, "No instance identity"]]). Instance-only state is the location pointers,
 timers, contents, sockets, mutations, provenance strings and anything
 an immortal changed.
 
 * The struct (=h/structs.h:240=)
+:PROPERTIES:
+:CUSTOM_ID: the-struct
+:END:
 
 | group        | fields                                                                                           |
 |--------------+--------------------------------------------------------------------------------------------------|
@@ -43,9 +49,12 @@ Exactly one of the location pointers is meaningful at a time, and the
 code maintains the room, character and container lists by hand
 (=obj_to_room=, =obj_from_char=, ...). The whole "where is it" question
 is these five pointers plus the intrusive lists; see [[file:mobs.org][mobs.org]] for why
-that matters ([[file:mobs.org::*No instance identity][mobs, identity]]).
+that matters ([[file:mobs.org::#no-instance-identity][mobs, identity]]).
 
 * Item types (=item_types[]=, =constants.c=)
+:PROPERTIES:
+:CUSTOM_ID: item-types
+:END:
 
 undefined, light, scroll, wand, staff, weapon, fire weapon, missile,
 treasure, armor, potion, worn, other, trash, trap, container, note,
@@ -63,8 +72,14 @@ potion its level and up to three spells; a corpse (a container) uses
 (=world/compile=, =tran=) maps the names to slots.
 
 * Flags
+:PROPERTIES:
+:CUSTOM_ID: flags
+:END:
 
 ** Wear (=wear_flags=, =h/const.h:265=)
+:PROPERTIES:
+:CUSTOM_ID: wear
+:END:
 
 take, finger, neck, body, head, legs, feet, hands, arms, shield, about,
 waist, wrist, wield, hold, throw, light, damaged (cannot wear or
@@ -75,6 +90,9 @@ shield, about, waist, two wrists, wield, hold, off-hand, wings, two
 trinkets.
 
 ** Extra (=extra_flags=, =h/const.h:292=)
+:PROPERTIES:
+:CUSTOM_ID: extra
+:END:
 
 glow, hum, flexible (volume grows with contents), mundane
 (unenchantable), nodrop (cursed in the Diku sense: cannot be dropped or
@@ -83,12 +101,18 @@ anti-neutral, randomize (mutate on load), hidden, indestruct, arena
 only, test. Bits 14 to 28 are unused.
 
 ** Container (=CONT_*=)
+:PROPERTIES:
+:CUSTOM_ID: container
+:END:
 
 closeable, pickproof, closed, locked, knockable, crackable. A crackable
 locked container gets a =mm_crack_code= at load and the =crack= command
 is a Mastermind-style guessing game against it.
 
 * Rarity, tiers, mutation
+:PROPERTIES:
+:CUSTOM_ID: rarity-tiers-mutation
+:END:
 
 =rarity= is common, uncommon, rare, epic or legendary; it colours the
 name everywhere (=rarity_color_code=, yellow through purple) and feeds
@@ -103,6 +127,9 @@ rarity can rise with net karma. Applies are capped at 15 per object.
 =mutateinfo= shows the tables.
 
 * Applies, sockets, sets
+:PROPERTIES:
+:CUSTOM_ID: applies-sockets-sets
+:END:
 
 - /Applies/: up to 15 (location, modifier, qualifier) triples; 104
   =APPLY_= locations: the seven stats, level, age, mana, hit, move,
@@ -125,11 +152,17 @@ rarity can rise with net karma. Applies are capped at 15 per object.
   Sets 1 and 2 are reserved placeholders.
 
 * Where objects come from
+:PROPERTIES:
+:CUSTOM_ID: where-objects-come-from
+:END:
 
 ** Zone resets (=zone.c=)
+:PROPERTIES:
+:CUSTOM_ID: zone-resets
+:END:
 
 The only source of new instances other than immortals and a few
-specials ([[file:rooms.org::*Ageing and reset][rooms, "Ageing and reset"]]). A zone command loads an object into a room (=O=), gives it to
+specials ([[file:rooms.org::#ageing-and-reset][rooms, "Ageing and reset"]]). A zone command loads an object into a room (=O=), gives it to
 a mob (=G=), equips it (=E=), puts it in a container (=P= / =I=), or
 chains loads. =load_obj= (=zone.c:441=) counts how many of that vnum
 are already in the room, loads the difference up to the command's
@@ -141,6 +174,9 @@ character may own (checked in =get= and in shops, "You already have N,
 the limit"). =show obj limited= lists prototypes with either limit.
 
 ** Other sources
+:PROPERTIES:
+:CUSTOM_ID: other-sources
+:END:
 
 - =load= (immortal, =I6=) creates an instance and stamps
   =loaded_by_imm=.
@@ -151,8 +187,14 @@ the limit"). =show obj limited= lists prototypes with either limit.
 - Shops with =producing= lists conjure their stock on demand.
 
 * While in the world
+:PROPERTIES:
+:CUSTOM_ID: while-in-the-world
+:END:
 
 ** Carrying
+:PROPERTIES:
+:CUSTOM_ID: carrying
+:END:
 
 Weight and item-count capacity come from strength (=CAN_CARRY_W=,
 =CAN_CARRY_N=); containers have their own capacity in =value[0]= and
@@ -162,9 +204,12 @@ cannot be dropped or given; anti-alignment items zap the wrong wearer
 on wear.
 
 ** The per-object tick (=ev_update_obj=, =limits.c:990=)
+:PROPERTIES:
+:CUSTOM_ID: the-per-object-tick
+:END:
 
 Every object instance has its own =EVT_OBJ_UPDATE= event once per
-60-second tick ([[file:game-engine-loop.org::*The event system][engine, "The event system"]]), which:
+60-second tick ([[file:game-engine-loop.org::#the-event-system][engine, "The event system"]]), which:
 
 - counts down =timer2= and, at zero, drops a carried item to the floor
   or deletes one inside a container, with "phases out of existence"
@@ -178,18 +223,27 @@ Every object instance has its own =EVT_OBJ_UPDATE= event once per
   the light slot, =handler.c:3552=).
 
 ** Sounds
+:PROPERTIES:
+:CUSTOM_ID: sounds
+:END:
 
 Objects with noises make them every 60 s on the audio pulse
 (=ObjNoise=, =sound.c=), like mobs.
 
 ** Specials
+:PROPERTIES:
+:CUSTOM_ID: specials
+:END:
 
 13 object special procedures in =spec_obj.c=, bound by vnum in
 =assign_objects=. They run with the same trigger types as mob specials
 (=SPEC_CMD=, =SPEC_MOVE=, ...) and are checked for every object the
-acting player wears or carries, then every object on the floor, after the room special and before the mobs (=interpreter.c:314=; order in [[file:mobs.org::*Special procedures][mobs, "Special procedures"]]).
+acting player wears or carries, then every object on the floor, after the room special and before the mobs (=interpreter.c:314=; order in [[file:mobs.org::#special-procedures][mobs, "Special procedures"]]).
 
 ** Shops (=shop.c=, =world/SHOP=)
+:PROPERTIES:
+:CUSTOM_ID: shops
+:END:
 
 Extracted shop data: [[file:shops.org][shops.org]].
 
@@ -201,6 +255,9 @@ price tag" (=real_cost=) cannot be sold back; limited items respect
 =max_for_player= at the counter.
 
 ** Auction, lockers, warehouse
+:PROPERTIES:
+:CUSTOM_ID: auction-lockers-warehouse
+:END:
 
 Details: [[file:locker.org][locker.org]], [[file:warehouse.org][warehouse.org]].
 
@@ -210,8 +267,14 @@ storage rooms persisted in =LockerSave/*.room= and indexed by
 shared by all its characters, persisted in the account's data.
 
 * Persistence
+:PROPERTIES:
+:CUSTOM_ID: persistence
+:END:
 
 ** In player files (=SaveObjectList=, =player.save.c=)
+:PROPERTIES:
+:CUSTOM_ID: in-player-files
+:END:
 
 A character's inventory and each worn item are written inline into the
 character file, recursively for containers, as a =SUB_OBJECT= ...
@@ -225,19 +288,28 @@ what makes old saves survive prototype changes: anything not saved
 takes the current template's value.
 
 ** In rooms (=world.save.c=, =SaveZone=)
+:PROPERTIES:
+:CUSTOM_ID: in-rooms
+:END:
 
 Every 10 s one saveable zone (those with a =save= range in the zone
-file) has its rooms in that range written to =WorldSave/zone.N= ([[file:rooms.org::*Saving (=world.save.c=, =SaveZone=)][rooms, "Saving"]]),
+file) has its rooms in that range written to =WorldSave/zone.N= ([[file:rooms.org::#saving][rooms, "Saving"]]),
 including objects on the floor, and the world count per prototype. At
 boot these are reloaded after the world file, so dropped items in a
 saveable zone survive a reboot. =lib/BOOT_CLEAN= discards them.
 
 ** Elsewhere
+:PROPERTIES:
+:CUSTOM_ID: elsewhere
+:END:
 
 Lockers, the account warehouse, and corpses (which are in rooms, so
 only in saveable zones).
 
 * Death of an object
+:PROPERTIES:
+:CUSTOM_ID: death-of-an-object
+:END:
 
 =extract_obj= removes it from wherever it is, decrements the
 prototype's =game_count= (=handler.c:3990=), frees contents recursively
@@ -249,6 +321,9 @@ purge rooms, and spells that destroy items. There is no log of any of
 this.
 
 * Immortal tools
+:PROPERTIES:
+:CUSTOM_ID: immortal-tools
+:END:
 
 =load= / =purge= (=I6=), =string= (=I6=, rename and redescribe,
 stamps =stringed_by_imm=), =oedit= (=I10=, add, remove, list, fix
@@ -258,6 +333,9 @@ applies; stamps =edited_by_imm=), =mutateobj= (=I9=), =mutateinfo=,
 host ([[file:../SUMMARY.md][SUMMARY.md]] §15).
 
 * Quirks
+:PROPERTIES:
+:CUSTOM_ID: quirks
+:END:
 
 - Identity: none per instance. Two copies of a unique item after a
   restore from two backups are indistinguishable; "where did my sword

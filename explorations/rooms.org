@@ -12,6 +12,9 @@ that ages zones and fires room events), [[file:mobs.org][mobs.org]]
 [[file:players.org][players.org]] (load rooms, rentable rooms, the void). Earlier extractor notes: [[file:zones.org][zones.org]], [[file:sectors.org][sectors.org]].
 
 * The numbers
+:PROPERTIES:
+:CUSTOM_ID: the-numbers
+:END:
 
 | rooms loaded at boot        | 26,287 (=world.out=)            |
 | zone files                  | 136 in =world/ZONE=              |
@@ -20,21 +23,27 @@ that ages zones and fires room events), [[file:mobs.org][mobs.org]]
 | room specials               | 18 in =spec_rooms.c=             |
 
 * A room (=room_data=, =h/structs.h:391=)
+:PROPERTIES:
+:CUSTOM_ID: a-room
+:END:
 
 | group      | fields                                                                                   |
 |------------+------------------------------------------------------------------------------------------|
 | identity   | =number= (the vnum; rooms are hashed in =room_db= by it), =name=, =description=, =ex_description= (keyword extras), =zone= |
 | kind       | =sector_type= (below), =room_flags= (below), =size=, =max_people= (0 = unlimited), =parent= |
-| light      | =light= (count of lit light sources present), =dark= (magical darkness count); see [[*Light and dark]] |
+| light      | =light= (count of lit light sources present), =dark= (magical darkness count); see [[#light-and-dark]] |
 | movement   | =exits= (linked list of =room_exit=), =river_speed= and =river_dir=, =tele_targ=, =tele_time=, =tele_look= |
 | tracking   | =track[]= (ring of up to =max_tracks= footprints: who, when, which way) |
 | live state | =contents= (objects on the floor), =people= (characters here), =visited=, =map= (cached minimap), =funct= (special procedure) |
 
 As with mobs and objects, the occupant lists are intrusive singly linked
 lists threaded through the characters and objects themselves
-([[file:mobs.org::*No instance identity][mobs.org, "No instance identity"]]).
+([[file:mobs.org::#no-instance-identity][mobs.org, "No instance identity"]]).
 
 ** Exits (=room_exit=)
+:PROPERTIES:
+:CUSTOM_ID: exits
+:END:
 
 Direction =num= (north, east, south, west, up, down and more; =go= and
 =enter= use named exits), =to_room=, =keyword= and
@@ -42,13 +51,13 @@ Direction =num= (north, east, south, west, up, down and more; =go= and
 =default_state= and =reset_time= for doors that reset, =key= (object
 vnum), a position and width used by the map, and the Mastermind
 =mm_crack_code= for crackable doors (same minigame as containers,
-[[file:objects.org::*Flags][objects.org, container flags]]).
+[[file:objects.org::#flags][objects.org, container flags]]).
 
 Exit flags (=EX_*=, =h/const.h:472=): door, closed, locked, secret,
 pickproof, knockable, hidden, message, autoclose, autolock, crackable.
 A door with a =reset_time= gets an =EVT_DOOR= event at boot and after
 every change, returning it to =default_state= when the time is up
-([[file:game-engine-loop.org::*The event system][engine, "The event system"]]).
+([[file:game-engine-loop.org::#the-event-system][engine, "The event system"]]).
 
 In the world file:
 
@@ -66,6 +75,9 @@ Room numbers in a zone file are offsets from the zone's range start;
 =Zone:N= reaches into another zone.
 
 ** Room flags (=h/const.h:425=)
+:PROPERTIES:
+:CUSTOM_ID: room-flags
+:END:
 
 | flag                           | effect                                                     |
 |--------------------------------+------------------------------------------------------------|
@@ -73,12 +85,12 @@ Room numbers in a zone file are offsets from the zone's range start;
 | =DEATH=                        | death trap: entering kills (=death_trap=)                  |
 | =NO_MOB=                       | mobs will not wander in                                    |
 | =INDOORS=                      | no weather, no sunlight                                    |
-| =PEACEFUL=                     | no fighting; aggression and hunting stop here ([[file:mobs.org::*Aggression and victim choice][mobs]]) |
+| =PEACEFUL=                     | no fighting; aggression and hunting stop here ([[file:mobs.org::#aggression-and-victim-choice][mobs]]) |
 | =NOSTEAL=, =NO_SUM=, =NO_MAGIC=, =NO_GOTO= | the obvious restrictions                       |
 | =POINT_OF_INTEREST=            | marked on the map                                          |
 | =PRIVATE=                      | at most two people                                         |
 | =ANTI_GOOD=, =ANTI_NEUTRAL=, =ANTI_EVIL=, =LORD_ONLY= | entry restrictions by alignment or rank |
-| =RENTABLE=                     | may =camp= here ([[file:players.org::*Leaving][players, "Leaving"]]) |
+| =RENTABLE=                     | may =camp= here ([[file:players.org::#leaving][players, "Leaving"]]) |
 | =ARENA=                        | arena rules; the arena is a grid of rooms from 900         |
 | =FAST_MANA=, =FAST_HIT=, =FAST_MOVE= | regeneration bonuses                                 |
 | =MAPABLE=, =NOSHOWEXIT=        | map and exit display                                       |
@@ -86,6 +98,9 @@ Room numbers in a zone file are offsets from the zone's range start;
 | =GOOD_ALTAR=, =NEUTRAL_ALTAR=, =EVIL_ALTAR= | altars for remort and sacrifice               |
 
 ** Sectors (=SECT_*=, =world/SECT/sectors.current=)
+:PROPERTIES:
+:CUSTOM_ID: sectors
+:END:
 
 Thirty types in code (inside, city, field, forest, hills, mountain,
 swimmable and unswimmable water, air, underwater, fire, cold, desert,
@@ -96,21 +111,27 @@ the delay in pulses before the next move, the base chance of leaving
 tracks, flags such as =water_breath= and =no_weather=, an entry damage
 formula, and the minimap glyphs and colours. Sector 83 is =noshowmap=.
 Fire, cold and similar sectors also hurt unprotected players every 4 s
-([[file:game-engine-loop.org::*8. Periodic work keyed to the pulse count (:304-357)][engine, periodic work]]).
+([[file:game-engine-loop.org::#periodic-work-keyed-to-the-pulse-count][engine, periodic work]]).
 
 Per-sector values as extracted are tabulated in [[file:sectors.org][sectors.org]]. Of the 26,284 rooms in the source files, 10,001 are sector
 =Prototype=, builders' placeholders.
 
 * Light and dark
+:PROPERTIES:
+:CUSTOM_ID: light-and-dark
+:END:
 
 =IS_DARK(room)= is "no lit light source here, and the room is flagged
 =DARK= or has magical darkness". =light= is a counter: a character
 entering with a lit light in the light slot increments it
 (=handler.c:3418=), leaving decrements it, lights burning out
-decrement it ([[file:objects.org::*The per-object tick][objects, per-object tick]]).
+decrement it ([[file:objects.org::#the-per-object-tick][objects, per-object tick]]).
 Outdoor rooms also follow the sun through =weather_and_time=.
 
 * What you see (=look_room=, =look.c:869=)
+:PROPERTIES:
+:CUSTOM_ID: what-you-see
+:END:
 
 Room name (coloured), a blue-glow marker, flags for immortals, the
 description, the minimap if =CONFIG_MAP= (=do_map auto=, drawn from
@@ -121,10 +142,13 @@ west."). This is the single room-display entry point, which is why the
 web plan hangs its room marker there ([[file:../SUMMARY.md][SUMMARY §14]]).
 
 * Moving between rooms (=do_move=, =move.c:735=)
+:PROPERTIES:
+:CUSTOM_ID: moving-between-rooms
+:END:
 
 In order: refuse while falling, held by vines, or in too crowded a
 room to flee; run the room's and the mobs' =SPEC_MOVE= specials, which
-may block ([[file:mobs.org::*Special procedures][mobs, specials]]);
+may block ([[file:mobs.org::#special-procedures][mobs, specials]]);
 check the exit exists and is not closed or secret; check sector
 requirements (boats on unswimmable water, water breathing underwater,
 flight for air); check the target's =max_people= and =PRIVATE= limits
@@ -143,6 +167,9 @@ look on arrival. River rooms push occupants =river_dir= every
 =river_speed= quarter-seconds.
 
 * Zones (=Zone=, =h/zone.h:70=; =world/ZONE/*.zon=)
+:PROPERTIES:
+:CUSTOM_ID: zones
+:END:
 
 The extracted zone data and its shape are in [[file:zones.org][zones.org]].
 
@@ -169,19 +196,25 @@ ranges, =load=, =loadgroup=, =atmost= and =upto= counts, =with= and
 probabilities, =requires=, =repeat=, and =chain=.
 
 ** Ageing and reset
+:PROPERTIES:
+:CUSTOM_ID: ageing-and-reset
+:END:
 
-Every 60 s =zone_update= ([[file:game-engine-loop.org::*8. Periodic work keyed to the pulse count (:304-357)][engine, periodic work]])
+Every 60 s =zone_update= ([[file:game-engine-loop.org::#periodic-work-keyed-to-the-pulse-count][engine, periodic work]])
 increments every zone's =age=; when it reaches =reset_freq= the zone
 resets if its type is /always/ (2), or /ifempty/ (1) and no player is
 in it; type /never/ (0) only resets at boot. =reset_zone= (=zone.c:834=)
 logs "Reset zone <name>" (the line that is 99% of the log), zeroes the
 age, and runs the commands: for each, count what is already there,
 load the shortfall up to the limits, roll each probability
-([[file:mobs.org::*Loading and limits][mobs, loading]],
-[[file:objects.org::*Where objects come from][objects, where from]]).
+([[file:mobs.org::#loading-and-limits][mobs, loading]],
+[[file:objects.org::#where-objects-come-from][objects, where from]]).
 =zreset= does it on demand; =show zones= lists ages and lifespans.
 
 ** Saving (=world.save.c=, =SaveZone=)
+:PROPERTIES:
+:CUSTOM_ID: saving
+:END:
 
 Every 10 s one zone with a =save= range is written to
 =WorldSave/zone.N=: the rooms in that range with their floor objects
@@ -190,6 +223,9 @@ file, so dropped items and door states in saveable zones survive a
 reboot. =lib/BOOT_CLEAN= makes the next boot discard them.
 
 ** Live room edits
+:PROPERTIES:
+:CUSTOM_ID: live-room-edits
+:END:
 
 Builders edit rooms in game with =redit= (=I2=) and write a range of
 rooms to a file with =rsave <file> <lo> <hi>=. Files placed in
@@ -200,13 +236,19 @@ world. The world repo is still the source of truth for everything
 else.
 
 * Room specials
+:PROPERTIES:
+:CUSTOM_ID: room-specials
+:END:
 
 18 C functions in =spec_rooms.c=, bound by vnum in =assign_rooms=. A
 room special is the first thing consulted for any command issued in
-the room ([[file:mobs.org::*Special procedures][dispatch order]]), so it
+the room ([[file:mobs.org::#special-procedures][dispatch order]]), so it
 can intercept movement, speech, or anything else.
 
 * Quirks
+:PROPERTIES:
+:CUSTOM_ID: quirks
+:END:
 
 - =light= is a counter maintained by hand on every enter, leave, wear,
   remove and burn-out; a mismatch leaves a room permanently lit or

@@ -9,6 +9,9 @@ a name is historical or misleading it says so.
 See also: [[file:mobs.org][mobs.org]] (what the mob think event does), [[file:objects.org][objects.org]] (the per-object tick), [[file:players.org][players.org]] (sessions, saves, idle), [[file:rooms.org][rooms.org]] (zone ageing and resets, room events). The full command table is in [[file:commands.org][commands.org]].
 
 * Overview
+:PROPERTIES:
+:CUSTOM_ID: overview
+:END:
 
 The server is one process, one thread, one loop. Everything the game does
 happens inside =game_loop()= in =comm.c:91=, which runs 100 times a second.
@@ -28,6 +31,9 @@ There are three time scales:
 The word "tick" in the code and in player speech means the 60-second one.
 
 * Boot, before the loop
+:PROPERTIES:
+:CUSTOM_ID: boot-before-the-loop
+:END:
 
 =main()= parses flags (=-d= data dir, =-p= purge days, =-a= extra ports,
 port), chdirs into the data dir, installs signal handlers, opens the
@@ -51,16 +57,25 @@ object gets a per-tick update event when created (=limits.c:869,987=).
 Doors with reset timers get an =EVT_DOOR= (=roomdb.c:208=).
 
 * One pulse, in order
+:PROPERTIES:
+:CUSTOM_ID: one-pulse-in-order
+:END:
 
 All references are =comm.c= unless noted.
 
 ** 1. Poll the network (:135-153)
+:PROPERTIES:
+:CUSTOM_ID: poll-the-network
+:END:
 
 =select()= with a zero timeout over every listening socket and every
 connection's descriptor, for input, output and exceptions. This never
 blocks; sleeping happens at the end of the pass.
 
 ** 2. Accept (:158-160)
+:PROPERTIES:
+:CUSTOM_ID: accept
+:END:
 
 For each listener with a pending connection, =new_connection()= until
 none remain. A connection from a wizlocked host is refused with a message
@@ -70,6 +85,9 @@ LINEMODE= and the login banner. Connection state is a small state machine
 (=nanny.c=) until the character enters the game (=CON_PLYNG=).
 
 ** 3. Per-connection input (:162-174)
+:PROPERTIES:
+:CUSTOM_ID: per-connection-input
+:END:
 
 For each connection:
 
@@ -92,11 +110,17 @@ For each connection:
 Nothing is executed yet.
 
 ** 4. Advance the pulse counter (:176-180)
+:PROPERTIES:
+:CUSTOM_ID: advance-the-pulse-counter
+:END:
 
 =PULSE++=, wrapping at =PULSE_MAX= (600 s worth). =phase = PULSE %
 PULSE_PLAYER= selects one of 6,000 event slots.
 
 ** 5. Run this pulse's events (:184-222)
+:PROPERTIES:
+:CUSTOM_ID: run-this-pulse-s-events
+:END:
 
 The short-term event queue is a /timing wheel/: =event_queue[]= has
 =PULSE_PLAYER= slots, one per pulse of a tick. Every event in slot
@@ -106,9 +130,12 @@ first-out; nothing depends on the order, since events re-check their
 targets when they fire. Events that reschedule themselves (most do) insert into
 a later slot. Fired events are freed after the slot is drained.
 
-See [[*The event system]] for what is in there.
+See [[#the-event-system]] for what is in there.
 
 ** 6. Execute commands (:225-263)
+:PROPERTIES:
+:CUSTOM_ID: execute-commands
+:END:
 
 For each connection, in list order:
 
@@ -135,6 +162,9 @@ position, then calls the handler with =cmd_info[cmd].num= as its
 sub-command.
 
 ** 7. Output and prompts (:264-301)
+:PROPERTIES:
+:CUSTOM_ID: output-and-prompts
+:END:
 
 For each connection whose socket is writable and that has queued output
 or has not just printed a prompt:
@@ -155,6 +185,9 @@ or has not just printed a prompt:
   character, preceded by a blank line unless =PLR_COMPACT=.
 
 ** 8. Periodic work keyed to the pulse count (:304-357)
+:PROPERTIES:
+:CUSTOM_ID: periodic-work-keyed-to-the-pulse-count
+:END:
 
 Each block runs when =PULSE= is a multiple of the interval. Intervals
 are defaults from =h/ticks.h= and can be changed live with the immortal
@@ -170,7 +203,7 @@ are defaults from =h/ticks.h= and can be changed live with the immortal
 | 2 s   | =PULSE_MODERN_TIC= | =update_modern_tic()=: class resources, rage decay for warrior/barbarian builds, energy gain for thieves |
 | 60 s  | =PULSE_PLAYER=     | the tick: =event_tick()= (long-term scheduler), =weather_and_time()= (advance one mud hour, change weather), =affect_update()= (spell durations on every character), =update_hates_and_fears()= (players), =boot_idle_conn()= (drop connections that never got past login within 5 min) |
 
-A zone reset ([[file:rooms.org::*Ageing and reset][rooms, "Ageing and reset"]]; =reset_zone=, =zone.c:834=) logs "Reset zone <name>", zeroes
+A zone reset ([[file:rooms.org::#ageing-and-reset][rooms, "Ageing and reset"]]; =reset_zone=, =zone.c:834=) logs "Reset zone <name>", zeroes
 the zone's age and executes the zone's command list (=perform_commands=):
 load mobs and objects up to their limits, equip and give, put in
 containers, set doors, purge, with range and list conditions. Boot-only
@@ -178,6 +211,9 @@ command lists exist for zones that should not repopulate later. This is
 the line that fills 99% of the log.
 
 ** 9. Housekeeping (:359-366)
+:PROPERTIES:
+:CUSTOM_ID: housekeeping
+:END:
 
 Wrap =PULSE= at =PULSE_MAX=; =TICS++= (a liveness counter for the
 compiled-out deadlock checkpoint); if a reboot is scheduled
@@ -185,6 +221,9 @@ compiled-out deadlock checkpoint); if a reboot is scheduled
 sets the shutdown flag.
 
 ** 10. Sleep until the next pulse (:368-413)
+:PROPERTIES:
+:CUSTOM_ID: sleep-until-the-next-pulse
+:END:
 
 The loop keeps an absolute =next_tick= timestamp and advances it by
 =PULSE_TIMEOUT= (10 ms) each pass. It sleeps for the remainder with a
@@ -196,10 +235,16 @@ no catch-up: missed pulses are simply skipped, so all intervals stretch
 under load.
 
 * The event system
+:PROPERTIES:
+:CUSTOM_ID: the-event-system
+:END:
 
 Two schedulers, one for pulses and one for ticks.
 
 ** Short-term: the timing wheel (=events.c:335=, =comm.c:184=)
+:PROPERTIES:
+:CUSTOM_ID: short-term-the-timing-wheel
+:END:
 
 =add_event(delay, type, ch, victim, obj, room, vnum, args, function)=
 creates an =event_t= and puts it in slot =(PULSE + max(1, delay)) %
@@ -213,10 +258,10 @@ Event types and who creates them:
 
 | type             | created by                                   | what it does when it fires                                                                     |
 |------------------+----------------------------------------------+------------------------------------------------------------------------------------------------|
-| =EVT_MOBILE=     | mob load (=mobdb.c:367=), then itself       | one mob's think: =event_mobile= (=mobact.c=) does =pulse_count++=, =act_state()= (the behaviour priority list, see [[file:mobs.org::*The decision list (=act_state=, =mobact.c:180=)][mobs, "The decision list"]]), =wait -= 1 s= clamped at 0, then reschedules itself after the remaining wait, or 1 s (always 1 s for =ACT_SPEC= mobs). There is no pass over all mobs anywhere: each mob is its own event, only the mobs in this pulse's slot think, and every mob thinks once per second. Its blows are a separate =EVT_STRIKE= chain |
+| =EVT_MOBILE=     | mob load (=mobdb.c:367=), then itself       | one mob's think: =event_mobile= (=mobact.c=) does =pulse_count++=, =act_state()= (the behaviour priority list, see [[file:mobs.org::#the-decision-list][mobs, "The decision list"]]), =wait -= 1 s= clamped at 0, then reschedules itself after the remaining wait, or 1 s (always 1 s for =ACT_SPEC= mobs). There is no pass over all mobs anywhere: each mob is its own event, only the mobs in this pulse's slot think, and every mob thinks once per second. Its blows are a separate =EVT_STRIKE= chain |
 | =EVT_STRIKE=     | =set_fighting= / =hit= (=fight.c:237,4039=), then itself | one blow: =event_strike= checks the fight is still on and in the same room, runs the mob special or =hit()=, then schedules the next blow after =calc_speed(ch)= pulses, which is =100 * PULSE_PER_SEC / speed_percent= (=limits.c=), so a 100% speed attacker strikes once a second. Combat is therefore per-attacker and asynchronous, not a shared round |
-| =EVT_PLR_UPDATE= | character creation (=limits.c:869=), then itself | the per-character tick ([[file:players.org::*A session][players, "A session"]]), =ev_update_player=: regen hit, mana, power and move for anyone at least stunned (link-dead players do not lose points), a 50% chance per tick to worsen hunger, thirst, drunkenness and fullness (remort sustain reduces it), 5 damage if incapacitated and 1 if mortally wounded, =update_char_objects=, and for players =check_idling=: save at 5 idle ticks, pull into the void at 720 (12 h), extract after 1440 (24 h). New characters get their first one at a random point near the end of the current tick "to discourage enter/exit" |
-| =EVT_OBJ_UPDATE= | object creation (=limits.c:987=), then itself | the per-object tick ([[file:objects.org::*The per-object tick (=ev_update_obj=, =limits.c:990=)][objects, "The per-object tick"]]), =ev_update_obj=: count down =timer2= and phase the object out of existence at zero, plus other timers |
+| =EVT_PLR_UPDATE= | character creation (=limits.c:869=), then itself | the per-character tick ([[file:players.org::#a-session][players, "A session"]]), =ev_update_player=: regen hit, mana, power and move for anyone at least stunned (link-dead players do not lose points), a 50% chance per tick to worsen hunger, thirst, drunkenness and fullness (remort sustain reduces it), 5 damage if incapacitated and 1 if mortally wounded, =update_char_objects=, and for players =check_idling=: save at 5 idle ticks, pull into the void at 720 (12 h), extract after 1440 (24 h). New characters get their first one at a random point near the end of the current tick "to discourage enter/exit" |
+| =EVT_OBJ_UPDATE= | object creation (=limits.c:987=), then itself | the per-object tick ([[file:objects.org::#the-per-object-tick][objects, "The per-object tick"]]), =ev_update_obj=: count down =timer2= and phase the object out of existence at zero, plus other timers |
 | =EVT_SPELL=      | =spell_parser.c:1090=                        | a cast completes after its casting delay; the caster also gets =WAIT_STATE= |
 | =EVT_SKILL=      | skills                                       | delayed skill effects                                                                          |
 | =EVT_DEATH=      | =move.c:573= and death handling              | death processing a quarter second after the fact                                               |
@@ -233,6 +278,9 @@ why there is no per-mob or per-fight loop anywhere: the loop only drains
 the slot.
 
 ** Long-term: ticks (=events.c= top, =event_tick=)
+:PROPERTIES:
+:CUSTOM_ID: long-term-ticks
+:END:
 
 A sorted list of =event= records keyed by tick number, drained once per
 =PULSE_PLAYER= by =event_tick()=. Types: =EV_FUNC= (call a function),
@@ -243,6 +291,9 @@ skipped rather than dereferenced), and =EV_RESCHED= for the long delays
 handed over from =add_event=. Granularity is one minute.
 
 * Mob AI per event (=act_state=, =mobact.c:180=)
+:PROPERTIES:
+:CUSTOM_ID: mob-ai-per-event
+:END:
 
 In order, first match wins: group up with a leader if =group_with= is
 set; stop fighting a victim who left the room; run the mob's special
@@ -258,6 +309,9 @@ branches =sendf= debug text to the mob, visible only to an immortal
 switched into it.
 
 * Wait states and lag
+:PROPERTIES:
+:CUSTOM_ID: wait-states-and-lag
+:END:
 
 =ch->wait= is a pulse count. Commands, spells and skills add to it with
 =WAIT_STATE=. For players it is decremented once per pulse in step 6 and
@@ -266,6 +320,9 @@ at a time by =event_mobile=, which also delays the mob's next AI event by
 the remainder, so a lagged mob simply thinks later.
 
 * Time and weather
+:PROPERTIES:
+:CUSTOM_ID: time-and-weather
+:END:
 
 =weather_and_time(1)= once per tick advances =time_info.hours= by one, so
 a mud hour is one real minute, and rolls days, months and years; then
@@ -273,6 +330,9 @@ a mud hour is one real minute, and rolls days, months and years; then
 and light levels come from this clock.
 
 * Signals and shutdown (=signals.c=, =main.c:290=)
+:PROPERTIES:
+:CUSTOM_ID: signals-and-shutdown
+:END:
 
 - =SIGHUP=, =SIGINT=, =SIGTERM=: save every player, =full_save_world=,
   exit.
@@ -291,6 +351,9 @@ The loop exits when =shutdwn= is set (the =shutdown= command, or
 the next boot discard =WorldSave/=.
 
 * Cost model
+:PROPERTIES:
+:CUSTOM_ID: cost-model
+:END:
 
 Per pulse: =O(connections)= for select and the three connection walks,
 plus whatever events sit in one of the 6,000 slots. With 10,000 mobs each
@@ -310,6 +373,9 @@ Measured on production: 133 MB resident, about 12% of one core with a
 handful of players.
 
 * Quirks worth knowing
+:PROPERTIES:
+:CUSTOM_ID: quirks-worth-knowing
+:END:
 
 - A command typed while the pager is waiting is eaten by the pager.
 - Autosave is random, roughly every 100 s per connection, on top of the
@@ -327,6 +393,9 @@ handful of players.
   touch a connection outside the input, command and output passes.
 
 * Implications for a rewrite
+:PROPERTIES:
+:CUSTOM_ID: implications-for-a-rewrite
+:END:
 
 The loop is a 100 Hz frame with a 6,000-slot timing wheel over it and a
 coarse scheduler above that. In an asyncio or Lisp image the same three
@@ -343,8 +412,14 @@ events landing in one pulse (a cast completing and a blow) can resolve
 in the opposite order to how they were scheduled.
 
 * Clarifications from discussion (2026-10-02)
+:PROPERTIES:
+:CUSTOM_ID: clarifications-from-discussion
+:END:
 
 ** What a pass really is
+:PROPERTIES:
+:CUSTOM_ID: what-a-pass-really-is
+:END:
 
 The six steps, with what is rationed and what is not:
 
@@ -365,6 +440,9 @@ So a pass is unbounded: every hot socket, every event in the slot, one
 command for every connection, every zone that resets, in a single thread.
 
 ** The pacing
+:PROPERTIES:
+:CUSTOM_ID: the-pacing
+:END:
 
 No timer, no alarm. =next_tick= is an absolute deadline set to =now +
 10 ms= at start and advanced by exactly 10 ms every pass regardless of
@@ -380,6 +458,9 @@ the call with =EINTR= instead of killing the process; they are not part
 of the pacing.
 
 ** The wheel
+:PROPERTIES:
+:CUSTOM_ID: the-wheel
+:END:
 
 =event_queue[6000]=, one slot per pulse of a tick; advances one slot per
 pass, so a full turn is 60 s at nominal rate. Slot = =(PULSE + delay) %
@@ -400,6 +481,9 @@ diagnosed. The only deliberate spreading is the random 1..1,200 first
 think at mob load.
 
 ** The minute scheduler
+:PROPERTIES:
+:CUSTOM_ID: the-minute-scheduler
+:END:
 
 A single sorted linked list keyed by tick (=events.c:60=), FIFO among
 equal ticks, drained once per tick by =event_tick=, targets validated by
@@ -411,6 +495,9 @@ arrangement is the wheel having been added later for fine-grained
 events, with the reroute so it never overflows.
 
 ** Commands and the wheel
+:PROPERTIES:
+:CUSTOM_ID: commands-and-the-wheel
+:END:
 
 Commands never go on the wheel. They sit in the connection's queue and
 step 3 pulls one per pass. A command that must continue later does its
@@ -424,6 +511,9 @@ burst across passes; the per-connection cap bounds a pass, a per-pass
 budget would smooth it.
 
 ** Output
+:PROPERTIES:
+:CUSTOM_ID: output
+:END:
 
 Handlers never write to sockets; =sendf= / =act= / =SEND_TO_Q= append
 blocks to the connection's output queue. Step 4 drains the whole queue
@@ -439,6 +529,9 @@ the string editor: while =PLR_VEG= is set, ordinary output is discarded
 flag on the block, not a second queue.
 
 ** Mapping to asyncio
+:PROPERTIES:
+:CUSTOM_ID: mapping-to-asyncio
+:END:
 
 Steps 1 and 4 are pure I/O and become per-connection reader and writer
 tasks on asyncio streams: readers append lines to the input queue,

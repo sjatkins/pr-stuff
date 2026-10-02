@@ -9,6 +9,9 @@ read for this; everything comes from the code and the world data files.
 See also: [[file:game-engine-loop.org][game-engine-loop.org]] (one command per pulse, the tick, prompts), [[file:objects.org][objects.org]] (inventory as inline copies), [[file:mobs.org][mobs.org]] (the same struct, identity), [[file:rooms.org][rooms.org]] (load rooms, rentable rooms, the void). Earlier extractor notes: [[file:accounts.org][accounts.org]], [[file:classes.org][classes.org]], [[file:races.org][races.org]], [[file:clans.org][clans.org]], [[file:effects_skills.org][effects_skills.org]], [[file:locker.org][locker.org]], [[file:warehouse.org][warehouse.org]]; every command in [[file:commands.org][commands.org]].
 
 * Two things: accounts and characters
+:PROPERTIES:
+:CUSTOM_ID: two-things-accounts-and-characters
+:END:
 
 A person has an /account/; an account owns up to 64 /characters/. The
 account is what logs in (name and password at the =login:= prompt); a
@@ -25,10 +28,16 @@ ops scripts rebuild from the directory (=scripts/pr_functions.sh=,
 =rebuild_indexes=). There is no database; the name is the identity.
 
 * Accounts (=account.c=, =h/structs.h:783=)
+:PROPERTIES:
+:CUSTOM_ID: accounts
+:END:
 
 What the account files look like in practice: [[file:accounts.org][accounts.org]].
 
 ** Fields
+:PROPERTIES:
+:CUSTOM_ID: fields
+:END:
 
 name, password hash (=crypt= with the account name as salt), mother's
 maiden name, email, real name, the last four sites connected from, last
@@ -39,6 +48,9 @@ commands, free-text notes, an ignore list, and the /warehouse/, an
 object list shared by all the account's characters.
 
 ** Flags (=A_*=, =h/const.h:1405=)
+:PROPERTIES:
+:CUSTOM_ID: flags
+:END:
 
 =A_VALID=, =A_NONEW= (may not create characters), =A_SILENCE=,
 =A_STUPID=, =A_BANISHED=, =A_LOG= (every command logged), =A_NOPURGE=,
@@ -46,6 +58,9 @@ object list shared by all the account's characters.
 =A_VER_MAILED=, =A_VERIFIED=).
 
 ** File
+:PROPERTIES:
+:CUSTOM_ID: file
+:END:
 
 Tagged binary written by =save_acct= (=account.c:33=): one numbered
 field at a time, strings length-prefixed, the character list as a
@@ -53,6 +68,9 @@ count plus names, command lists, times. =load_acct= reads it back by
 tag, so fields can be added without breaking old files.
 
 ** Creating one
+:PROPERTIES:
+:CUSTOM_ID: creating-one
+:END:
 
 At =login:= type =new=. The states (=nanny.c=): account name, password
 twice, default terminal type, mother's maiden name, email address
@@ -61,6 +79,9 @@ message, then the account menu. A host on the =no-new= list cannot
 create accounts; a host on =wizlocked= cannot connect at all.
 
 ** The account menu
+:PROPERTIES:
+:CUSTOM_ID: the-account-menu
+:END:
 
 =A= add an existing character to this account (needs its password),
 =C= create a character, =D= delete the account or a character, =H=
@@ -72,8 +93,14 @@ Deleting an account deletes every character on it (this is how Bunta
 was lost on 2026-09-22).
 
 * Characters
+:PROPERTIES:
+:CUSTOM_ID: characters
+:END:
 
 ** The struct
+:PROPERTIES:
+:CUSTOM_ID: the-struct
+:END:
 
 A player is a =char_data= (=h/structs.h:565=), the same struct as a
 mob, with =ACT_ISNPC= clear. The player-relevant fields, grouped:
@@ -115,6 +142,9 @@ mob, with =ACT_ISNPC= clear. The player-relevant fields, grouped:
   first login.
 
 ** Flags (=PLR_*=, =h/const.h:807=)
+:PROPERTIES:
+:CUSTOM_ID: flags-2
+:END:
 
 | flag           | meaning                                                   |
 |----------------+-----------------------------------------------------------|
@@ -143,6 +173,9 @@ mob, with =ACT_ISNPC= clear. The player-relevant fields, grouped:
 descriptions, timestamps, keywords, hunger display, channel names.
 
 ** File (=player.save.c=, =save_char= at :198)
+:PROPERTIES:
+:CUSTOM_ID: file-2
+:END:
 
 Tagged binary, like the account file: a version marker (tag 245,
 current version 6) then every field above by tag, then the kept kills,
@@ -151,7 +184,7 @@ whole inventory and each worn item (tag =WEAR= plus slot) serialised
 inline with =SaveObjectList=, then every affect and pulse affect. A
 character's objects therefore live inside its file as copies; nothing
 references an object anywhere else, and there is no instance identity
-for them (see [[file:mobs.org::*No instance identity][mobs, "No instance identity"]] and [[file:objects.org::*Persistence][objects, "Persistence"]]). Tag 49 is the room to load into
+for them (see [[file:mobs.org::#no-instance-identity][mobs, "No instance identity"]] and [[file:objects.org::#persistence][objects, "Persistence"]]). Tag 49 is the room to load into
 next time, which is why =save_char(ch, room)= takes a room.
 
 Loading is =load_char(ch, name)= → =load_char_with_path=, a switch on
@@ -160,6 +193,9 @@ line in the logs is this loader meeting an apply index the current
 tables do not know.
 
 ** Creating a character (=nanny.c=)
+:PROPERTIES:
+:CUSTOM_ID: creating-a-character
+:END:
 
 From the menu, =C=, unless the account is =A_NONEW= or has 64
 characters. Three methods:
@@ -180,6 +216,9 @@ map and two recall scrolls. The character is added to the account and
 enters the world.
 
 ** Classes, races, clans (world data)
+:PROPERTIES:
+:CUSTOM_ID: classes-races-clans
+:END:
 
 Extracted tables: [[file:classes.org][classes.org]], [[file:races.org][races.org]], [[file:clans.org][clans.org]]; the skill and effect system in [[file:effects_skills.org][effects_skills.org]].
 
@@ -201,6 +240,9 @@ Extracted tables: [[file:classes.org][classes.org]], [[file:races.org][races.org
   talk on a clan channel; the character stores =clan= and =clan_rank=.
 
 ** Levels, experience, remort, apex
+:PROPERTIES:
+:CUSTOM_ID: levels-experience-remort-apex
+:END:
 
 - Mortal levels run 1 to 500 (=MAX_ACHIEVABLE=). Experience needed per
   level comes from a per-class table (=EXP_NEEDED=); =gain_exp=
@@ -225,8 +267,14 @@ Extracted tables: [[file:classes.org][classes.org]], [[file:races.org][races.org
   =goto=, =restore=, =chat= and =transfer=.
 
 * A session
+:PROPERTIES:
+:CUSTOM_ID: a-session
+:END:
 
 ** Logging in
+:PROPERTIES:
+:CUSTOM_ID: logging-in
+:END:
 
 Account name and password at =login:=; the banner, MOTD nag, menu;
 =L <name>= loads the character file, and if that character is already
@@ -236,14 +284,20 @@ Otherwise the character is placed in the saved load room, "entered
 game" is logged, and the per-tick update event starts.
 
 ** While playing
+:PROPERTIES:
+:CUSTOM_ID: while-playing
+:END:
 
 One command per pulse, lag by wait states, the pager, the string
-editor: all in [[file:game-engine-loop.org::*One pulse, in order][engine, "One pulse, in order"]]. Every tick (60 s)
+editor: all in [[file:game-engine-loop.org::#one-pulse-in-order][engine, "One pulse, in order"]]. Every tick (60 s)
 =ev_update_player= regenerates hit, mana, power and move, worsens
 hunger, thirst and drunkenness with 50% probability, damages the
 incapacitated and mortally wounded, and advances the idle timer.
 
 ** Saving
+:PROPERTIES:
+:CUSTOM_ID: saving
+:END:
 
 =save_char= is called on: quit and camp; link loss; death; level
 gain; the random autosave in the loop (about every 100 s per
@@ -251,6 +305,9 @@ connection); the 5th idle tick; immortal =set= and =restore=; and
 =save=. Saves always write the whole file, objects included.
 
 ** Idle
+:PROPERTIES:
+:CUSTOM_ID: idle
+:END:
 
 =check_idling= (=limits.c=) per tick for mortals: save at 5 idle
 ticks, pull into "the void" (room 1) at 720 (12 hours) with the
@@ -259,6 +316,9 @@ hours). A connection that never gets past login is dropped after 5
 minutes (=boot_idle_conn=).
 
 ** Losing the link
+:PROPERTIES:
+:CUSTOM_ID: losing-the-link
+:END:
 
 =close_socket= logs "Losing link", adds 15 minutes to a running PK
 cooldown, detaches the connection, accumulates played time, and saves.
@@ -267,8 +327,11 @@ updates; regen while link-dead never /reduces/ points (the update
 keeps the higher value). Reconnecting resumes in place.
 
 ** Leaving
+:PROPERTIES:
+:CUSTOM_ID: leaving
+:END:
 
-- =camp=: only in a =RENTABLE= room ([[file:rooms.org::*Room flags (=h/const.h:425=)][rooms, flags]]) for mortals, not while fighting,
+- =camp=: only in a =RENTABLE= room ([[file:rooms.org::#room-flags][rooms, flags]]) for mortals, not while fighting,
   not while hurt, not during a PK cooldown. Junk is removed, the
   character is saved with everything it carries and wears, and leaves.
 - =quit=: anywhere, but the warning is explicit: quitting outside a
@@ -278,6 +341,9 @@ keeps the higher value). Reconnecting resumes in place.
   duration they can neither quit nor camp.
 
 ** Death (=fight.c=, =dieWithXPPenalty= at :531)
+:PROPERTIES:
+:CUSTOM_ID: death
+:END:
 
 A player who dies loses experience: a quarter of current experience or
 a level-scaled amount, whichever is smaller, times a penalty factor;
@@ -288,6 +354,9 @@ revert form, and the character is saved into =LOAD_ROOM_MORTAL=, where
 they continue.
 
 * Purging
+:PROPERTIES:
+:CUSTOM_ID: purging
+:END:
 
 =-p <days>= is parsed by =main.c= into =purge_days=, and the boot-time
 purge in =db.c:395= is entirely commented out, as is the =A_NOPURGE=
@@ -296,6 +365,9 @@ the =unpurge= script are from when it did. The 1,440-tick idle extract
 removes a character from the running game, not from disk.
 
 * Other per-player things
+:PROPERTIES:
+:CUSTOM_ID: other-per-player-things
+:END:
 
 - /Mail/: =mail_list= on the character; the =mail= command.
 - /Boards/: board posts are world data, not character data, but
@@ -311,6 +383,9 @@ removes a character from the running game, not from disk.
   this file's scope.
 
 * Quirks
+:PROPERTIES:
+:CUSTOM_ID: quirks
+:END:
 
 - Identity is the name string. Renaming a character means a new file;
   everything that refers to a player by name (consent, mail, clan
