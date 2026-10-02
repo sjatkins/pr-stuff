@@ -1088,3 +1088,28 @@ scheduler, mob AI order, wait states, signals, shutdown, cost model,
 quirks, and rewrite implications (frame + timing wheel + coarse
 scheduler; the per-second character_list walks are the only
 world-size-scaled cost).
+
+**Mobs documented** (2026-10-02): `explorations/mobs.org`. Mobs are
+`char_data` with ACT_ISNPC; no trigger on player arrival: they act only
+from their own ~1/s think (`act_state` priority list: group, drop lost
+fight, special proc, hatred decay, lag/charm/paralysis, healer, fight,
+hunt, aggression every 4th think, aid friends, scavenge/items, default
+position, hateful, afraid, wander every 5th think, guardian) and from a
+player's command in the room running the mob's special before the
+command (SPEC_CMD/MOVE; order room, worn, carried, mobs, floor). Memory:
+hates/fears by category (race, sex, alignment, class, vnum) plus
+individuals for one real hour, added on blows landed when patience
+(health%) < alignment gap, spread by citizens/police once a minute.
+Hunting: SetHunting on flee/fear/special/notoriety, budget level+1..50
+steps, one shortest-path step per think, zone-bound unless FAR_HUNT.
+117 C specials bound by vnum; no scripted mob language in src.
+
+**Rewrite requirement (2026-10-02): instance identity.** The C server has
+no identity for mob or object instances: a vnum names the prototype, and
+an instance is distinguished only by its memory address (reused after
+death); player files store copies of objects, not references. Hatred,
+hunting, grouping and the long-term scheduler all work around this with
+pointers validated against live lists, and "same vnum = friend". Every
+mob and object instance must get an id at creation (UOP form, class
+prefix + instance part), kept for life; prototype becomes a field; all
+relations, memory, saves and changesets reference the id.
