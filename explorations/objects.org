@@ -1,77 +1,273 @@
-#+TITLE: Objects — what the extractor taught us
-#+AUTHOR: notes from building py_json/src/prworld (objects)
-#+DATE: 2026-09-27
-#+STARTUP: overview
+#+TITLE: Perilous Realms: objects
+#+DATE: 2026-10-02
+#+OPTIONS: toc:2
 
-* Where objects live
+Items: prototypes, instances, where they live, how they load, change,
+persist and die. Read from =src/= at commit 94876a77 and the world data
+files. Companion to =game-engine-loop.org=, =mobs.org=, =players.org=.
 
-- Source: =world/OBJ/*.obj=, 125 files, driven by =world/OBJ/ALLOBJS=
-  (=#include= list, absolute vnums, no offsets).
-- Compiled by =world/OBJ/compile= → =../tran obj ALLOBJS obj.out=. Loaded
-  by =objdb.c:boot_obj= into the =obj_db= hash of prototypes.
-- Extracted to =py_json/out/objects.jsonl=: 4,855 prototypes.
-- The same =ReadObject= / =ReadObjList= code in =objdb.c= also reads the
-  *saved* object records inside player, account, locker, auction and
-  world-save files; that is a different (hand-coded) field id set, covered
-  in =players.org=.
+* Prototype and instance
 
-* Record format
+A /prototype/ is an entry in =obj_db=, a hash keyed by vnum of
+=index_mem= records (=objdb.c:910=), each holding a template =obj_data=,
+counts (=world_count= from zone files, =game_count= live,
+=num_destroyed=), limits (=max_exist=, default 32000 meaning none;
+=max_for_player=; =zone_limit=) and an optional special-procedure
+pointer. 4,854 prototypes load from =obj.out= at boot.
 
-Schema =obj_fields=. The =type= block selects one item type and its own
-sub-schema (=item_fields=):
+An /instance/ is an =obj_data= made by =get_obj(vnum, ...)= as a copy
+of the template. It has no identity beyond its memory address and its
+vnum: two long swords are two copies of prototype 3022 (see =mobs.org=,
+"No instance identity"). Instance-only state is the location pointers,
+timers, contents, sockets, mutations, provenance strings and anything
+an immortal changed.
 
-| type token        | sub-fields                                                |
-|-------------------+-----------------------------------------------------------|
-| armor             | effective_ac, force, stopping, absorb, timer              |
-| weapon            | wtype (=weapon_types=), no_dice, size_dice, type (=damage_types=), speed |
-| light             | duration                                                  |
-| scroll, potion    | level, spell1..3                                          |
-| wand, staff       | level, max_charges, charges, spell                        |
-| container, pouch  | max_hold, flags (=container_bits=), key, timer            |
-| drink_container   | max_units, amount, type (=drinks=), poisoned              |
-| food              | fullness, poisoned                                        |
-| key               | uses                                                      |
-| trap              | effect_type (=trap_eff_flags=), damage_type, level, charges |
-| board             | flags (=board_bits=)                                      |
-| spellgem          | effect_multiplier, power_mana_multiplier, casting_time, failure_modifier |
-| socket            | combine, combine_to, removable, unique                    |
-| component, audio, treasure, money | uses / frequency / value                  |
-| hierarchical, item_set | A32 lists                                            |
-| other, book, worn, trash, note, pen, boat, missile, fireweapon | markers (HOL): no value |
+* The struct (=h/structs.h:240=)
 
-Other top-level fields: name, namelist, longdesc/long, action/special,
-weight, value, rent, real_cost, qpvalue, bits (=extra_bits=), wear
-(=wear_bits=), material (=material_types=), rarity (=rarity_types=), tier,
-min_level, max_exist, max_player, mass, volume, dimensions {length, width,
-height}, apply { ... }, sockets, item_set, piece_of_set, use_cooldown,
-ws_cooldown, item_ability { ... }, item_ability_duration/msg/desc, touch
-{transport_room, msg_to_room, msg_to_char, msg_to_dest}, owner, extras.
+| group        | fields                                                                                           |
+|--------------+--------------------------------------------------------------------------------------------------|
+| identity     | =vnum=, =name= (keyword list, what =get=/=show= match), =short_description= (as carried: "a long sword"), =description= (as lying in a room), =action_description=, =ex_description= (keyword → text extras) |
+| kind         | =type_flag= (one of the item types below), =wear_flags= (where it can go), =extra_flags= (bits below), =material=, =rarity=, =obj_tier=, =min_level= |
+| numbers      | =value[5]= and =dvalue[5]= (meaning depends on type), =values[]= for hierarchical items, =cost=, =cost_per_day= (rent), =real_cost=, =qpCost= (quest points) |
+| physical     | =intrinsic_weight=, =contents_weight=, =intrinsic_volume=, =contents_volume=, =length=, =width=, =height= |
+| time         | =timer=, =timer2=, =time_stamp=, =created_date=, =last_use_time=, =use_cooldown=, =ws_cooldown= |
+| modifiers    | =apply[15]= (location, modifier, qualifier), =pulse_apply[15]=, =activate_thresholds[]=, =bitvector[8]= (affects granted while worn) |
+| sockets      | =sockets= count, =socket_apply[25]=, =contains_sockets=, =socketed_into= |
+| sets         | =item_set=, =piece_of_set=, =item_ability_desc=                                                 |
+| provenance   | =loaded_by_imm=, =edited_by_imm=, =mutated_by_imm=, =stringed_by_imm=, =mutation_count=, =owner=, =held_for= |
+| lock puzzle  | =mm_crack_code=, =mm_crack_attempts= (crackable containers)                                     |
+| location     | =in_room= or =carried_by= or =equipped_by= or =in_obj= or =in_warehouse= / =in_acct_warehouse=; =contains=; list links =next_content=, =next= |
 
-* Things learned
+Exactly one of the location pointers is meaningful at a time, and the
+code maintains the room, character and container lists by hand
+(=obj_to_room=, =obj_from_char=, ...). The whole "where is it" question
+is these five pointers plus the intrusive lists; see =mobs.org= for why
+that matters.
 
-- =apply= blocks are lists of (location, modifier) in the server
-  (=objdb.c= case 49 appends one entry per line, =MAX_OBJ_APPLY= slots) and
-  modifiers to the same location stack. The extractor emits a dict; the
-  only repeats in the data are name-valued applies (=spell_affect=,
-  =eat_spell=, =resistance=), emitted as lists.
-- The apply location names come from =apply_fields= in =constants.c=, 104
-  rows, which double as the enchant-suffix table ("of toughness").
-- Marker item types are written as =other { 0, 0, 0, 0 }=; =tran= writes only
-  the type id and the server then reads (and discards) the next word. The
-  extractor emits =\"type\": {\"other\": null}=.
-- Empty prototype text is normal: a saved object with an empty string means
-  "use the prototype text" and =ReadObject= copies it from =obj_db=.
-- =obj_data= has two apply-like arrays besides =apply=: =pulse_apply= and
-  =socket_apply=, plus =activate_thresholds= for set bonuses. Only =apply=
-  appears in the prototype sources.
-- Macros: =Void.obj= defines =@board=, =@mortboard=, =@wizboard=.
+* Item types (=item_types[]=, =constants.c=)
 
-* Caveats in the data
+undefined, light, scroll, wand, staff, weapon, fire weapon, missile,
+treasure, armor, potion, worn, other, trash, trap, container, note,
+liquid container, key, food, money, pen, boat, audio, board, book,
+pouch, component, hierarchical, spell gem, set item, socket.
 
-- =Asgard.obj= writes =hitndamage ( 10 )= with parentheses on twelve objects.
-  =tran= skips to the next brace, so those values are lost in =obj.out= and
-  the next field is misassigned. The extractor reads parenthesised values
-  deliberately, so the JSON is more complete than the binary here.
-- 72 remaining warnings: =bits= or =wear= given twice (last wins in the
-  server), duplicate =min_level=, one =other 0,0,0,0= with no delimiter.
-- Vnum set checked against =obj.out=: exact match on 4,855.
+The five =value= slots mean different things per type, and the world
+file names them per type instead of by index: an armour block has
+=effective_ac= and =force=; a weapon its dice and damage type; a light
+its hours in =value[2]=; a container its capacity, =CONT_*= flags and
+key vnum; a liquid container its capacity, current amount, liquid and
+poison; a wand or staff its level, charges and spell; a scroll or
+potion its level and up to three spells; a corpse (a container) uses
+=value[3]= as the corpse marker and =timer= for decay. The compiler
+(=world/compile=, =tran=) maps the names to slots.
+
+* Flags
+
+** Wear (=wear_flags=, =h/const.h:265=)
+
+take, finger, neck, body, head, legs, feet, hands, arms, shield, about,
+waist, wrist, wield, hold, throw, light, damaged (cannot wear or
+wield), construction, pouch, dual wield, dual wield only (off-hand
+only), wings, trinket. A character has 22 wear positions (=MAX_WEAR=):
+light, two fingers, two neck, body, head, legs, feet, hands, arms,
+shield, about, waist, two wrists, wield, hold, off-hand, wings, two
+trinkets.
+
+** Extra (=extra_flags=, =h/const.h:292=)
+
+glow, hum, flexible (volume grows with contents), mundane
+(unenchantable), nodrop (cursed in the Diku sense: cannot be dropped or
+given), invisible, magic, cursed, bless, anti-good, anti-evil,
+anti-neutral, randomize (mutate on load), hidden, indestruct, arena
+only, test. Bits 14 to 28 are unused.
+
+** Container (=CONT_*=)
+
+closeable, pickproof, closed, locked, knockable, crackable. A crackable
+locked container gets a =mm_crack_code= at load and the =crack= command
+is a Mastermind-style guessing game against it.
+
+* Rarity, tiers, mutation
+
+=rarity= is common, uncommon, rare, epic or legendary; it colours the
+name everywhere (=rarity_color_code=, yellow through purple) and feeds
+the mutation roll. =obj_tier= is a separate scale. =ITEM_RANDOMIZE= on a
+prototype, or the immortal =mutateobj= command, calls
+=mutate_object(o, min)= (=objdb.c:449=): add =min= plus a critical-chain
+roll of extra applies, each with a random "karma" (good or bad), a
+location picked to avoid duplicates and a modifier sized from the
+per-apply stats table, renaming the item with the apply's adjective or
+"of ..." phrase as it goes ("a flaming longsword of the bear"). The
+rarity can rise with net karma. Applies are capped at 15 per object.
+=mutateinfo= shows the tables.
+
+* Applies, sockets, sets
+
+- /Applies/: up to 15 (location, modifier, qualifier) triples; 104
+  =APPLY_= locations: the seven stats, level, age, mana, hit, move,
+  gold, exp, hit and damage rolls, saving throws, resistances,
+  immunities and susceptibilities, per-body-part armour and stopping,
+  skill bonuses (backstab, kick, sneak, hide, bash, pick, steal,
+  track), spells cast on wear, weapon spells, eat spells, power, and
+  the elemental resistances. =pulse_apply= entries tick while worn.
+  =activate_thresholds= gate applies on level.
+- /Sockets/: a socketable item has =sockets= slots; gems (type "spell
+  gem" or "socket") inserted with =socket insert= add their applies to
+  =socket_apply[]= and are remembered by vnum and name; =socket
+  combine= merges gems, =socket destroy= and =remove= undo. =where=
+  searches socket names too.
+- /Item sets/: =world/ITEM_SETS/item_sets.current= defines named sets
+  with two-piece and higher bonuses (applies) and a rarity; a "set
+  item" carries =item_set= and its piece number, and wearing enough
+  pieces applies the set bonus (=reset_and_apply_item_set_bonuses=,
+  =handler.c=, the function whose freed-node loop crashed on 2026-09-28).
+  Sets 1 and 2 are reserved placeholders.
+
+* Where objects come from
+
+** Zone resets (=zone.c=)
+
+The only source of new instances other than immortals and a few
+specials. A zone command loads an object into a room (=O=), gives it to
+a mob (=G=), equips it (=E=), puts it in a container (=P= / =I=), or
+chains loads. =load_obj= (=zone.c:441=) counts how many of that vnum
+are already in the room, loads the difference up to the command's
+count (a =U= unique command loads at most one), and rolls the command's
+load probability per copy; a probability over 100 is treated as about
+0.1%. Loads are also refused when the prototype's =max_exist= is
+reached, and =max_for_player= caps how many of a limited item one
+character may own (checked in =get= and in shops, "You already have N,
+the limit"). =show obj limited= lists prototypes with either limit.
+
+** Other sources
+
+- =load= (immortal, =I6=) creates an instance and stamps
+  =loaded_by_imm=.
+- Corpses are containers made by =make_corpse= at death, holding the
+  inventory and equipment, with a decay =timer= that is shorter when
+  empty.
+- Some specials and spells create objects (keys, summoned items).
+- Shops with =producing= lists conjure their stock on demand.
+
+* While in the world
+
+** Carrying
+
+Weight and item-count capacity come from strength (=CAN_CARRY_W=,
+=CAN_CARRY_N=); containers have their own capacity in =value[0]= and
+contribute =contents_weight= and =contents_volume= to whoever holds
+them. =ITEM_FLEXIBLE= containers grow with contents. =nodrop= items
+cannot be dropped or given; anti-alignment items zap the wrong wearer
+on wear.
+
+** The per-object tick (=ev_update_obj=, =limits.c:990=)
+
+Every object instance has its own =EVT_OBJ_UPDATE= event once per
+60-second tick (see =game-engine-loop.org=), which:
+
+- counts down =timer2= and, at zero, drops a carried item to the floor
+  or deletes one inside a container, with "phases out of existence"
+  (used for temporary and dropped items, =DROP_TICKS=);
+- for armour with a biodegrade value, counts down =timer= and dissolves
+  it "from your body", "in your hands" or "into a fertile soil";
+- for corpses (containers with the corpse marker), shortens the timer
+  once looted empty, counts it down, then spills remaining contents
+  into the room and dissolves the corpse;
+- handles other timed types (lights burn down their hours while worn in
+  the light slot, =handler.c:3552=).
+
+** Sounds
+
+Objects with noises make them every 60 s on the audio pulse
+(=ObjNoise=, =sound.c=), like mobs.
+
+** Specials
+
+13 object special procedures in =spec_obj.c=, bound by vnum in
+=assign_objects=. They run with the same trigger types as mob specials
+(=SPEC_CMD=, =SPEC_MOVE=, ...) and are checked for every object the
+acting player wears or carries, then every object on the floor, after
+the room special and before the mobs (=interpreter.c:314=).
+
+** Shops (=shop.c=, =world/SHOP=)
+
+A shop is a keeper mob vnum, a room (0 for a travelling salesman),
+lists of types and vnums it buys, what it produces, buy and sell profit
+percentages, temper messages and opening hours. Prices scale from
+=cost= by the profit percentage and a level scaling; items with a "real
+price tag" (=real_cost=) cannot be sold back; limited items respect
+=max_for_player= at the counter.
+
+** Auction, lockers, warehouse
+
+=auction= is a player market channel. Lockers are per-player object
+storage rooms persisted in =LockerSave/*.room= and indexed by
+=lockers.save=. The warehouse is an object list on the /account/,
+shared by all its characters, persisted in the account's data.
+
+* Persistence
+
+** In player files (=SaveObjectList=, =player.save.c=)
+
+A character's inventory and each worn item are written inline into the
+character file, recursively for containers, as a =SUB_OBJECT= ...
+=END_OF_LIST= tree. =WriteObject= writes the vnum and then only the
+fields that differ from the prototype: strings are compared with
+=str_cmp= against the template and skipped when equal, so a plain
+unmodified sword is little more than its vnum, while a restrung,
+mutated or socketed one carries its differences. On load, =ReadObject=
+starts from the prototype and overlays the saved fields, which is also
+what makes old saves survive prototype changes: anything not saved
+takes the current template's value.
+
+** In rooms (=world.save.c=, =SaveZone=)
+
+Every 10 s one saveable zone (those with a =save= range in the zone
+file) has its rooms in that range written to =WorldSave/zone.N=,
+including objects on the floor, and the world count per prototype. At
+boot these are reloaded after the world file, so dropped items in a
+saveable zone survive a reboot. =lib/BOOT_CLEAN= discards them.
+
+** Elsewhere
+
+Lockers, the account warehouse, and corpses (which are in rooms, so
+only in saveable zones).
+
+* Death of an object
+
+=extract_obj= removes it from wherever it is, decrements the
+prototype's =game_count= (=handler.c:3990=), frees contents recursively
+and frees the struct. Causes: timers above, being eaten, drunk or used
+up, sacrifice, junk, =purge= (immortal), a corpse decaying, a container
+with it decaying, a player quitting outside a rentable room (equipment
+lost), a shop buying it, extraction of its holder, zone resets that
+purge rooms, and spells that destroy items. There is no log of any of
+this.
+
+* Immortal tools
+
+=load= / =purge= (=I6=), =string= (=I6=, rename and redescribe,
+stamps =stringed_by_imm=), =oedit= (=I10=, add, remove, list, fix
+applies; stamps =edited_by_imm=), =mutateobj= (=I9=), =mutateinfo=,
+=stat= / =ostat=, =show obj= (search, range, limited), =owhere=,
+=identify=. The =show obj= search is the one that failed on the old
+host (=SUMMARY.md= §15).
+
+* Quirks
+
+- Identity: none per instance. Two copies of a unique item after a
+  restore from two backups are indistinguishable; "where did my sword
+  go" cannot be answered.
+- The in-file representation is a diff against the prototype, so
+  editing a prototype silently changes every saved copy that did not
+  override that field. Useful for balance changes, surprising for
+  restrung items that relied on a default.
+- =extra_flags= has fifteen unused bits in the middle and the
+  randomize flag sits among them; =ITEM_HIDDEN= exists "for compat
+  with 1.5 server".
+- Limits: =max_exist= 32000 means unlimited; the only places that
+  enforce =max_for_player= are =get= and shops, not zone loads to mobs.
+- A load probability over 100 is a deliberate near-zero rate, not a
+  bug.
+- Light hours, corpse decay, biodegrade and drop timers are all
+  separate counters on the same two fields, interpreted by type.
