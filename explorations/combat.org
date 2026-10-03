@@ -11,7 +11,7 @@ See also: [[file:game-engine-loop.org::#the-event-system][engine, the event syst
 (what mobs do between blows), [[file:players.org::#death][players, death]],
 [[file:objects.org::#applies-sockets-sets][objects, applies]] (where
 hit and damage bonuses come from), [[file:rooms.org::#room-flags][rooms, flags]]
-(peaceful and arena rooms).
+(peaceful and arena rooms), [[file:spells.org][spells.org]] (casting, affects, saves).
 
 * Shape of a fight
 :PROPERTIES:

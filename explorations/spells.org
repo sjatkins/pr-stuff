@@ -1,0 +1,268 @@
+#+TITLE: Perilous Realms: spells, affects and skills
+#+DATE: 2026-10-03
+#+OPTIONS: toc:2
+
+Casting, the spell table, what a spell does, affects and how they wear
+off, pulse affects, spell items, components, learning. Read from
+=src/spell_parser.c=, =magic*.c=, =spells*.c=, =handler.c=, =skills.c=,
+=other.c= and =world/CLASSES=, =world/SKILL= at commit 94876a77.
+
+See also: [[file:combat.org::#resolution][combat, resolution]] (where
+damage spells land), [[file:combat.org::#spells][combat, spells in combat]],
+[[file:game-engine-loop.org::#the-event-system][engine, the event system]]
+(=EVT_SPELL= and the tick that ages affects), [[file:players.org::#classes-races-clans][players, classes]]
+(who learns what), [[file:mobs.org::#in-a-fight][mobs, in a fight]]
+(=mob_attack=, =act_caster=), [[file:objects.org::#applies-sockets-sets][objects, applies]]
+(the same =APPLY_= locations as affects); earlier extractor notes in
+[[file:effects_skills.org][effects_skills.org]].
+
+* The numbers
+:PROPERTIES:
+:CUSTOM_ID: numbers
+:END:
+
+| spell numbers defined (=h/spells.h=) | 253 (=SPELL_ARMOR= 1 ... =SPELL_AFFECT_NOFEAR= 10115) |
+| =MAX_EXIST_SPELL=                      | 240 (wear-off message table size)           |
+| skill numbers                          | =SKILL_BASE= 10000 to =LAST_SKILL= 10141    |
+| weapon proficiencies                   | =PROF_BASE= 5000 + weapon type              |
+| spell functions                        | ~450 across =magic.c=, =magic2=, =magic_area=, =magic_dam=, =magic_obj=, =magic_prot=, =magic_relo=, =spells1/2/3= |
+| classes with spell lists               | 40 (=world/CLASSES/classes=)                |
+
+* Two tables
+:PROPERTIES:
+:CUSTOM_ID: two-tables
+:END:
+
+** The engine table (=spell_info[]=, =h/spell_func.h=)
+:PROPERTIES:
+:CUSTOM_ID: engine-table
+:END:
+
+One row per spell number: =beats= (casting time in violence pulses),
+minimum position, flags (violent, general, area, quest...), a
+=targets= bitmask, and the =cast_= function pointer.
+
+#+begin_example
+  /* 1 */ {  1, STA, V|G,     CR,              cast_armor },
+  /* 2 */ {  1, FIG, V|G|A|Q, CR|VC,           cast_teleport },
+  /* 4 */ {  2, FIG, V|G,     CR|VC|VI,        cast_blindness },
+#+end_example
+
+Target bits (=TAR_*=): ignore, char in room, char in world, fight
+self, fight victim (defaults to your opponent), self only, not self,
+object in inventory, in room, in world, equipped, by name, violent
+(starts a fight), room. A =cast_X= wrapper switches on how the spell
+was invoked, =SPELL_TYPE_SPELL=, potion, wand, staff, scroll or
+weapon spell, and calls the real =spell_X(level, caster, arg, type,
+target char, target obj, effective level)=.
+
+** The class table (=world/CLASSES/classes=)
+:PROPERTIES:
+:CUSTOM_ID: class-table
+:END:
+
+Each class lists the spells and skills it can learn, one row each:
+
+#+begin_example
+SPELLS                 Lvl Diff Cost Gld Max Mana  S  Prereq         Components
+magic missile         |  3|  1 |    |   | 95| 14 | P |               |960
+continual light       |  7|  1 |    |   | 95| 15 | P | create light  |960
+#+end_example
+
+Level to learn, difficulty (multiplies mana when reagents are
+missing), cost, guild maximum, maximum learnable percent, mana cost,
+source (=P= power or mana), prerequisites, component vnums. Loaded
+into =spell_entry= records per class; =do_cast= finds the caster's
+class entry for the spell and refuses if there is none.
+
+* Casting (=do_cast=, =spell_parser.c:797=)
+:PROPERTIES:
+:CUSTOM_ID: casting
+:END:
+
+In order, each a refusal with its own message:
+
+1. Not humanoid, in a form that cannot cast, or a paladin or avenger
+   off their alignment path.
+2. =NO_MAGIC= room (immortals exempt). Underwater needs the right
+   spell or form. Bards have a separate =ballad= syntax.
+3. Spell name parsed; the class entry found; "unimplemented/disabled"
+   if the engine table has no function.
+4. Position: the table's minimum, and "can't concentrate" if the spell
+   needs more than fighting position and you are fighting.
+5. Level, silence, confusion, two druid form checks.
+6. Cost: the entry's mana; multiplied by =1 + difficulty= when
+   reagents are missing and the caster lacks reagent mastery;
+   divided by remort mana or power efficiency. Checked against mana
+   or power by =source=; a true-neutral caster without a remort effect
+   cannot use mana magic.
+7. Delay: =WAIT_QTR_SEC + PULSE_VIOLENCE × (beats - 1)=, reduced by
+   casting haste scaled by remort count. Immortals cast instantly.
+8. The roll: =d101= against the caster's learned percent for the
+   spell; power casters add =power_penalty=, a negative from the
+   weight of iron worn and carried ("your focus is warped by the
+   presence of iron"). A failed roll costs half the mana, and with a
+   second roll under the learned percent the spell /improves/ ("in
+   failure, you learn better the nuances").
+9. On success: lag =delay + 2 s=, an =EVT_SPELL= scheduled after
+   =delay= carrying the spell number and argument, and =say_spell=:
+   the room hears the spell's name with each syllable swapped from a
+   table ("bless" → "fido", "bur" → "mosa") unless they know the spell.
+
+At completion (=event_spell=, =spell_parser.c:1250=): re-check
+silence, confusion, paralysis and position; deduct the cost; resolve
+the target /now/ by the target bits (the named character in the room,
+your opponent for fight-victim spells, yourself for self-only,
+inventory or room objects); refuse if the caster changed rooms; call
+the spell function with the caster's level as the effective level.
+A target that left during the cast is simply not found.
+
+* What a spell does
+:PROPERTIES:
+:CUSTOM_ID: what-a-spell-does
+:END:
+
+Three shapes cover nearly all 450 functions.
+
+- /Damage/: roll dice scaled by level, apply remort weapon-spell
+  bonuses, call =damage(caster, victim, dam, SPELL_X)=
+  ([[file:combat.org::#resolution][combat, resolution]]). Magic
+  missile is =dice(level/20, 4)=; lightning bolt =min(200, dice(level/20, 8))=.
+  =GetSpellType= maps each spell number to a damage type (fire, cold,
+  electricity, acid, poison, force, water, light, darkness, magic) so
+  resistances and saves apply. Area spells loop the room.
+- /Affect/: build an =affected_type= (spell number, duration in
+  ticks, =APPLY_= location, modifier, affect bits) and
+  =affect_to_char=. Armour is =-10 - remort= to all AC for
+  =max(remort + 5, 14)= ticks plus a body-stopping bonus. Protection
+  spells set bits (sanctuary, detect invisible, fly).
+- /Direct effect/: heal (cure light =dice(2,13) + 4= plus spell power,
+  with a critical-heal chance), restore, dispel, teleport and
+  relocation, create items, charm, summon, enchant.
+
+=calc_spell_power= adds a fraction of the caster's =spell_power=
+(from items, affects and remort) to heals, durations and some damage;
+=spell_duration= lengthens affects; =spell_casting_haste= shortens
+delays.
+
+The saving throw used by damage and some affects is
+=MakeResistanceCheck=: =CalcResistanceCheck= takes the attacker's
+level, the victim's resistance value for the damage type and a
+"resist stat" blended from the stats that matter for that type (fire
+and electricity: dexterity and luck; cold and poison: constitution and
+luck; force: strength and constitution), looks it up on a curve, and
+the victim passes on =d100 <= min(95, max(scale × score, minimum))=.
+
+* Affects (=handler.c=, =spell_parser.c=)
+:PROPERTIES:
+:CUSTOM_ID: affects
+:END:
+
+An =affected_type= on a character: =type= (spell or skill number),
+=duration= in ticks, =modifier=, =location= (an =APPLY_= slot), and
+an affect =bitvector=. =affect_to_char= links it at the head of
+=ch->affected=, applies the modifier through =affect_modify= (which
+handles the special locations: resist and immune bits, susceptibility,
+granted spells) and recomputes totals with =affect_total=. Barbarians
+cannot be poisoned by this path. =affect_join= handles recasting:
+durations and modifiers are averaged or summed per the join flags.
+
+Every tick (=affect_update= → =update_char_spells=) each affect's
+duration is reduced; at zero the wear-off message from
+=spell_wear_off_msg[]= (=constants.c=) is sent, "You feel less
+protected", unless it starts with =*=, and the affect is removed with
+its modifier reversed. Remort bonuses and shapeshift forms are exempt
+from ageing. The item-set and remort bonus resets walk this same list,
+which is where the 2026-09-28 use-after-free was.
+
+* Pulse affects and cooldowns
+:PROPERTIES:
+:CUSTOM_ID: pulse-affects
+:END:
+
+A second affect system for things that /happen over time/ rather than
+sit as a modifier: =affected_pulse_type= carries a damage type, proc
+type with initial, pulse and finish stages, stacking rules
+(=can_stack=, multiplier, counter), wall-clock =start_time=,
+=last_update=, =pulse_proc_frequency=, =duration=, counters, messages
+for start, pulse and finish, and a location and modifier. Every
+second (=update_pulse_affects=,
+[[file:game-engine-loop.org::#8-periodic-work-keyed-to-the-pulse-count][engine, periodic work]])
+each pulse affect whose frequency has elapsed runs its proc (damage
+over time, heal over time, a periodic buff, a shield that absorbs a
+percentage), and expires by wall clock, so a server stall ends them
+early while ordinary affects freeze. =affected_pulse_cooldown= records
+when an ability may be used again (silence, assassinate, item-set
+abilities). These are what =PULSE_TYPE_BUFF=, =HEAL=, =DAMAGE=,
+=SHIELD= refer to in the headers.
+
+A newer data-driven /Effect/ system exists alongside
+(=EffectDefinition= with hashes of messages and procs such as
+=RandomDamage=, defined in =world/SKILL/effects.tran=); it is partly
+wired and is described in [[file:effects_skills.org][effects_skills.org]].
+
+* Spell items and components
+:PROPERTIES:
+:CUSTOM_ID: items
+:END:
+
+- /Potions/ (=quaff=): up to three spells at the item's level, cast
+  on the drinker with =SPELL_TYPE_POTION=; the potion is consumed.
+- /Scrolls/ (=recite=): the same with a target, consumed.
+- /Wands and staves/ (=use=): a level, charges and a spell in the
+  value slots; staves hit everyone in the room. Charges count down.
+- /Weapon spells/: an =APPLY_WEAPON_SPELL= apply on a weapon fires its
+  spell on hits with =SPELL_TYPE_WEAPONSPELL=; item-set weapon spells
+  likewise ([[file:combat.org::#resolution][combat]]).
+- /Spell gems and pouches/: item types that hold spells or gems for
+  socketing ([[file:objects.org::#applies-sockets-sets][objects]]).
+- /Components/: a class spell row may list reagent vnums;
+  =has_components= requires each in the caster's possession, or a
+  casting item, or reagent mastery; otherwise the spell still works
+  at the difficulty-multiplied mana cost.
+
+* Learning
+:PROPERTIES:
+:CUSTOM_ID: learning
+:END:
+
+A character's known spells and skills are arrays of (number, learned
+percent). =practice= at a guildmaster (a mob special,
+[[file:mobs.org::#special-procedures][mobs, specials]]) spends
+=spells_to_learn= points gained on levelling to raise a percent toward
+the class's guild maximum, gated by level and prerequisites; beyond
+that, use raises it, including the learn-on-failure roll in casting.
+=get_spell= and =get_skill= read the percent; weapon proficiencies are
+skills numbered from =PROF_BASE= and scale weapon to-hit and damage
+([[file:combat.org::#to-hit][combat, to hit]]). Remort resets every
+percent to zero ([[file:players.org::#levels-experience-remort-apex][players, remort]]).
+
+* Mobs and spells
+:PROPERTIES:
+:CUSTOM_ID: mobs
+:END:
+
+A mob's spell list from its definition is used two ways: on a strike,
+=mob_attack= rolls against =magic_use= and may cast a random known
+spell instead of hitting; on a think while fighting, =act_caster= →
+=eval_spells= rates each known spell for the situation and casts the
+best through =phys_cast=, the same path as a player minus the
+command parsing ([[file:mobs.org::#in-a-fight][mobs, in a fight]]).
+
+* Quirks
+:PROPERTIES:
+:CUSTOM_ID: quirks
+:END:
+
+- Two affect systems age on different clocks: ordinary affects by
+  tick count, pulse affects by wall clock.
+- The spell list is three parallel things that must agree by number:
+  =h/spells.h= defines, the =spell_info[]= row, and the class file's
+  name. A new spell touches all three plus the wear-off message table.
+- Failing a cast can improve the spell; succeeding cannot.
+- Iron is a power caster's enemy by weight, 150 units worn or 300
+  carried per point of penalty.
+- A spell's target is resolved when it completes, not when it is
+  cast, so a victim who leaves the room mid-cast escapes it.
+- Immortal class casts instantly and is exempt from most checks.
+- Barbarians ignore the poison affect entirely.
