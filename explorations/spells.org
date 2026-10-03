@@ -187,7 +187,7 @@ type with initial, pulse and finish stages, stacking rules
 =last_update=, =pulse_proc_frequency=, =duration=, counters, messages
 for start, pulse and finish, and a location and modifier. Every
 second (=update_pulse_affects=,
-[[file:game-engine-loop.org::#8-periodic-work-keyed-to-the-pulse-count][engine, periodic work]])
+[[file:game-engine-loop.org::#periodic-work-keyed-to-the-pulse-count][engine, periodic work]])
 each pulse affect whose frequency has elapsed runs its proc (damage
 over time, heal over time, a periodic buff, a shield that absorbs a
 percentage), and expires by wall clock, so a server stall ends them
