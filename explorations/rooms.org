@@ -217,10 +217,18 @@ load the shortfall up to the limits, roll each probability
 :END:
 
 Every 10 s one zone with a =save= range is written to
-=WorldSave/zone.N=: the rooms in that range with their floor objects
-and the per-prototype world counts. At boot these load after the world
-file, so dropped items and door states in saveable zones survive a
-reboot. =lib/BOOT_CLEAN= makes the next boot discard them.
+=WorldSave/zone.N= (=room.save.c= =WriteRoom=): for each room in the
+range, every exit whose state differs from its default (flags, crack
+code and attempts), the room flags, every /mob/ standing in it
+(=mob.save.c= =SaveMob=: prototype vnum, stats, hit points, gold,
+position, affect bits, armour, inventory and equipment, affects and
+pulse affects) and every object on the floor. The limited-item world
+counts go to =WorldSave/Misc/limited.obj=. At boot these load after the
+world file (=LoadMob= creates the mob from its prototype and overlays
+the saved fields), so dropped items, door states and the mobs of
+saveable zones survive a reboot; mobs anywhere else do not.
+=lib/BOOT_CLEAN= makes the next boot discard them. Extracted form:
+=py_json/out/worldsave.jsonl= and =limited.jsonl=.
 
 ** Live room edits
 :PROPERTIES:

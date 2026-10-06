@@ -13,13 +13,20 @@ from pathlib import Path
 from typing import Any
 
 from . import classes as classes_mod
+from . import extras as extras_mod
 from . import players as players_mod
 from . import zones as zones_mod
 from .schemas import TRAN_TYPES
 from .tranparse import Context, ConvertError, convert, read_text, split_names
 
 ALL_TYPES = ["sectors", "rooms", "mobs", "objects", "shops", "races", "clans",
-             "item_sets", "effects", "skills", "zones", "classes", "players", "accounts"]
+             "item_sets", "effects", "skills", "zones", "classes", "players", "accounts",
+             "spells", "commands", "applies", "name_tables", "messages", "socials", "help",
+             "lockers", "worldsave", "limited", "boards"]
+
+# Types read from the C sources (-s), the lib directory (-l), or names.json.
+SRC_TYPES = {"spells", "commands"}
+LIB_TYPES = {"lockers", "worldsave", "limited", "boards"}
 
 OUTPUT_NAMES = {
     "rooms": "rooms.jsonl", "mobs": "mobs.jsonl", "objects": "objects.jsonl",
@@ -27,6 +34,10 @@ OUTPUT_NAMES = {
     "clans": "clans.jsonl", "item_sets": "item_sets.jsonl", "effects": "effects.jsonl",
     "skills": "skills.jsonl", "zones": "zones.jsonl", "classes": "classes.jsonl",
     "players": "players.jsonl", "accounts": "accounts.jsonl",
+    "spells": "spells.jsonl", "commands": "commands.jsonl", "applies": "applies.jsonl",
+    "name_tables": "name_tables.jsonl", "messages": "messages.jsonl", "socials": "socials.jsonl",
+    "help": "help.jsonl", "lockers": "lockers.jsonl", "worldsave": "worldsave.jsonl",
+    "limited": "limited.jsonl", "boards": "boards.jsonl",
 }
 
 
@@ -56,7 +67,30 @@ def default_players_src() -> Path | None:
 
 
 def convert_type(type_name: str, world: Path, strict: bool,
-                 players_src: Path | None = None, include_secrets: bool = False) -> tuple[list[dict[str, Any]], list[str]]:
+                 players_src: Path | None = None, include_secrets: bool = False,
+                 src_dir: Path | None = None, lib_dir: Path | None = None) -> tuple[list[dict[str, Any]], list[str]]:
+    if type_name in SRC_TYPES:
+        src = src_dir or (world.parent / "src")
+        if not (src / "h").is_dir():
+            raise ConvertError(f"C source directory {src} not found (use --src)")
+        return (extras_mod.convert_spells if type_name == "spells" else extras_mod.convert_commands)(src, strict)
+    if type_name == "applies":
+        return extras_mod.convert_applies()
+    if type_name == "name_tables":
+        return extras_mod.convert_name_tables()
+    if type_name == "messages":
+        return extras_mod.convert_messages(world / "MISC" / "messages", strict)
+    if type_name == "socials":
+        return extras_mod.convert_socials(world / "MISC" / "actions", strict)
+    if type_name == "help":
+        return extras_mod.convert_help(world / "HELP" / "help_table", strict)
+    if type_name in LIB_TYPES:
+        lib = lib_dir or (world.parent / "live" / "lib")
+        if not lib.is_dir():
+            raise ConvertError(f"lib directory {lib} not found (use --lib)")
+        fn = {"lockers": extras_mod.convert_lockers, "worldsave": extras_mod.convert_worldsave,
+              "limited": extras_mod.convert_limited, "boards": extras_mod.convert_boards}[type_name]
+        return fn(lib, strict)
     if type_name in ("players", "accounts"):
         src = players_src or default_players_src()
         if src is None or not src.exists():
@@ -78,6 +112,18 @@ def convert_type(type_name: str, world: Path, strict: bool,
         if names:
             ctx.tables["sector_types"] = names
     return convert(ctx, entry, schema), ctx.warnings
+
+
+def canonicalize(type_name: str, records: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
+    """Pass every record through its py-pr model so the file is the model's own
+    shape (ids filled in, lists regrouped, enums in canonical order). The
+    models are found at ../py-pr/src or on sys.path; without them the raw
+    shape is written and a warning says so."""
+    try:
+        from .canon import canonical_records
+    except ImportError as e:   # pragma: no cover
+        return records, [f"canonical output unavailable ({e}); wrote raw records"]
+    return canonical_records(type_name, records)
 
 
 def write_jsonl(records: list[dict[str, Any]], out: Path | None, indent: int | None) -> None:
@@ -105,6 +151,12 @@ def main(argv: list[str] | None = None) -> int:
                          "(default: newest players_*.tar beside the world dir)")
     ap.add_argument("--include-secrets", action="store_true",
                     help="keep password hashes in players.jsonl / accounts.jsonl")
+    ap.add_argument("-s", "--src", type=Path, default=None,
+                    help="C source directory for spells/commands (default: <world>/../src)")
+    ap.add_argument("-l", "--lib", type=Path, default=None,
+                    help="game lib directory for lockers/worldsave/limited/boards (default: <world>/../live/lib)")
+    ap.add_argument("--raw", action="store_true",
+                    help="write the extractor's own record shape instead of the canonical py-pr model shape")
     args = ap.parse_args(argv)
 
     world = args.world or default_world_dir()
@@ -124,11 +176,21 @@ def main(argv: list[str] | None = None) -> int:
         if t not in types:
             continue
         try:
-            records, warnings = convert_type(t, world, args.strict, args.players, args.include_secrets)
-        except (ConvertError, ValueError, players_mod.FormatError) as e:
+            records, warnings = convert_type(t, world, args.strict, args.players, args.include_secrets,
+                                             args.src, args.lib)
+        except (ConvertError, ValueError, players_mod.FormatError, extras_mod.ExtrasError) as e:
             print(f"error: {t}: {e}", file=sys.stderr)
             status = 1
             continue
+        if not args.raw:
+            try:
+                records, canon_warnings = canonicalize(t, records)
+            except Exception as e:   # a model rejected a record: report, keep going, fail at the end
+                msg = str(e).splitlines()
+                print(f"error: {t}: not canonical: " + " ".join(msg[:3]), file=sys.stderr)
+                status = 1
+                continue
+            warnings = list(warnings) + canon_warnings
         out = args.out_dir / OUTPUT_NAMES[t]
         write_jsonl(records, out, None)
         summary.append((t, len(records), len(warnings), out))

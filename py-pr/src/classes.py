@@ -32,9 +32,11 @@ Conventions:
 
 from __future__ import annotations
 
+import hashlib
+
 from typing import Any, ClassVar, Literal, Optional, Union, get_args, get_origin
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, SerializeAsAny, model_validator
 
 from names import (  # generated vocabularies, see tools/gen_enums.py
     AccountFlag, Direction, AffectBit, ApplyLocation, BoardFlag, ClanFlag, ClanRank, ClassName, ConfigFlag,
@@ -48,6 +50,116 @@ class PRModel(BaseModel):
     """Base: unknown keys are an error so drift between extractor and models shows up."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+# ---------------------------------------------------------------------------
+# Identity
+# ---------------------------------------------------------------------------
+
+_B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+
+def base62(n: int, width: int) -> str:
+    out = ""
+    while n:
+        n, r = divmod(n, 62)
+        out = _B62[r] + out
+    return out.rjust(width, "0")
+
+
+# Fixed once, never reused, never derived from the class name at runtime: a
+# retired class keeps its id. 32 random bits as six base-62 characters.
+CLASS_IDS: dict[str, str] = {
+    "Room": "1gCFlO",
+    "Mob": "1NibSH",
+    "ObjectPrototype": "0DbsUI",
+    "Shop": "0j1ssp",
+    "Race": "277ioN",
+    "Sector": "40ZCJa",
+    "Clan": "3zJHI1",
+    "ItemSet": "0ZHhMW",
+    "Effect": "3DdcCb",
+    "Skill": "0rT6JD",
+    "Zone": "2pnHrm",
+    "CharacterClass": "3AML1P",
+    "Player": "4Cbuft",
+    "Account": "1FlTEA",
+    "Locker": "0Koo8a",
+    "Storage": "4fA0GN",
+    "WorldSaveZone": "1dclW3",
+    "LimitedItemCount": "4RWEUP",
+    "Board": "4FA4Vc",
+    "Auction": "39ZMCr",
+    "HelpEntry": "0ka32x",
+    "Social": "15iDRX",
+    "DamageMessage": "2ejjYT",
+    "StoryTeller": "0AbQ0W",
+    "NameTable": "0VwcN6",
+    "ApplyDefinition": "1L8KtY",
+    "SpellDefinition": "3NiIVV",
+    "CommandDefinition": "0FHNmD",
+    "SavedMob": "2CuNVd",
+}
+
+
+def make_id(class_name: str, key: str) -> str:
+    """class id + 64-bit instance part, as base-62 (6 + 11 characters).
+
+    Extraction has no live system to hand out ids, so the instance part is a
+    stable hash of the record's natural key (vnum, name, ...): the same
+    source always yields the same id and a re-extraction is the identity.
+    A running game mints random instance parts instead; the shape is the
+    same, so ids from either source mix."""
+    cid = CLASS_IDS[class_name]
+    digest = hashlib.blake2b(f"{class_name}:{key}".encode("utf-8"), digest_size=8).digest()
+    return cid + base62(int.from_bytes(digest, "big"), 11)
+
+
+class PRRecord(PRModel):
+    """A top-level record: one JSONL line, one persisted thing, one ``id``.
+
+    ``id`` is the uniform identity every relation, changeset and save path
+    keys on (SUMMARY.md §16/§17). It is filled in on validation when the
+    source did not carry one, from ``_id_fields`` (the first present wins,
+    joined with ``:`` when several are listed as a tuple key). Equality and
+    hashing are by id, so two loads of the same record are the same thing.
+    """
+
+    id: Optional[str] = None
+    _id_fields: ClassVar[tuple[str, ...]] = ("vnum", "number", "index", "name", "command", "cmd", "room", "zone")
+    _id_join: ClassVar[bool] = False       # True: join every listed field, not just the first present
+
+    def _id_key(self) -> str:
+        vals = []
+        for f in self._id_fields:
+            v = getattr(self, f, None)
+            if v is None:
+                continue
+            if isinstance(v, list):
+                v = v[0] if v else None
+                if v is None:
+                    continue
+            vals.append(str(v))
+            if not self._id_join:
+                break
+        if not vals:
+            raise ValueError(f"{type(self).__name__}: no identity field among {self._id_fields}")
+        return ":".join(vals)
+
+    @model_validator(mode="after")
+    def _ensure_id(self) -> "PRRecord":
+        if self.id is None:
+            self.id = make_id(type(self).__name__, self._id_key())
+            self.__pydantic_fields_set__.add("id")
+        return self
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, PRRecord) and self.id is not None and other.id is not None:
+            return self.id == other.id
+        return BaseModel.__eq__(self, other)
+
+    def __hash__(self) -> int:
+        return hash(self.id) if self.id is not None else id(self)
 
 
 class Positional(PRModel):
@@ -298,7 +410,7 @@ class Exit(PRModel):
     reset: Optional[int] = None
 
 
-class Room(PRModel):
+class Room(PRRecord):
     """A room prototype from world/ROOM. Static world data; contents and occupants are runtime state."""
 
     vnum: int
@@ -322,7 +434,7 @@ class Room(PRModel):
 # Mobs  (world/MOB, mobs.jsonl)
 # ---------------------------------------------------------------------------
 
-class Mob(PRModel):
+class Mob(PRRecord):
     """A mob (NPC) prototype from world/MOB. Copied into a live character each time a zone loads it."""
 
     vnum: int
@@ -470,6 +582,12 @@ class ItemType(PRModel):
         if isinstance(data, dict):
             data = cls._flatten(data)
             if cls is ItemType:
+                if "slots" in data or data.get("kind") is None:
+                    return UntypedValues.model_validate(data) if cls is not UntypedValues else handler(data)
+                if data.get("saved"):
+                    layout = _VALUE_LAYOUT.get(data.get("kind"))
+                    if layout is not None:
+                        return layout[0].model_validate(data)
                 sub = cls._by_kind.get(data.get("kind"))
                 if sub is None:
                     raise ValueError(f"unknown item kind {data.get('kind')!r}")
@@ -630,7 +748,7 @@ class Touch(PRModel):
     msg_to_dest: Optional[str] = None
 
 
-class ObjectPrototype(PRModel):
+class ObjectPrototype(PRRecord):
     """An object prototype from world/OBJ. Live items are SavedObject copies of these."""
 
     vnum: int
@@ -639,7 +757,7 @@ class ObjectPrototype(PRModel):
     namelist: Optional[str] = None
     longdesc: Optional[str] = None
     action: Optional[str] = None
-    type: Optional[ItemType] = None
+    type: Optional[SerializeAsAny[ItemType]] = None
     weight: Optional[int] = None
     value: Optional[int] = None
     rent: Optional[int] = None
@@ -687,7 +805,7 @@ class ShopMessages(PRModel):
     sell: Optional[str] = None
 
 
-class Shop(PRModel):
+class Shop(PRRecord):
     """A shop from world/SHOP: which mob sells what, where, and at what multipliers."""
 
     vnum: int
@@ -721,7 +839,7 @@ class StatAdjust(PRModel):
     luck: Optional[int] = None
 
 
-class Race(PRModel):
+class Race(PRRecord):
     """A playable or mob race from world/RACE, indexed by vnum in the race table."""
 
     vnum: int
@@ -787,7 +905,7 @@ class SectorMap(PRModel):
     mob_color: Optional[str] = None
 
 
-class Sector(PRModel):
+class Sector(PRRecord):
     """A terrain type from world/SECT; rooms reference it by name."""
 
     vnum: int
@@ -805,7 +923,7 @@ class Sector(PRModel):
 # Clans  (world/CLAN, clans.jsonl)
 # ---------------------------------------------------------------------------
 
-class Clan(PRModel):
+class Clan(PRRecord):
     """A clan from world/CLAN. Membership lives on the player record (clan, clan_rank)."""
 
     vnum: int
@@ -832,7 +950,7 @@ class SetBonus(PRModel):
     set_ability_msg: Optional[str] = None
 
 
-class ItemSet(PRModel):
+class ItemSet(PRRecord):
     """A gear set from world/ITEM_SETS whose bonuses scale with pieces worn."""
 
     vnum: int
@@ -886,14 +1004,14 @@ class EffectFields(PRModel):
     procs: Optional[dict[str, str]] = None             # phase -> procedure name
 
 
-class Effect(EffectFields):
+class Effect(EffectFields, PRRecord):
     """A top-level effect definition from world/SKILL/effects.tran (2011 effect system)."""
 
     vnum: int
     source: str
 
 
-class Skill(PRModel):
+class Skill(PRRecord):
     """A skill from world/SKILL/skills.tran: a name bundling several effects."""
 
     vnum: int
@@ -959,7 +1077,7 @@ class ZoneCommand(PRModel):
     loads: list[ZoneLoad] = Field(default_factory=list)
 
 
-class Zone(PRModel):
+class Zone(PRRecord):
     """A zone from world/ZONE: a vnum range plus the commands that populate it at boot and on reset."""
 
     name: str
@@ -1010,7 +1128,7 @@ class Speed(PRModel):
     max: int
 
 
-class CharacterClass(PRModel):
+class CharacterClass(PRRecord):
     """A character class from world/CLASSES/classes (skills.c boot_class):
     stat limits, saving throws, flags and learnable skills and spells."""
 
@@ -1070,6 +1188,7 @@ class SocketApply(PRModel):
 
 class SavedSpellItemType(SpellItemType):
     """scroll and potion as saved: the spells are numbers, not names."""
+    saved: Literal[True] = True
     spell1: Optional[int] = None
     spell2: Optional[int] = None
     spell3: Optional[int] = None
@@ -1077,11 +1196,13 @@ class SavedSpellItemType(SpellItemType):
 
 class SavedChargedItemType(ChargedItemType):
     """wand and staff as saved: the spell is a number, not a name."""
+    saved: Literal[True] = True
     spell: Optional[int] = None
 
 
 class SavedTrapType(TrapType):
     """trap as saved: ``damage_type`` is the raw attack-type number."""
+    saved: Literal[True] = True
     damage_type: Optional[int] = None
 
 
@@ -1140,7 +1261,8 @@ def typed_item_values(kind: Optional[str], slots: list[int]) -> ItemType:
     if layout is None or len(slots) != 5:
         return UntypedValues(kind=kind, slots=slots)
     model, fields = layout
-    return model(kind=tran, **{name: (conv(slots[i]) if conv else slots[i]) for name, (i, conv) in fields.items()})
+    extra = {"saved": True} if "saved" in model.model_fields else {}
+    return model(kind=tran, **extra, **{name: (conv(slots[i]) if conv else slots[i]) for name, (i, conv) in fields.items()})
 
 
 class SavedObject(PRModel):
@@ -1152,7 +1274,7 @@ class SavedObject(PRModel):
     description: Optional[str] = None
     action_description: Optional[str] = None
     contents: list[SavedObject] = Field(default_factory=list)
-    values: Optional[ItemType] = None                  # the file's value[5], read per ``type``
+    values: Optional[SerializeAsAny[ItemType]] = None  # the file's value[5], read per ``type``
     wear_flags: WearFlag = WearFlag(0)
     extra_flags: ObjectFlag = ObjectFlag(0)
     affects: AffectBit = AffectBit(0)   # granted while worn
@@ -1354,7 +1476,7 @@ class PlayerTimes(PRModel):
     played: Optional[int] = None
 
 
-class Player(PRModel):
+class Player(PRRecord):
     """A player character as saved in stash/<a-z>/<name>; one file per character, owned by an Account."""
 
     name: Optional[str] = None
@@ -1499,7 +1621,7 @@ class Player(PRModel):
 # Accounts  (account/<a-z>/<name>, accounts.jsonl)
 # ---------------------------------------------------------------------------
 
-class Account(PRModel):
+class Account(PRRecord):
     """A login account as saved in account/<a-z>/<name>; owns one or more Players and a shared warehouse."""
 
     name: Optional[str] = None
@@ -1534,15 +1656,15 @@ class Account(PRModel):
 # Structures with no extractor yet
 # ---------------------------------------------------------------------------
 
-class Locker(PRModel):
-    """LockerSave/locker.<room>.room: the communal chest in one room."""
+class Locker(PRRecord):
+    """LockerSave/locker.<room>.room: the communal chest in one room (lockers.jsonl)."""
 
     room: int
     source: Optional[str] = None
     items: list[SavedObject] = Field(default_factory=list)
 
 
-class Storage(PRModel):
+class Storage(PRRecord):
     """One document per item store, whatever kind: the shape warehouses and
     lockers share (see explorations/warehouse.org)."""
 
@@ -1550,24 +1672,125 @@ class Storage(PRModel):
     owner: Optional[str] = None                        # character or account name
     room: Optional[int] = None                         # locker room vnum
     items: list[SavedObject] = Field(default_factory=list)
+    _id_fields: ClassVar[tuple[str, ...]] = ("kind", "owner", "room")
+    _id_join: ClassVar[bool] = True
+
+
+class Regens(PRModel):
+    hp: Optional[int] = None
+    mana: Optional[int] = None
+    power: Optional[int] = None
+
+
+class SparseResistances(PRModel):
+    """resistances_data with only the non-zero members written (SaveMob's Write skips zeros)."""
+    fire: Optional[int] = None
+    cold: Optional[int] = None
+    water: Optional[int] = None
+    electricity: Optional[int] = None
+    poison: Optional[int] = None
+    acid: Optional[int] = None
+    force: Optional[int] = None
+    magic: Optional[int] = None
+    light: Optional[int] = None
+    darkness: Optional[int] = None
+
+
+class SavedMob(PRRecord):
+    """A mob instance as mob.save.c SaveMob writes it inside a zone save: a
+    prototype vnum plus everything that may have changed since it loaded,
+    its inventory and equipment, and its affects. These are the only mob
+    instances the game ever persists (rooms in a zone's save range)."""
+
+    vnum: Optional[int] = None
+    weight: Optional[int] = None
+    height: Optional[int] = None
+    base_stats: Stats = Field(default_factory=Stats)
+    stats: Stats = Field(default_factory=Stats)
+    hit: Optional[int] = None
+    max_hit: Optional[int] = None
+    mana: Optional[int] = None
+    max_mana: Optional[int] = None
+    move: Optional[int] = None
+    max_move: Optional[int] = None
+    power: Optional[int] = None
+    max_power: Optional[int] = None
+    gold: Optional[int] = None
+    exp: Optional[int] = None
+    hit_bonus: Optional[int] = None
+    dam_bonus: Optional[int] = None
+    resist: Immunity = Immunity(0)
+    immune: Immunity = Immunity(0)
+    susceptible: Immunity = Immunity(0)
+    attacks_per_round_old: Optional[int] = None        # tag 31, obsolete
+    affected_by: AffectBit = AffectBit(0)
+    position: Optional[Position] = None
+    act: MobAction = MobAction(0)
+    apply_saving_throw: Optional[SavingThrows] = None
+    armor: Optional[list[int]] = None                  # 6 slots, LOCATION_UNKNOWN..HEAD
+    stopping: Optional[list[int]] = None
+    base_armor: Optional[list[int]] = None
+    base_stopping: Optional[list[int]] = None
+    carry_weight: Optional[int] = None
+    carry_volume: Optional[int] = None
+    birth: Optional[int] = None
+    default_zone: Optional[int] = None
+    story_teller: Optional[str] = None
+    bindpoint: Optional[int] = None
+    attacks_per_round: Optional[float] = None
+    base_melee_penetration: Optional[float] = None
+    base_spell_penetration: Optional[SparseResistances] = None
+    base_spell_power: Optional[float] = None
+    life_steal: Optional[float] = None
+    extradam: Optional[int] = None
+    spell_casting_vamp: Optional[float] = None
+    regens: Optional[Regens] = None
+    hit_shield: Optional[int] = None
+    remort_count: Optional[int] = None
+    rage: Optional[int] = None
+    energy: Optional[int] = None
+    equipment: dict[WearPosition, list[SavedObject]] = Field(default_factory=dict)
+    inventory: list[SavedObject] = Field(default_factory=list)
+    affects: list[Affect] = Field(default_factory=list)
+    pulse_affects: list[PulseAffect] = Field(default_factory=list)
+    pulse_cooldowns: list[PulseCooldown] = Field(default_factory=list)
+    # an instance in a save has no natural key beyond its prototype; the
+    # extractor cannot tell two saved wolves apart, so neither can the id
+    _id_fields: ClassVar[tuple[str, ...]] = ("vnum", "birth", "hit", "gold")
+    _id_join: ClassVar[bool] = True
+
+
+class SavedExit(PRModel):
+    """An exit whose state differs from its default, in a zone save."""
+
+    num: int                                           # exit number; >= 10 is a named exit (go/enter)
+    direction: Optional[Direction] = None              # the name when num is one of the ten
+    info: ExitFlag = ExitFlag(0)
+    crack_code: Optional[int] = None
+    crack_attempts: Optional[int] = None
 
 
 class WorldSaveRoom(PRModel):
-    """One room's persisted contents from WorldSave/zone.<n> or RoomSave."""
+    """One room's persisted state from WorldSave/zone.<n> (room.save.c WriteRoom)."""
 
     vnum: int
+    exits: list[SavedExit] = Field(default_factory=list)
+    flags: RoomFlag = RoomFlag(0)
+    mobs: list[SavedMob] = Field(default_factory=list)
     items: list[SavedObject] = Field(default_factory=list)
 
 
-class WorldSaveZone(PRModel):
-    """WorldSave/zone.<n>: the persisted contents of every room in one zone's save range."""
+class WorldSaveZone(PRRecord):
+    """WorldSave/zone.<n>: every room in one zone's save range (worldsave.jsonl)."""
 
     zone: int
+    source: Optional[str] = None
     rooms: list[WorldSaveRoom] = Field(default_factory=list)
+    _id_fields: ClassVar[tuple[str, ...]] = ("zone",)
 
 
-class LimitedItemCount(PRModel):
-    """WorldSave/Misc/limited.obj: world_count per limited object vnum."""
+class LimitedItemCount(PRRecord):
+    """WorldSave/Misc/limited.obj: world_count per limited object vnum (limited.jsonl)."""
 
     vnum: int
     count: int
@@ -1580,10 +1803,11 @@ class BoardMessage(PRModel):
     body: str
 
 
-class Board(PRModel):
-    """board.c: one file per board object vnum."""
+class Board(PRRecord):
+    """<vnum>.board (board.c): one file per board object vnum (boards.jsonl)."""
 
     vnum: int
+    source: Optional[str] = None
     messages: list[BoardMessage] = Field(default_factory=list)
 
 
@@ -1603,30 +1827,39 @@ class AuctionSale(PRModel):
     have_sale: bool = False
 
 
-class Auction(PRModel):
-    """<auctioneer>-<room>.auction: the sales held by one auctioneer."""
+class Auction(PRRecord):
+    """<auctioneer>-<room>.auction: the sales held by one auctioneer (not extracted yet)."""
 
     auctioneer: str
     room: int
     sales: list[AuctionSale] = Field(default_factory=list)
     inventory: list[SavedObject] = Field(default_factory=list)
+    _id_fields: ClassVar[tuple[str, ...]] = ("auctioneer", "room")
+    _id_join: ClassVar[bool] = True
 
 
-class HelpEntry(PRModel):
-    """help_table (help.c build_help_index): keywords share one text."""
+class HelpEntry(PRRecord):
+    """help_table (help.c build_help_index, new format): keywords share one
+    text; ``.usage`` and ``.xrefs`` subsections are split out (help.jsonl)."""
 
     keywords: list[str]
     topics: list[str] = Field(default_factory=list)
     min_level: int = 0
     text: str
+    usage: Optional[str] = None
+    xrefs: Optional[str] = None
+    _id_fields: ClassVar[tuple[str, ...]] = ("keywords",)
 
 
-class Social(PRModel):
-    """actions file (social.c social_messg)."""
+class Social(PRRecord):
+    """actions file (social.c social_messg) (socials.jsonl)."""
 
     command: str
+    abbrev: Optional[str] = None
     hide: bool = False
+    min_position: Optional[str] = None                 # actor's
     min_victim_position: Optional[str] = None
+    min_level: Optional[int] = None
     char_no_arg: Optional[str] = None
     others_no_arg: Optional[str] = None
     char_found: Optional[str] = None
@@ -1645,15 +1878,19 @@ class Msg(PRModel):
     room_msg: Optional[str] = None
 
 
-class DamageMessage(PRModel):
-    """messages file (fight.c): one alternative for one attack type."""
+class DamageMessage(PRRecord):
+    """messages file (fight.c load_messages): one alternative for one attack
+    type; ``ordinal`` numbers the alternatives for a type (messages.jsonl)."""
 
     attack_type: int
+    attack_name: Optional[str] = None
+    ordinal: int = 1
     die: Msg
     miss: Msg
     hit: Msg
     god: Msg
-    sanctuary: Optional[Msg] = None
+    _id_fields: ClassVar[tuple[str, ...]] = ("attack_type", "ordinal")
+    _id_join: ClassVar[bool] = True
 
 
 class Story(PRModel):
@@ -1663,51 +1900,66 @@ class Story(PRModel):
     text: str
 
 
-class StoryTeller(PRModel):
-    """The stories a story-telling mob can recite, from its file."""
+class StoryTeller(PRRecord):
+    """The stories a story-telling mob can recite, from its file (not extracted yet)."""
 
     mob_vnum: int
     file: str
     stories: list[Story] = Field(default_factory=list)
+    _id_fields: ClassVar[tuple[str, ...]] = ("mob_vnum",)
 
 
 # ---------------------------------------------------------------------------
 # Reference tables compiled into the C (names.json in py_json)
 # ---------------------------------------------------------------------------
 
-class NameTable(PRModel):
-    """A ``char *name[]`` table: position is the numeric code or bit index."""
+class NameTable(PRRecord):
+    """A ``char *name[]`` table: position is the numeric code or bit index (name_tables.jsonl)."""
 
     name: str
     values: list[str]
 
 
-class ApplyDefinition(PRModel):
-    """apply_fields row in constants.c."""
+class ApplyDefinition(PRRecord):
+    """apply_fields row in constants.c (applies.jsonl)."""
 
     index: int
+    id_name: Optional[str] = None                      # APPLY_STR
     name: str
     type: Literal["S32", "BIT", "E32"]
     list: Optional[str] = None                         # name table for BIT/E32 values
 
 
-class SpellDefinition(PRModel):
-    """A spell or skill number and its name from spell_list.h."""
+class SpellDefinition(PRRecord):
+    """One row of the engine's spell_info[] / skill_info[] table (spell_func.h)
+    joined with its name, wear-off message and damage type (spells.jsonl).
+    The per-class learning rows live in CharacterClass.spells / .skills."""
 
-    number: int
-    name: str
+    number: int                                        # spell number, or SKILL_BASE + skill index
+    kind: Literal["spell", "skill"]
+    name: Optional[str] = None
+    id_name: Optional[str] = None                      # SPELL_ARMOR / SKILL_SNEAK
+    beats: int = 0                                     # casting time in violence pulses
+    min_position: Optional[str] = None
+    flags: list[str] = Field(default_factory=list)     # verbal, gestures, noarena, noquest
+    targets: list[str] = Field(default_factory=list)   # TAR_* names, lower-cased
+    handler: Optional[str] = None                      # cast_x / do_x C function
+    wear_off: Optional[str] = None
+    damage_type: Optional[str] = None                  # from GetSpellType
+    category: Optional[Literal["heal", "buff", "utility"]] = None
 
 
-class CommandDefinition(PRModel):
-    """cmd_info[] row (interpreter.h command_info)."""
+class CommandDefinition(PRRecord):
+    """cmd_info[] row (inter.h) (commands.jsonl)."""
 
     cmd: str
-    minimum_position: str
-    minimum_level: int
+    minimum_position: Optional[str] = None
+    minimum_level: int = 0
     priority: int = 0
     flags: list[str] = Field(default_factory=list)
     handler: Optional[str] = None                      # C function name
-    num: int = 0
+    num: int = 0                                       # sub-command number passed to the handler
+    num_name: Optional[str] = None                     # CMD_* name of num, when it has one
 
 
 # Mapping from py_json output file to model, for validation and loading.
@@ -1716,4 +1968,7 @@ JSONL_MODELS: dict[str, type[PRModel]] = {
     "races": Race, "sectors": Sector, "clans": Clan, "item_sets": ItemSet,
     "effects": Effect, "skills": Skill, "zones": Zone, "classes": CharacterClass,
     "players": Player, "accounts": Account,
+    "spells": SpellDefinition, "commands": CommandDefinition, "applies": ApplyDefinition,
+    "name_tables": NameTable, "messages": DamageMessage, "socials": Social, "help": HelpEntry,
+    "lockers": Locker, "worldsave": WorldSaveZone, "limited": LimitedItemCount, "boards": Board,
 }

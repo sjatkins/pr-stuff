@@ -76,4 +76,42 @@ uv sync
 uv run python tools/validate_jsonl.py      # every line of ../py_json/out/*.jsonl
 ```
 
-All fourteen JSONL files validate cleanly.
+```
+.venv/bin/python tools/roundtrip.py        # validate -> dump == line, and stable
+```
+
+All twenty-five JSONL files validate and round-trip.
+
+## Identity
+
+Every top-level record class derives from `PRRecord` and has an `id`: a
+fixed six-character base-62 class id (`CLASS_IDS`, assigned once and never
+reused) followed by an eleven-character base-62 instance part. The
+extractor has no live system to mint ids, so the instance part is a
+stable hash of the record's natural key (`_id_fields`: vnum, number, index,
+name, ...), and re-extracting the same source yields the same ids; a
+running game mints random instance parts in the same shape. Records
+compare and hash by id. The id is set during validation when the source
+has none, and is part of the canonical JSONL.
+
+## Canonical JSONL
+
+The JSONL files are the models' own JSON: `model_dump_json(by_alias=True,
+exclude_unset=True)`. `py_json` writes them that way by passing each
+extracted record through the model (`prworld/canon.py`), so
+`Model.model_validate(json.loads(line))` and
+`m.model_dump_json(by_alias=True, exclude_unset=True)` are inverses.
+Two details make that hold: `ObjectPrototype.type` and
+`SavedObject.values` are `SerializeAsAny[ItemType]` so the item-kind
+subclass's fields are written, and the saved variants of spell, charged
+and trap items carry `saved: true` so a dump re-validates to the same
+class rather than the prototype's.
+
+## Persisted things the extractor covers beyond the world files
+
+`SpellDefinition` (`spells.jsonl`, one row per spell or skill number from
+the engine table), `CommandDefinition`, `ApplyDefinition`, `NameTable`,
+`DamageMessage` (`messages.jsonl`), `Social`, `HelpEntry`, `Locker`,
+`WorldSaveZone` with `WorldSaveRoom`, `SavedExit` and `SavedMob` (the
+only mob instances the game persists), `LimitedItemCount`, `Board`.
+`Auction`, `Storage` and `StoryTeller` are modelled but not extracted.

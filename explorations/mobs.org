@@ -58,6 +58,15 @@ event (=limits.c=): regen of hit, mana, power and move, hunger and
 thirst changes, suffering damage when incapacitated. So mobs heal
 between fights on the same schedule players do.
 
+Persistence: a mob standing in a room inside a zone's =save= range is
+written with that room every 10 s (=mob.save.c= =SaveMob=: vnum,
+stats, hit points, gold, position, affects, inventory and equipment)
+and recreated at boot from its prototype with those fields overlaid
+(=LoadMob=), see [[file:rooms.org::#saving][rooms, "Saving"]]. That is
+the only way a mob instance outlives a reboot; mobs elsewhere are
+gone at the next boot, and the saved ones still have no identity of
+their own beyond the room they stood in.
+
 * The think: what triggers a mob
 :PROPERTIES:
 :CUSTOM_ID: the-think-what-triggers-a-mob

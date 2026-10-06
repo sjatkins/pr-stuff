@@ -27,6 +27,35 @@ uv run rooms -o rooms.jsonl        # the original rooms-only command
 | classes   | `CLASSES/classes`               | `classes.jsonl`   |
 | players   | backup tar `stash/<a-z>/<name>` | `players.jsonl`   |
 | accounts  | backup tar `account/<a-z>/<name>` | `accounts.jsonl` |
+| spells    | `src/h/spell_func.h` + `spells.h` + `constants.c` + `fight.c` | `spells.jsonl` |
+| commands  | `src/h/inter.h`                 | `commands.jsonl`  |
+| applies   | `names.json` apply_fields       | `applies.jsonl`   |
+| name_tables | `names.json` tables           | `name_tables.jsonl` |
+| messages  | `MISC/messages`                 | `messages.jsonl`  |
+| socials   | `MISC/actions`                  | `socials.jsonl`   |
+| help      | `HELP/help_table`               | `help.jsonl`      |
+| lockers   | lib `LockerSave/locker.<room>.room` | `lockers.jsonl` |
+| worldsave | lib `WorldSave/zone.<n>`        | `worldsave.jsonl` |
+| limited   | lib `WorldSave/Misc/limited.obj` | `limited.jsonl`  |
+| boards    | lib `<vnum>.board`              | `boards.jsonl`    |
+
+The C sources default to `<world>/../src` (`-s`), the game's lib directory to
+`<world>/../live/lib` (`-l`). The lib-derived files describe whatever lib
+is there: for the checked-in `out/` that is this machine's local game, not
+production.
+
+## Canonical shape
+
+Unless `--raw` is given, every record is passed through its pydantic model
+in `../py-pr` (`prworld/canon.py` imports `../py-pr/src` and, when the
+running interpreter has no pydantic, that package's `.venv`) and written as
+`model_dump_json(by_alias=True, exclude_unset=True)`. So the JSONL *is*
+the model's own JSON: every record carries its `id`, grouped fields
+(`defense`, `hit`, typed `values`) are in their model form, and flags are
+in bit order. Loading a line with the model and dumping it again is the
+identity, and `py-pr/tools/roundtrip.py` checks exactly that for every
+line of every file. `--raw` writes the extractor's own dict shape, which
+the models also accept.
 
 Players and accounts are read from a player backup, either a `.tar` or an
 extracted directory, given with `-p`; the default is the newest
