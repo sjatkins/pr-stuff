@@ -15,10 +15,8 @@ MAILTO=una@erdaverse.com
 # 03:15 daily: players and accounts to s3://pr-player-backup
 15 3 * * *    $PR_HOME/scripts/cron/backup_players.sh
 
-# 03:45 on odd days of the month (every other day): all of live/lib to
-# s3://pr-full-backup. Month ends give an occasional one-day gap or two
-# days running; harmless.
-45 3 1-31/2 * *   $PR_HOME/scripts/cron/backup_full.sh
+# 03:45 on Sundays: all of live/lib to s3://pr-full-backup
+45 3 * * 0    $PR_HOME/scripts/cron/backup_full.sh
 
 # 04:00 on Sundays: delete crash dumps older than six months.
 0 4 * * 0     $PR_HOME/scripts/cron/cleanup_core.sh
