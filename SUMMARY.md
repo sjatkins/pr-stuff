@@ -1491,3 +1491,10 @@ rebuild must `aws s3 cp` the tarball down first. Bucket lifecycle rules
 not set. `scripts/sync_rooms.py` (room sync from Area/ via room2tran) is
 written and tested on a scratch repo but its logic is not yet agreed;
 not committed.
+
+Crontab installed on production 2026-10-09 (`scripts/cron/crontab`,
+`PR_HOME=/home/pr`, mail to una@erdaverse.com): liveness check every 5
+min, players 03:15 UTC daily, full backup 03:45 UTC Sundays, core cleanup
+04:00 UTC Sundays. Open: no MTA on the host, so cron mail is discarded
+until one is installed; `~pr/scripts` must symlink to
+`~pr/pr-stuff/scripts`.
