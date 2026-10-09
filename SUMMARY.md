@@ -1488,7 +1488,7 @@ written to `Backups/`; its old contents are left alone for now.
 uploaded from the dev machine. Open: `setup_pr_home.sh` and
 `load_players_from_last_backup.sh` still look in local `Backups/`; a
 rebuild must `aws s3 cp` the tarball down first. Bucket lifecycle rules
-not set. `scripts/sync_rooms.py` (room sync from Area/ via room2tran) is
+not set. `scripts/sync_rooms` (room sync from Area/ via room2tran) is
 written and tested on a scratch repo but its logic is not yet agreed;
 not committed.
 
@@ -1503,9 +1503,9 @@ until one is installed; `~pr/scripts` must symlink to
 `UPDATE/<builder> -> ../Area/<builder>` does the job with no copying, since
 `boot_update` follows symlinks and `rsave` rewrites the same name.
 
-### sync_rooms.py and Nitemare's rooms (2026-10-09)
+### sync_rooms and Nitemare's rooms (2026-10-09)
 
-`scripts/sync_rooms.py Area/<builder> [--write]`: one rsave file in,
+`scripts/sync_rooms Area/<builder> [--write]`: one rsave file in,
 changed `world/ROOM/*.room` out. Converts with `src/room2tran` (run from
 inside live/lib), replaces or appends room blocks by vnum, never deletes,
 adds a new area (area.list define, ALLROOMS include, `<name>.room`) when

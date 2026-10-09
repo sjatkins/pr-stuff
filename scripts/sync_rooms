@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Bring one builder's rsave file into the world repo.
 
-    sync_rooms.py Area/<builder>            report what would change
-    sync_rooms.py Area/<builder> --write    change world/ROOM/*.room
+    sync_rooms Area/<builder>            report what would change
+    sync_rooms Area/<builder> --write    change world/ROOM/*.room
 
 In game, `rsave` writes the builder's rooms to live/lib/Area/<builder>
 (binary, absolute vnums). This script converts that file to text with
