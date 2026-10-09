@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+"""Bring one builder's rsave file into the world repo.
+
+    sync_rooms.py Area/<builder>            report what would change
+    sync_rooms.py Area/<builder> --write    change world/ROOM/*.room
+
+In game, `rsave` writes the builder's rooms to live/lib/Area/<builder>
+(binary, absolute vnums). This script converts that file to text with
+src/room2tran, then for every room in it finds the block with the same
+vnum in world/ROOM/<area>.room and replaces it, or appends the block to
+the area file if the room is new. Nothing is deleted. Only area files
+that actually change are rewritten.
+
+After --write: cd world && git diff, commit, ./compile, restart.
+
+room2tran must be run from inside live/lib (it reads area.list, zone.out
+and sector.out from the current directory) and writes text files under
+live/lib/TextSave/, one per area, each starting with "#offset <area>".
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+PR_HOME = Path(os.environ.get("PR_HOME", os.getcwd()))
+
+
+# --------------------------------------------------------------------------
+# area.list: area name -> base vnum. A room's number in a .room file is
+# relative to the base of the area the file is for.
+
+
+def read_area_list(path: Path) -> dict[str, int]:
+    areas: dict[str, int] = {}
+    for line in path.read_text(errors="replace").splitlines():
+        match = re.match(r"#define\s+(\S+)\s+(\d+)", line)
+        if match:
+            areas[match.group(1)] = int(match.group(2))
+    return areas
+
+
+def area_for_vnum(areas: dict[str, int], vnum: int) -> str:
+    """The area whose base is the largest one not above vnum."""
+    best_name, best_base = "", -1
+    for name, base in areas.items():
+        if best_base < base <= vnum:
+            best_name, best_base = name, base
+    return best_name
+
+
+# --------------------------------------------------------------------------
+# Room text files. A file is a header (#offset line, comments) followed by
+# room blocks:  "N\n{ ... }" where N is the room number relative to the base.
+
+
+BLOCK_START = re.compile(r"^(\d+)\s*\n\s*\{", re.M)
+
+
+def end_of_block(text: str, open_brace: int) -> int:
+    """Index just past the '}' that closes the '{' at text[open_brace]."""
+    depth = 0
+    for i in range(open_brace, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    raise ValueError("unbalanced braces")
+
+
+def split_rooms(text: str) -> tuple[str, list[tuple[int, str]]]:
+    """Return (header, [(local number, block text)]), block text as written."""
+    rooms: list[tuple[int, str]] = []
+    first = BLOCK_START.search(text)
+    header = text[: first.start()] if first else text
+    pos = first.start() if first else len(text)
+    while True:
+        match = BLOCK_START.search(text, pos)
+        if not match:
+            break
+        open_brace = text.index("{", match.end() - 1)
+        end = end_of_block(text, open_brace)
+        rooms.append((int(match.group(1)), text[match.start():end].rstrip("\n") + "\n"))
+        pos = end
+    return header, rooms
+
+
+def offset_name(header: str) -> str | None:
+    match = re.search(r"^#offset\s+(\S+)", header, re.M)
+    return match.group(1) if match else None
+
+
+# A block's own number and its plain-number exit and teleport targets are
+# all relative to the same base. Moving a block to a file with a different
+# base means adding the difference to each of them. Targets written as
+# Area:n are absolute and are left alone.
+
+EXIT_TARGET = re.compile(r"(\bto\s*\{\s*[^,}]+,\s*)(\d+)(\s*\})")
+TELE_TARGET = re.compile(r"(\btele\s*\{\s*\d+\s*,\s*\d+\s*,\s*)(\d+)(\s*\})")
+
+
+def shift_block(block: str, delta: int) -> str:
+    if delta == 0:
+        return block
+    number, body = block.split("\n", 1)
+    body = EXIT_TARGET.sub(lambda m: f"{m.group(1)}{int(m.group(2)) + delta}{m.group(3)}", body)
+    body = TELE_TARGET.sub(lambda m: f"{m.group(1)}{int(m.group(2)) + delta}{m.group(3)}", body)
+    return f"{int(number) + delta}\n{body}"
+
+
+def same_room(a: str, b: str) -> bool:
+    """Compare two blocks ignoring whitespace differences."""
+    return re.sub(r"\s+", " ", a).strip() == re.sub(r"\s+", " ", b).strip()
+
+
+# --------------------------------------------------------------------------
+# The rsave file -> (vnum, block) pairs, via room2tran.
+
+
+def rooms_from_rsave(room2tran: Path, lib: Path, area_file: Path,
+                     areas: dict[str, int]) -> tuple[list[tuple[int, str]], dict[str, int]]:
+    textsave = lib / "TextSave"
+    textsave.mkdir(exist_ok=True)
+    for old in textsave.iterdir():
+        old.unlink()
+    # room2tran prints "#define NAME BASE" for rooms outside every area in
+    # area.list: a new area named after the file. Collect those.
+    run = subprocess.run([str(room2tran), str(area_file.relative_to(lib))],
+                         cwd=lib, check=True, capture_output=True, text=True)
+    new_areas: dict[str, int] = {}
+    for line in run.stdout.splitlines():
+        match = re.match(r"#define\s+(\S+)\s+(\d+)", line)
+        if match:
+            new_areas[match.group(1)] = int(match.group(2))
+
+    rooms: list[tuple[int, str]] = []
+    for text_file in sorted(textsave.iterdir()):
+        if text_file.name == "ALLROOMS":
+            continue
+        header, blocks = split_rooms(text_file.read_text(errors="replace"))
+        name = offset_name(header)
+        if name is None or (name not in areas and name not in new_areas):
+            sys.exit(f"{text_file}: room2tran wrote no usable #offset line ({name!r})")
+        base = areas[name] if name in areas else new_areas[name]
+        rooms += [(local + base, block) for local, block in blocks]
+    return rooms, new_areas
+
+
+# --------------------------------------------------------------------------
+# The repo side: every world/ROOM/<area>.room, edited in memory, written
+# only for areas that changed.
+
+
+class RepoRooms:
+    def __init__(self, room_dir: Path, areas: dict[str, int]):
+        self.room_dir = room_dir
+        self.areas = areas
+        self.text: dict[str, str] = {}                  # area -> file text
+        self.blocks: dict[int, tuple[str, str]] = {}    # vnum -> (area, block)
+        self.changed: set[str] = set()
+        self.new_areas: dict[str, int] = {}
+        for path in sorted(room_dir.glob("*.room")):
+            area = path.stem
+            if area not in areas:
+                continue
+            text = path.read_text(errors="replace")
+            self.text[area] = text
+            header, blocks = split_rooms(text)
+            base = areas[offset_name(header) or area]
+            for local, block in blocks:
+                self.blocks[local + base] = (area, block)
+
+    def add_area(self, name: str, base: int) -> None:
+        """A new area: a define in area.list, an include in ALLROOMS, an
+        empty <name>.room. All three are written by write()."""
+        self.areas[name] = base
+        self.new_areas[name] = base
+        self.text[name] = f"#offset {name}\n"
+        self.changed.add(name)
+
+    def area_of(self, vnum: int) -> str:
+        """An existing room stays in the file that holds it; a new one goes
+        to the area whose base is nearest below its vnum."""
+        current = self.blocks.get(vnum)
+        return current[0] if current else area_for_vnum(self.areas, vnum)
+
+    def place(self, vnum: int, block: str) -> str:
+        """Put a block into the repo. Returns "new", "changed" or "same"."""
+        area = self.area_of(vnum)
+        source_base = vnum - int(block.split("\n", 1)[0])
+        block = shift_block(block, source_base - self.areas[area])
+        current = self.blocks.get(vnum)
+        if current is None:
+            self.text.setdefault(area, f"#offset {area}\n")
+            self.text[area] = self.text[area].rstrip("\n") + "\n\n" + block
+            self.blocks[vnum] = (area, block)
+            self.changed.add(area)
+            return "new"
+        if same_room(current[1], block):
+            return "same"
+        self.text[area] = self.text[area].replace(current[1], block, 1)
+        self.blocks[vnum] = (area, block)
+        self.changed.add(area)
+        return "changed"
+
+    def write(self) -> list[Path]:
+        written = []
+        for area in sorted(self.changed):
+            path = self.room_dir / f"{area}.room"
+            path.write_text(self.text[area])
+            written.append(path)
+        if self.new_areas:
+            area_list = self.room_dir / "area.list"
+            allrooms = self.room_dir / "ALLROOMS"
+            with area_list.open("a") as f:
+                for name, base in self.new_areas.items():
+                    f.write(f"#define {name} {base}\n")
+            with allrooms.open("a") as f:
+                for name in self.new_areas:
+                    f.write(f"#include <{name}.room>\n")
+            written += [area_list, allrooms]
+        return written
+
+
+# --------------------------------------------------------------------------
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Bring one builder's rsave file into world/ROOM.")
+    parser.add_argument("area_file", type=Path, help="the rsave file, e.g. Area/Nitemare (relative to live/lib)")
+    parser.add_argument("--write", action="store_true", help="change the repo files (default: report only)")
+    parser.add_argument("--lib", type=Path, default=PR_HOME / "live" / "lib")
+    parser.add_argument("--world", type=Path, default=PR_HOME / "world")
+    parser.add_argument("--room2tran", type=Path, default=PR_HOME / "src" / "room2tran")
+    args = parser.parse_args(argv)
+
+    area_file = args.area_file if args.area_file.is_absolute() else args.lib / args.area_file
+    if not area_file.is_file():
+        sys.exit(f"no such file: {area_file}")
+    if not args.room2tran.is_file():
+        sys.exit(f"room2tran not found at {args.room2tran}; build it with make -f makefile.linux room2tran in src/")
+    room_dir = args.world / "ROOM"
+    areas = read_area_list(room_dir / "area.list")
+
+    repo = RepoRooms(room_dir, areas)
+    rooms, new_areas = rooms_from_rsave(args.room2tran, args.lib, area_file, areas)
+    for name, base in new_areas.items():
+        if name in areas:
+            continue        # room2tran works from live/lib's area.list, which lags the repo
+        print(f"new area {name} at {base}: will be added to area.list and ALLROOMS as {name}.room")
+        repo.add_area(name, base)
+    counts = {"new": 0, "changed": 0, "same": 0}
+    for vnum, block in rooms:
+        result = repo.place(vnum, block)
+        counts[result] += 1
+        if result != "same":
+            print(f"{result:8s} {vnum:7d}  {repo.area_of(vnum)}")
+
+    print(f"\n{counts['new']} new, {counts['changed']} changed, {counts['same']} unchanged")
+    if not repo.changed:
+        return 0
+    if args.write:
+        for path in repo.write():
+            print("wrote", path)
+        print("now: cd world && git diff, commit, ./compile, restart")
+    else:
+        print("report only; add --write to change " + ", ".join(f"ROOM/{a}.room" for a in sorted(repo.changed)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

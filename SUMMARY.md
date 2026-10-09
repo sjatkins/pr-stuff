@@ -1502,3 +1502,26 @@ until one is installed; `~pr/scripts` must symlink to
 `refresh_update_dir` removed again (2026-10-10): a symlink
 `UPDATE/<builder> -> ../Area/<builder>` does the job with no copying, since
 `boot_update` follows symlinks and `rsave` rewrites the same name.
+
+### sync_rooms.py and Nitemare's rooms (2026-10-09)
+
+`scripts/sync_rooms.py Area/<builder> [--write]`: one rsave file in,
+changed `world/ROOM/*.room` out. Converts with `src/room2tran` (run from
+inside live/lib), replaces or appends room blocks by vnum, never deletes,
+adds a new area (area.list define, ALLROOMS include, `<name>.room`) when
+the rooms lie outside every known area. Report mode by default. Tested
+against production's `Area/Nitemare` (copied read-only): 1,493 rooms,
+366 blank (name = number, skipped as the game itself does), 1,127 named,
+vnums 500000..983040, none in any pr-world area or zone; only the
+catch-all `last_room` zone (reset never, no save range) admits them, so
+they exist on production solely via the `UPDATE/Nitemare -> Area/Nitemare`
+symlink Sam made. The sync would create area `Nitemare` at 500000 with
+all 1,127 rooms; result compiles with tran; rerun is a no-op. Not yet
+applied to pr-world: whether one 483,000-vnum area with no zone is the
+wanted organisation is a builder decision.
+
+`src/room2tran` was a 32-bit 2011 binary, unrunnable here; fixed to build
+and run under current clang (cabarius/pr 6c863152): includes, pointer
+return of read_one_room, basename for invented areas, NULL check, -lm,
+1000-vnum offset limit removed, summary on stderr. Nothing builds it on a
+fresh host (`setup_pr_home.sh` builds pr3, tran, Zone/syntax only).
