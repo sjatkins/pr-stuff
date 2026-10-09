@@ -269,11 +269,11 @@ instance in a room and the zone save carries it across restarts, so a
 creative's hand-loaded mobs live only in =WorldSave=, never as a reset
 rule in the =.zon= file.
 
-=UPDATE/= is filled only by hand (=cp Area/<builder> UPDATE/=) and goes
-stale as soon as the builder does =rsave= again. Since 2026-10-09
-=PR_SERVER_SCRIPT= runs =refresh_update_dir= before every boot: each file
-already in =UPDATE/= is replaced by the =Area/= file of the same name when
-that is newer. Nothing is pulled into =UPDATE/= on its own.
+=UPDATE/= is filled only by hand. A copy goes stale as soon as the builder
+does =rsave= again, so use a symlink instead: =ln -s ../Area/<builder>
+UPDATE/<builder>=. =boot_update= opens entries with =fopen=, which follows
+the link, and =rsave= rewrites =Area/<builder>= under the same name, so
+the link always points at the latest save.
 
 ** Admin lists and feedback files
 :PROPERTIES:

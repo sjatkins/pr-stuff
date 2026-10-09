@@ -1498,3 +1498,7 @@ min, players 03:15 UTC daily, full backup 03:45 UTC Sundays, core cleanup
 04:00 UTC Sundays. Open: no MTA on the host, so cron mail is discarded
 until one is installed; `~pr/scripts` must symlink to
 `~pr/pr-stuff/scripts`.
+
+`refresh_update_dir` removed again (2026-10-10): a symlink
+`UPDATE/<builder> -> ../Area/<builder>` does the job with no copying, since
+`boot_update` follows symlinks and `rsave` rewrites the same name.

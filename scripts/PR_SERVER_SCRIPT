@@ -58,7 +58,6 @@ do
   prune_logs "$LOGS"
 
   rebuild_indexes "$LIB"
-  refresh_update_dir "$LIB"
 
 #  if test -f $DIR/prs.new
 #  then

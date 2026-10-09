@@ -53,25 +53,6 @@ list_all_players() {
   done
 }
 
-# refresh_update_dir [lib]
-#   For every builder file already in lib/UPDATE/ (which the game applies at
-#   boot), take the newer rsave from lib/Area/ if there is one. Only files a
-#   person has already placed in UPDATE/ are refreshed; nothing is pulled in
-#   from Area/ on its own. PR_SERVER_SCRIPT runs this before every boot.
-refresh_update_dir() {
-  local lib=${1:-$PR_LIB}
-  local update_dir="$lib/UPDATE" area_dir="$lib/Area"
-  local update_file area_file
-
-  for update_file in "$update_dir"/*; do
-    test -f "$update_file" || continue          # skip if the glob matched nothing
-    area_file="$area_dir/$(basename "$update_file")"
-    if test -f "$area_file" && test "$area_file" -nt "$update_file"; then
-      cp -p "$area_file" "$update_file"
-    fi
-  done
-}
-
 # prune_logs [logs-dir]
 #   Delete rotated logs (<logs-dir>/*.log) older than the retention
 #   cutoff: the start of the current year or three months ago, whichever
