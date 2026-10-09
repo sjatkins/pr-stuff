@@ -1,0 +1,24 @@
+# Crontab for the pr user on the production host.
+# Install with:  crontab scripts/cron/crontab      (replaces the whole table)
+# Check with:    crontab -l
+#
+# Fields: minute hour day-of-month month day-of-week, then the command.
+# "*" means every; "*/5" means every fifth; day-of-week 0 is Sunday.
+# The host clock is UTC.
+
+PR_HOME=/home/pr
+MAILTO=una@erdaverse.com
+
+# Every five minutes: restart the game if it is not answering on its ports.
+*/5 * * * *   $PR_HOME/scripts/cron/check_and_restart_pr_server.sh
+
+# 03:15 daily: players and accounts to s3://pr-player-backup
+15 3 * * *    $PR_HOME/scripts/cron/backup_players.sh
+
+# 03:45 on odd days of the month (every other day): all of live/lib to
+# s3://pr-full-backup. Month ends give an occasional one-day gap or two
+# days running; harmless.
+45 3 1-31/2 * *   $PR_HOME/scripts/cron/backup_full.sh
+
+# 04:00 on Sundays: delete crash dumps older than six months.
+0 4 * * 0     $PR_HOME/scripts/cron/cleanup_core.sh
