@@ -1463,3 +1463,13 @@ only via `rsave` (binary `Area/`) or `tsave` (`WORLD/`) and the repo only
 by hand. Only-in-live: stash/account (players tar), WorldSave/RoomSave/
 LockerSave, boards, auctions, Area/WORLD/UPDATE/TextSave/BUILD.LOG, the
 admin lists, ideas/typos/bugs, StoryFiles, PURGED, logs.
+
+### UPDATE/ refresh at boot (2026-10-09)
+
+`refresh_update_dir` in `scripts/pr_functions.sh`, called from the
+`PR_SERVER_SCRIPT` loop before every boot: for each file already in
+`lib/UPDATE/`, copy the newer `lib/Area/<same name>` over it. Opt-in per
+builder (first copy into UPDATE/ stays a human act). Fixes the stale-copy
+trap where the game applied an old UPDATE/ file and the builder had to
+`rload`. Also clarified in live-directory.org: creatives' hand-loaded
+mobs persist only through WorldSave, not as zone reset rules.
