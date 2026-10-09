@@ -1,7 +1,7 @@
 #!/bin/bash
 # Shared functions for the Perilous Realms ops scripts. Source it:
 #
-#   . "$(dirname "$(readlink -f "$0")")/pr_functions.sh"
+#   . "$PR_HOME/scripts/pr_functions.sh"
 #
 # PR_HOME is the directory that holds live/, scripts/ and Backups/ and
 # defaults to the current directory. PR_LIB is the game's data directory.

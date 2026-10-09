@@ -11,7 +11,7 @@
 # pr3 is running.
 set -e
 PR_HOME="${PR_HOME:-$(pwd)}"
-. "$(dirname "$(readlink -f "$0")")/pr_functions.sh"
+. "$PR_HOME/scripts/pr_functions.sh"
 
 file="$1"
 if [ -z "$file" ]; then

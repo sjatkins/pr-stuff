@@ -21,7 +21,7 @@
 #   7. Rebuild the player, account and locker indexes.
 set -e
 PR_HOME="${PR_HOME:-$(pwd)}"
-. "$(dirname "$(readlink -f "$0")")/pr_functions.sh"
+. "$PR_HOME/scripts/pr_functions.sh"
 
 GITHUB_USER="$1"
 if [ -n "$GITHUB_USER" ]; then
@@ -86,7 +86,7 @@ fi
 if [ "$(find "$LIB/stash" -mindepth 2 -type f 2>/dev/null | wc -l)" -gt 0 ]; then
   say "players exist in live/lib/stash, not restoring"
 elif ls "$PR_HOME"/Backups/players_*.tar* >/dev/null 2>&1; then
-  "$(dirname "$(readlink -f "$0")")/load_players_from_last_backup.sh"
+  "$PR_HOME/scripts/load_players_from_last_backup.sh"
 else
   say "no players and no Backups/players_*.tar.gz to restore; the world will be empty"
 fi

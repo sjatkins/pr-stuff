@@ -3,7 +3,7 @@
 # PR_HOME is the directory that holds live/ and src/.
 # Defaults to the current directory, so run from that directory or export it.
 PR_HOME="${PR_HOME:-$(pwd)}"
-. "$(dirname "$(readlink -f "$0")")/pr_functions.sh"
+. "$PR_HOME/scripts/pr_functions.sh"
 DIR="$PR_HOME/live"
 LIB="$DIR/lib"
 LOGS="$DIR/logs"
@@ -23,7 +23,7 @@ export DYLD_LIBRARY_PATH
 export DYLD_PRINT_LIBRARIES
 
 # Create anything missing from the live tree (no-op once set up).
-"$(dirname "$(readlink -f "$0")")/setup_pr_home.sh" || exit 1
+"$PR_HOME/scripts/setup_pr_home.sh" || exit 1
 
 while true
 do
