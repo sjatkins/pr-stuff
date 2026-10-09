@@ -1473,3 +1473,21 @@ builder (first copy into UPDATE/ stays a human act). Fixes the stale-copy
 trap where the game applied an old UPDATE/ file and the builder had to
 `rload`. Also clarified in live-directory.org: creatives' hand-loaded
 mobs persist only through WorldSave, not as zone reset rules.
+
+### Backups to S3 (2026-10-09)
+
+Buckets `pr-full-backup` and `pr-player-backup` (us-west-1). IAM role
+`pr-backup-writer` (list/put/get on those two buckets only) is attached
+to the production instance `i-0ece98b23fcf17313` as an instance profile;
+the host has `awscli` and needs no credentials on disk (`aws s3 ls` with
+no bucket is denied by design; name the bucket). `scripts/cron/backup_full.sh`
+and `backup_players.sh` rewritten: tar into a temp dir, size check,
+`aws s3 cp` to the bucket, delete the local tarball. Nothing new is
+written to `Backups/`; its old contents are left alone for now.
+`PR_BACKUP_BUCKET=""` skips the upload (dev). Verified: player backup
+uploaded from the dev machine. Open: `setup_pr_home.sh` and
+`load_players_from_last_backup.sh` still look in local `Backups/`; a
+rebuild must `aws s3 cp` the tarball down first. Bucket lifecycle rules
+not set. `scripts/sync_rooms.py` (room sync from Area/ via room2tran) is
+written and tested on a scratch repo but its logic is not yet agreed;
+not committed.
