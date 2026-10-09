@@ -32,3 +32,7 @@ graphify-out/*.sig
 /millie_compile.sh
 /restart_pr_server.sh
 /logs/
+
+# pr-be is its own repo (github.com/sjatkins/pr-be), checked out here like
+# src/ and world/.
+/pr-be/

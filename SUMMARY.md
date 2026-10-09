@@ -1185,7 +1185,9 @@ it. The JSON/pydantic extraction is the import path, not the model.
 
 **Findings that shape it.** Mob and object instances have no identity
 (prototype vnum + memory address; objects are inline copies in whatever
-holds them; mobs are never persisted at all, so a mob cannot learn or
+holds them; mobs are persisted only with the rooms of a zone's save
+range (SaveMob/LoadMob, every 10 s, restored at boot: a correction of
+the earlier "never"), and even those have no identity, so a mob cannot learn or
 grow). The prototype is genotype, the incarnation a runtime phenotype,
 and there is no "individual" layer between. Specials bind by a hardcoded
 vnum→C-function table (386 rows, 94 functions: 38 reused behaviours on
@@ -1287,3 +1289,177 @@ line was assembler→BCPL→C (MUD1, Aber, Diku 1990), rebuilding Lisp
 machinery by hand ever since; this code even carries a dead Ruby
 embedding (ruby_cmds.c, -DNO_RUBY). Guile scripting on the C base is
 possible but spends effort on the layer the rewrite replaces.
+
+**Combat documented** (2026-10-02): `explorations/combat.org`. No rounds:
+per-attacker EVT_STRIKE chains at calc_speed (par 1/s; players
+100+10*level/speed_level × weapon speed/10 × dex, capped by class;
+mobs attacks_per_round×100). set_fighting caps a mob's attackers at 6
+(ok_to_fight says 10/12). To-hit: hit location from aim vs dex/int or a
+height-class table; THAC0 = max(200-10*level/thaco_level, thaco_min*10)
+- 7*hitroll (mobs 200-10*hitroll), + half missing weapon proficiency,
+- str; d200 vs thac0-AC[loc], >196 auto-hit, <5 miss; AC per location
+±100. Damage: str bonus + weapon dice × proficiency (or mob dice), crits
+on a d200 window from remort/precision, location multipliers (head
+1.11..feet 1.0). damage(): resistances/immunities by damage type with
+saving roll (d100 vs resist score ≤95), stopping[loc]+worn−penetration
+subtracted (sanctuary adds flat stopping, not halving), absorb pulse
+affects, item damage on heavy blows, hit_shield, then hp; positions by
+hp (−3 incap, −6 mortally, −11 dead); wimpy flee; die → SPEC_DEATH,
+alignment, death cry, group_gain (victim exp / sum of present group
+levels, then per-class curve), corpse, players to LOAD_ROOM_MORTAL with
+1 hp. Flee: random open exit, roll to stumble, exp loss outside arena,
+leaves a hunter. PK is global except PEACEFUL rooms; aggressor becomes
+criminal with a 15-min rent_disable. ~30 skill commands share one shape.
+
+**Spells documented** (2026-10-03): `explorations/spells.org`. Two tables
+must agree by number: engine `spell_info[]` (beats, position, flags,
+TAR_ target bits, cast_ wrapper → spell_ function) and the per-class
+rows in world/CLASSES (level, difficulty, guild max, mana, source P/M,
+prereqs, components); 253 spell numbers, ~450 functions. do_cast: form,
+NO_MAGIC, class entry, position, level/silence/confusion, cost (×(1+
+difficulty) without reagents, ÷ remort efficiency), delay = ¼ s +
+4 s×(beats−1) − haste, d101 vs learned% (+ iron power_penalty), failure
+costs half mana and may improve the spell; EVT_SPELL after delay, say_spell
+syllables. Completion deducts cost and resolves the target then. Spell
+shapes: damage (dice by level → damage() with GetSpellType damage type),
+affect (affected_type: duration ticks, APPLY_ location, modifier, bits;
+aged per tick with wear-off messages), direct (heal/dispel/teleport/
+create). Saves: CalcResistanceCheck blends stats per damage type, d100 ≤
+min(95, …). Pulse affects: wall-clock procs every second (DoT/HoT/shield),
+cooldowns; a partly wired data-driven Effect system (effects.tran).
+Items: potions/scrolls/wands/staves/weapon spells via SPELL_TYPE_;
+components by vnum. Learning: practice at guildmasters with
+spells_to_learn, use raises %, remort zeroes. Mobs: mob_attack on strikes,
+act_caster/eval_spells on thinks.
+
+**JSONL + pydantic coherence (2026-10-06).** `py_json` now extracts 25
+types; new: spells (spell_info/skill_info rows from spell_func.h joined
+with names, wear-off messages and GetSpellType damage types), commands
+(inter.h), applies and name_tables (names.json), messages
+(world/MISC/messages), socials (world/MISC/actions), help
+(world/HELP/help_table with .usage/.xrefs split out), lockers
+(lib/LockerSave), worldsave (lib/WorldSave/zone.N incl. saved mobs,
+exits, items), limited (limited.obj), boards (lib/*.board). Options
+`-s src`, `-l lib`, `--raw`. The canonical JSONL shape IS the py-pr
+model's `model_dump_json(by_alias=True, exclude_unset=True)`: the CLI
+passes every record through the model (`prworld/canon.py`, importing
+`../py-pr/src` and its .venv's pydantic) so load→dump is the identity;
+`py-pr/tools/roundtrip.py` proves it for every line of every file (all
+25 pass; `validate_jsonl.py` too). py-pr: `PRRecord` base gives every
+top-level record a UOP-style `id` (fixed 6-char base-62 class id in
+`CLASS_IDS` + 11-char instance part; deterministic from the natural key
+at extraction, random in a live system), eq/hash by id; `SavedMob`,
+`SavedExit`, `WorldSaveRoom`, `SparseResistances`, `Regens` added;
+`SpellDefinition`, `CommandDefinition`, `Social`, `DamageMessage`,
+`HelpEntry`, `Board`, `Locker` reshaped to the extractor; item-type
+fields are `SerializeAsAny` and saved spell/charged/trap variants carry
+`saved: true` so dumps re-validate to the same class; untyped slots
+survive. Findings while doing it: mob.save.c and room.save.c each have
+their own tag numbering (WEAR is 251 in a mob save, END_OF_LIST in a
+player file); SaveMob writes time_t as 8 bytes while the player file
+uses 32-bit times; WriteA on s32 arrays writes the real byte count, so
+the "sh_int" in the macro call is a lie the reader must ignore;
+SaveZone starts each file with a u16 252 header. Local lib: 115 zone
+saves, 12,918 rooms, 8,455 saved mobs, 3,339 items.
+
+**Models moved to pr-be (2026-10-06).** `py-pr/src/{classes,names}.py` and
+its tools now live in the separate repo `pr-be` (github sjatkins/pr-be):
+`src/pr_be/classes.py`, `src/pr_be/names.py`, `tools/{validate_jsonl,
+roundtrip,gen_enums}.py`; py-pr keeps only a pointer README. Identity
+reworked to Sam's spec: `from sjasoft.utils.index import make_id`
+(the package is `sjasoft.utils`, plural); every PRRecord subclass has
+`class_id: ClassVar[str]` set once to a literal `make_id(48)` value
+(30 classes), and `id: str = Field(default_factory=...)` yielding
+`f"{class_id}.{make_id(64)}"`, bound per subclass in
+`__pydantic_init_subclass__`; an after-validator marks the minted id as
+set so `exclude_unset` dumps carry it; a record loaded from JSONL keeps
+its id, so ids are assigned once at first extraction. `py_json`'s
+canon.py imports `pr_be.classes` from `../pr-be` (and its .venv for
+pydantic/sjasoft-utils). All 25 JSONL files regenerated with ids;
+validate and roundtrip both exit 0. pr-be/.venv came from uv; pydantic
+was already in its pyproject.
+
+**Mongo store (2026-10-06).** Local MongoDB 7 in Docker (`pr-mongo`
+container, volume `pr-mongo-data`, bound to 127.0.0.1:27017, restart
+unless-stopped; Docker needed `systemctl enable --now docker` and the
+user in the `docker` group — done). `pr-be/src/pr_be/store.py`: Store
+with one collection per record class named after the class; document =
+`model_dump(mode="json", by_alias=True, exclude_unset=True)` + `_id` =
+record id; `from_doc` = `cls(**doc)`; upsert by id, find/load/count/
+delete/drop. `tools/load_mongo.py --drop` loaded all 25 JSONL files into
+db `pr` (26,287 rooms ... 115 zone saves) and verified 50 docs per
+collection come back equal. `.dict()` is pydantic v1 naming; v2's
+`model_dump(mode="json")` is what gives the Mongo-safe form (flags as
+name lists, enums as strings).
+
+**Relations in the store (2026-10-06).** pr-be: `Role` (id = bare
+make_id(48), no class prefix; name, reverse_name, description) and
+`Related` (PRRecord; subject, role, object — all required strings; the
+triple store, one triple per record) in `STORE_ONLY_MODELS`. Store
+helpers: define_role, relate (idempotent), unrelate, objects_of,
+subjects_of, ensure_indexes (unique subject+role+object). First role
+defined in the db: `located_in` / `contains`. Direction: stop working
+from JSONL; pydantic classes + Mongo are the source going forward;
+refactoring (Item hierarchy with Weapon/Armor/... subclasses,
+ItemInstance, rename SpellDefinition→Spell etc., fold limited counts
+into the prototype, drop the one-record Skill and the reference-table
+collections) is under consideration, not started.
+`pr-be/docs/role-considerations.org` is the working document for which
+roles to adopt, with candidate roles, what each replaces in the C
+fields, the qualifier question (slot, direction, rank, percent, expiry:
+proposal is a single optional qualifier field for one-value cases and
+a separate record for multi-field ones), what stays a field, and a
+first-steps order (character_of, located_in for inventories/warehouses,
+worn_by, member_of, instance_of).
+`Related.qualifier` is an optional dict ("role specialisation data",
+Sam's term): e.g. `{"slot": "wield"}` on `worn_by`; uniqueness is
+(subject, role, object) and `relate` on an existing triple replaces the
+qualifier; `related(role=..., object=..., slot="head")` filters on
+qualifier keys. Roles defined in the db: `located_in`/`contains`,
+`worn_by`/`wears`. Decisions recorded in role-considerations.org.
+**Decision 2026-10-08 (supersedes the qualifier dict):** `Related` is
+exactly three ids, subject/role/object, RDF style, nothing else ever.
+Specificity lives in the role: `Role.specializes` (parent role id);
+`worn_on_<slot>` (22, generated from WearPosition) specialize `worn_by`;
+`Store.related(role=...)` expands a role to its specializations
+transitively (`role_ids`), `relations_of(id)` returns everything
+related either way keyed by role id in one query. Values that are not
+kinds (learned %, expiry, load count) are records keyed by the two ids,
+not triples. Roles in the db: located_in, worn_by + 22; no Related
+rows yet. Rationale recorded in role-considerations.org.
+
+**How builder work reaches the game (2026-10-08).** Nothing automatic;
+no cron job touches the world repo. Rooms: in game `redit`, then
+`rsave` writes a binary room file to `lib/Area/<builder>` (+ `.bak`;
+BUILD.LOG records each save; production has files 2010–2026, Nitemare
+1,493 rooms last 2026-01-29). Getting that into the repo is a hand
+step: `src/room2tran` converts an Area file to tran text in
+`TextSave/`, or `tsave`/`save_world` write text to `lib/WORLD/`; then
+copy into `world/ROOM/<zone>.room` and commit. Production has neither
+`TextSave` nor `WORLD`, so that step has not been run there. Mobs,
+objects, zone resets: no in-game editor at all (`load`/`set`/`oedit`
+only touch live instances, never prototypes); the only route is editing
+`world/MOB`, `OBJ`, `ZONE` text by hand, commit, `world/compile`,
+restart. The Oct 2026 world commits (Grass_Barrows mobs and zone,
+CemeteryOfHell room, MOTD) are that route. For what a builder actually
+did on a given change, ask them; the files only show where things
+landed.
+
+### live/ survey from src (2026-10-08)
+
+`explorations/live-directory.org`: every file under `live/lib` the game
+reads or writes, attributed from the I/O call sites through the graphify
+call graph to boot / command / login / link-loss / 10 s pulse / signal.
+Headlines: the process `chdir`s to `live/lib` and all paths are relative;
+`logs/` is only the redirected stderr; the compiled world and all display
+text come from `world/compile` (`world/lib` is a symlink to `live/lib`);
+`account.list` is never written by the game (new accounts are counted
+after the next restart's `rebuild_indexes`); `skills.out` and
+`lockers.save` have no reader in src; `maxplayers` has no reader;
+`WorldSave/zone.N` is one saveable zone per 10 s round robin, read and
+unlinked at boot then rewritten; AUTOSAVE rooms and lockers are written
+synchronously on the triggering command; builder definitions reach disk
+only via `rsave` (binary `Area/`) or `tsave` (`WORLD/`) and the repo only
+by hand. Only-in-live: stash/account (players tar), WorldSave/RoomSave/
+LockerSave, boards, auctions, Area/WORLD/UPDATE/TextSave/BUILD.LOG, the
+admin lists, ideas/typos/bugs, StoryFiles, PURGED, logs.

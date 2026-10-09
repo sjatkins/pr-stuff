@@ -1,0 +1,348 @@
+#+TITLE: live/: what the game reads and writes there
+#+OPTIONS: ^:nil
+
+Derived from =src/= (every =fopen/open/opendir/mkdir/rename/unlink/remove/
+system/popen/stat= call site, attributed to its caller chain with the
+graphify call graph in =graphify-out/graph.json=) plus the shell scripts in
+=scripts/= and =world/compile=. The local =live/= tree was *not* used as
+evidence. Written 2026-10-08.
+
+See also: [[file:game-engine-loop.org::#periodic][periodic blocks]],
+[[file:rooms.org::#saving][room saving]], [[file:mobs.org::#persistence][mob persistence]],
+[[file:players.org][players]], [[file:objects.org][objects]].
+
+* How the game reaches live/
+:PROPERTIES:
+:CUSTOM_ID: layout
+:END:
+
+=scripts/PR_SERVER_SCRIPT= runs =live/pr3 -d live/lib ... > live/logs/log 2>&1=
+in a loop. =main.c= does =chdir(dir)= to the =-d= directory, and from then on
+*every path in the C code is relative to =live/lib=*. So =live/= has exactly
+three things: the =pr3= symlink to =src/pr3=, =lib/= (everything the game
+touches) and =logs/= (the process's stdout+stderr, touched only by the script).
+
+Nothing in src writes anywhere else on disk. There is no database, no
+syslog: =vlog()= in =PRLib/nlog.c= writes to stderr, which the script
+redirects to =live/logs/log=.
+
+* One source: live/lib, never the repo
+:PROPERTIES:
+:CUSTOM_ID: one-source
+:END:
+
+The game does not "prefer live over world". It has exactly one source,
+=live/lib=, and never reads the world repo, never copies from it, and has
+no idea it exists. No path in =src/*.c= contains =world/=, =../=, =ROOM= or
+a call to =tran=; every loader opens a bare relative name under the
+chdir'd data directory. The only fallback, in =PRLib/misc.c=
+=pipe_or_file=, is to run =zcat= on =<name>.gz= in that same directory.
+
+** Missing files
+:PROPERTIES:
+:CUSTOM_ID: missing
+:END:
+
+- *Compiled files are required.* =mob.out obj.out zone.out shop.out
+  sector.out race.out clans.out classes actions messages players.new=
+  missing → =exit()=. =world.out= missing → logged, boot continues into an
+  empty world. Nothing is generated from anywhere.
+- *State files are optional.* =main.c= creates =WorldSave/=, =account/= and
+  =stash/= itself. No =WorldSave= files → fresh world. No =RoomSave/=,
+  =UPDATE/=, admin lists, =BOOT_CLEAN= → logged or silently empty. Missing
+  display text → empty string plus =perror=. That is the whole
+  start-from-nothing path: compiled files required, state optional.
+
+** How the repo reaches live
+:PROPERTIES:
+:CUSTOM_ID: repo-to-live
+:END:
+
+Only two things do it, both outside the game:
+- =world/compile=, run by hand, writes the =.out= files, =classes=, =help=,
+  =help_table=, =motd= and the 18 =MISC= files into =live/lib= through the
+  =world/lib= symlink. It overwrites unconditionally.
+- =scripts/setup_pr_home.sh= runs =world/compile= only if
+  =live/lib/world.out= is absent, and restores players from the newest
+  =Backups/players_*.tar.gz= only if =stash/= is empty. On a host that is
+  already set up it touches nothing.
+
+So the compiled files in live *are* the world as of the last time someone
+ran =compile=. The repo can be ahead of production indefinitely and the
+game will not notice.
+
+** Continuity on a normal restart
+:PROPERTIES:
+:CUSTOM_ID: continuity
+:END:
+
+=boot_db= order: compiled definitions → =UPDATE/*= overrides → every player
+file (=boot_players=) → =LoadWorld= reads and unlinks =WorldSave/*= and
+immediately rewrites it → =LoadAutosaveRooms= → =boot_reset=. Saved zone
+state is applied on top of the definitions. =boot_reset= (=zone.c=) resets
+only zones that are =boot_only= *and* have no save range, or every zone on
+a clean boot (=-c=). So:
+- a zone with a save range comes back exactly as at its last 10 s save;
+- a zone without one is repopulated by its normal reset schedule;
+- =-c= (via =BOOT_CLEAN=, which also deletes =WorldSave/=) discards both.
+
+** What this settles for the database
+:PROPERTIES:
+:CUSTOM_ID: canonical
+:END:
+
+Definitions are canonical in the pr-world repo; =live/lib='s compiled
+copies are a possibly stale cache and =UPDATE/= an undocumented override
+layer. Players, accounts and all runtime state are canonical only in
+=live/lib=. Extract definitions from the repo and state from live, with
+one caveat: diff =UPDATE/= and the last-compiled =.out= files against the
+repo first, so anything production is actually running that the repo
+lacks is not lost.
+
+* Who else writes into live/lib
+:PROPERTIES:
+:CUSTOM_ID: others
+:END:
+
+- =world/compile= (the world repo). =world/lib= is a symlink to =../live/lib=.
+  It runs =tran= and the per-directory =compile= scripts and copies the
+  results in: =world.out mob.out obj.out zone.out shop.out sector.out
+  race.out clans.out item_sets.out effects.out skills.out area.list=, plus
+  =classes= (CLASSES/), =help=, =help_table=, =motd= (HELP/) and the 18
+  files of =MISC/= (=actions messages welcome news credits info donations
+  services class_help_info reject_msg pc_is_debtor pc_is_broke login_help
+  vote_message newbie_message mxp_elements termcap prompts=). Run by hand;
+  nothing in the game triggers it.
+- =scripts/pr_functions.sh= =rebuild_indexes= (called by PR_SERVER_SCRIPT on
+  every (re)start and by setup): regenerates =players.new= from =stash/=,
+  =account.list= from =account/=, =lockers.save= from =LockerSave/=.
+- =PR_SERVER_SCRIPT= itself: consumes the =CLEAN_EXIT= and =BOOT_CLEAN=
+  marker files; on =BOOT_CLEAN= it =rm -rf WorldSave= and passes =-c=;
+  rotates =logs/log= into =logs/recent/log.1..5= and =logs/YYMMDDhhmmss.log=;
+  =prune_logs=.
+- cron: =backup_players.sh= tars =lib/stash lib/account=;
+  =backup_full.sh= tars all of =lib= (minus tarballs, cores, logs);
+  =cleanup_core.sh= deletes old =core.*=.
+- Nothing writes back to the =world/= repo. The only src→text-world path is
+  the builder's =tsave= (below), and that writes under =lib/WORLD/=.
+
+* File by file
+:PROPERTIES:
+:CUSTOM_ID: files
+:END:
+
+Legend for *when*: BOOT = =boot_db= / =setup_game= at process start; CMD =
+an immortal or player command; LOGIN = =nanny= states; LINK = =close_socket=
+(link loss or quit); 10s = the =PULSE_ZONE_SAVE= block of =game_loop=;
+SIG = =hupsig= / =signal_fatal= / shutdown (=full_save_world=,
+=save_all_players=). "Elsewhere" says where the same information exists
+outside =live/lib=.
+
+** Compiled world: read only
+:PROPERTIES:
+:CUSTOM_ID: compiled
+:END:
+
+| file           | read by (when)                                  | written by src | elsewhere          |
+|----------------+-------------------------------------------------+----------------+--------------------|
+| world.out      | =boot_world= (BOOT) via =pipe_or_file=            | never          | world/ROOM         |
+| area.list      | =boot_areas= (BOOT); included by =room2tran=      | never          | world/ROOM         |
+| zone.out       | =ReadZones= (BOOT; also =room2tran= tool)         | never          | world/ZONE         |
+| mob.out        | =boot_mob= (BOOT)                                 | never          | world/MOB          |
+| obj.out        | =boot_obj= (BOOT)                                 | never          | world/OBJ          |
+| shop.out       | =boot_shp= (BOOT via =assign_mobiles=; CMD =file shops=) | never   | world/SHOP         |
+| sector.out     | =boot_sectors= (BOOT; CMD =file sectors=, after =system("./rebuild-world")=) | never | world/SECT |
+| race.out       | =boot_races= (BOOT; CMD =file races=)             | never          | world/RACE         |
+| clans.out      | =boot_clans= (BOOT; CMD =file clan=)              | never          | world/CLAN         |
+| item_sets.out  | =boot_item_sets= (BOOT; CMD =file item_set=)      | never          | world/ITEM_SETS    |
+| effects.out    | =boot_effects= (BOOT)                             | never          | world/SKILL        |
+| skills.out     | copied by compile; *no reader in src* (=SKILLS_FILE= is "skils.out" and unused) | never | world/SKILL |
+| classes        | =boot_classes= (BOOT; CMD =file classes=)         | never          | world/CLASSES      |
+| help_table     | =boot_db= opens and keeps =help_fl= (BOOT; CMD =file table=) | never | world/HELP        |
+| help           | =file_to_string= (BOOT; CMD =file help=)          | never          | world/HELP         |
+| motd           | =file_to_string= + =stat= for its mtime (BOOT; CMD =file motd=) | never | world/HELP     |
+| actions        | =boot_social_messages= (BOOT; CMD =file socials=) | never          | world/MISC         |
+| messages       | =load_messages= (BOOT) fight messages              | never          | world/MISC         |
+
+=./rebuild-world= is invoked relative to =live/lib= by =file sectors=; no
+such script exists in any repo, so that branch fails silently unless one
+is placed there by hand.
+
+** Display and configuration text: read only, hand edited
+:PROPERTIES:
+:CUSTOM_ID: display
+:END:
+
+All read at BOOT by =file_to_string= in =boot_db=, re-readable with the
+=file= command. None is written by src. All of them are copied in by
+=world/compile= from =world/HELP= (=motd=, =help=, =help_table=) or
+=world/MISC= (everything else), so the repo copy is the master unless
+someone edits =live/lib= directly, which =compile= would then overwrite:
+
+=welcome news donations services credits info class_help_info reject_msg
+pc_is_debtor pc_is_broke login_help vote_message newbie_message
+mxp_elements=; also =termcap= (=init_terms=, BOOT; =file termcap=),
+=prompts= (=load_prompt=, read on the =prompt= command), =StoryFiles/<name>=
+(read by the =storyteller= mob special when it fires).
+
+=vote_message= is also =stat='ed at boot for its mtime (shown to players as
+"new since").
+
+** Player and account database
+:PROPERTIES:
+:CUSTOM_ID: players
+:END:
+
+| file                      | written by (when)                                                                                                   | read by (when)                                                               | elsewhere |
+|---------------------------+---------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------+-----------|
+| stash/<l>/<name>          | =save_char=: =exit_game= (quit/rent), =close_socket= (LINK), =close_sockets= and =save_all_players= (SIG), =damage=/=dieWithXPPenalty= (death), =transaction= (any money change), =do_save=, =do_score= (!), =check_reconnect= (LOGIN), =add_char_to_account= (LOGIN), =do_passwd=, =do_resetplayer=, =do_resetobject=, =command_process= (after a mortal is moved to the load room); =SendMail= rewrites the file with mail appended; =state_CHANGE_PNAME= removes the old file (=/bin/rm=); =delete_char= → =/bin/mv ... PURGED/= | =load_char=: LOGIN (=get_pchar=, =state_nme=, =state_add_char=), =boot_players= (BOOT: *every* player file is loaded once to build IMMORTALS/wizlist and validate), =link_load_char= (CMD =linkload=), =do_passwd=, =do_reset_all_players=, =SendMail=, =boot_accounts= (opens to verify) | players tar (cron), full backup |
+| account/<l>/<name>        | =save_acct=: LINK, =add_char_to_account=, =transaction= (bank), =do_account=, =do_aset=, =do_comment=, =do_grant=, =do_revoke=, =do_ignore=, =add_ignore=, =do_resetplayer=, =do_purge=, =do_goto= (immortal account flags); =delete_account= → =/bin/mv ... PURGED/account= | =load_acct= via =get_account= (LOGIN), =do_resetplayer=, =do_info=, =do_rchar=, =boot_accounts= (BOOT with =-c= or paranoid) | players tar, full backup |
+| players.new               | =create_entry= appends one line on character creation and rename (LOGIN); rebuilt from =stash/= by the script at every start | =boot_players= (BOOT), =do_reset_all_players=                       | derivable from stash/ |
+| account.list              | *never written by src*; rebuilt from =account/= by the script at every start | =boot_db= (=popen("wc -l < account.list")= for the count), =boot_accounts= (BOOT) | derivable from account/ |
+| account.report            | =boot_accounts= (BOOT, =-c= only): report of purged/repaired accounts      | nobody                                                                       | derivable |
+| IMMORTALS, wizlist        | =boot_players= (BOOT, =playerstats.c=): regenerated from the player scan   | =wizlist= read back by =file_to_string= in =boot_players= for the =wizlist= command | derivable |
+| PURGED/, PURGED/account   | =/bin/mv= targets of =delete_char= / =delete_account= (CMD =adelete=, =purge=, LOGIN password-confirm delete, =boot_accounts= cleanup) | nobody (=scripts/unpurge= by hand)                                 | *only in live* (full backup) |
+| trashcan                  | =do_trashcan= and =state_CHANGE_PNAME= append (bad/retired names)         | =new_name_ok= (LOGIN name states, =do_trashcan=)                             | *only in live* |
+
+Player files are the single copy of everything a character owns (inventory,
+equipment, warehouse, mail, affects). The account file holds the account's
+bank, character list, notes, grants, ignores.
+
+** Runtime world state
+:PROPERTIES:
+:CUSTOM_ID: worldstate
+:END:
+
+| file                        | written by (when)                                                                                                                                                                   | read by (when)                                                                                                         | elsewhere |
+|-----------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------+-----------|
+| WorldSave/zone.<N>          | =SaveZone= (10s: *one* saveable zone per call, round robin over zones that have a =save= range); =full_save_world= writes all of them (SIG; also immediately after =LoadWorld= at BOOT) | =LoadWorld= (BOOT unless =-c=): reads every file, then *unlinks it*; =full_save_world= rewrites them right away        | full backup only |
+| WorldSave/Misc/limited.obj  | =full_save_world= (SIG, BOOT after load): vnum + world_count for limited objects                                                                                                     | =LoadLimitCount= in =boot_players= (BOOT unless =-c=), then *unlinked*; if present, =bypass_scan= skips counting limited items by scanning player files | derivable (count of instances) |
+| RoomSave/<vnum>.room (+.old)| =SaveRoom= for rooms flagged AUTOSAVE: on =get=/=put=/=drop= in such a room (=obj1.c=, =objdb.c=), locker commands, =SaveAutosaveRooms= inside =full_save_world=; previous file renamed to =.old= | =LoadAutosaveRooms= (BOOT, always): reads each, deletes the file if the room is no longer AUTOSAVE                      | full backup only |
+| LockerSave/locker.<room>.room (+.old) | =SaveLocker= on =put=/=get= locker (CMD); previous renamed to =.old=                                                                                                      | =ReadLocker= on =list=/=get=/=put= locker (CMD); never at boot                                                           | full backup only |
+| lockers.save                | script only                                                                                                                                                                         | *nobody in src* (=LOCKERS_FILE= defined, unused)                                                                        | derivable |
+| <vnum>.board                | =save_board= on post/remove (CMD)                                                                                                                                                   | =load_board= via =initaboard= on first use of that board                                                                | *only in live* (full backup) |
+| <name>-<room>.auction       | =save_auc_data= when a player talks to / gives to an auctioneer (mob special); =free_auc_data= unlinks on =free_char=                                                               | same code paths                                                                                                         | *only in live* |
+| online_status.html          | =UpdateStatus= (10s): writes =.new= then =rename= over                                                                                                                              | nobody in src (served by a web server)                                                                                  | transient |
+| BOOT_CLEAN                  | =do_reboot= (CMD) and =set_boot_clean= when =readobject= hits a runaway file (>10000 elements)                                                                                       | PR_SERVER_SCRIPT: deletes =WorldSave=, starts with =-c=, removes the marker                                             | marker |
+| CLEAN_EXIT                  | never by src (placed by hand / restart script)                                                                                                                                      | PR_SERVER_SCRIPT: stops the loop                                                                                        | marker |
+
+What a zone save contains (=WriteRoom=, for each non-AUTOSAVE room in the
+zone's save range): exits whose state differs from default or are
+crackable, every mob standing in the room (=SaveMob=: full runtime state),
+every object on the floor (=SaveObjectList=), and room flags. AUTOSAVE
+rooms are skipped there and go to =RoomSave/= instead, which holds the
+same shape of record for a single room.
+
+So the "zone" file is just a batching of per-room records by vnum range;
+there is no zone-level state in it.
+
+Consequences:
+- Between a =LoadWorld= and the next =SaveZone= round there is a window
+  where the only copy of a zone's state is in memory. =LoadWorld= calls
+  =full_save_world= immediately, so the window is normally short.
+- With =-c= (clean boot) =LoadWorld= is skipped *and* the script has already
+  removed =WorldSave/=; the world comes up purely from the compiled files.
+- A crash that is not caught by =signal_fatal= loses up to one full
+  round-robin cycle (10 s × number of saveable zones) of room/mob/object
+  state. The =.room= and locker files are written synchronously on the
+  triggering command, so they lose nothing.
+
+** Builder files
+:PROPERTIES:
+:CUSTOM_ID: builder
+:END:
+
+| file                  | written by (when)                                                        | read by (when)                                               | elsewhere |
+|-----------------------+--------------------------------------------------------------------------+--------------------------------------------------------------+-----------|
+| Area/<builder> (+.bak)| =do_rsave= (CMD =rsave=): binary dump of that builder's rooms; old file =mv='d to =.bak= | =do_rload= (CMD =rload=) only; *never at boot*               | *only in live* until converted |
+| BUILD.LOG             | =do_rsave= appends who/when                                              | nobody                                                       | *only in live* |
+| WORLD/<name>, WORLD/world | =save_range= (CMD =save_range=), =save_world= (CMD =tsave=): text in the world repo's room format | nobody in src; meant to be copied into =world/ROOM= by hand  | *only in live* until copied |
+| UPDATE/*              | by hand                                                                  | =boot_update= (BOOT): room definitions that override =world.out= | *only in live* |
+| TextSave/*            | =room2tran= (separate tool, not the game): converts =Area/= binaries to text | nobody                                                       | *only in live* until copied |
+
+This is the whole builder→repo path: in-game edits are held in memory and
+in =WorldSave= (as changed exits/contents only, not definitions); room
+*definitions* only reach disk through =rsave= or =tsave=, and only reach
+the repo by hand. Mob and object definitions have no in-game write path
+at all.
+
+** Admin lists and feedback files
+:PROPERTIES:
+:CUSTOM_ID: admin
+:END:
+
+| file                        | written by (when)                                                             | read by (when)                                   | elsewhere |
+|-----------------------------+-------------------------------------------------------------------------------+--------------------------------------------------+-----------|
+| wizlocked, no-new, always-sites | =write_lock_list= (CMD =wizlock=, =nonew=, =set=), =write_lock_list_no_ch= (LOGIN =state_login= auto-lock) | =boot_lock_list= in =setup_game= (BOOT) | *only in live* |
+| norent                      | =do_norent= (CMD)                                                             | =boot_no_rent= (BOOT)                             | *only in live* |
+| disable                     | =do_disable= appends, =do_enable= rewrites (CMD)                              | =boot_disable= (BOOT)                             | *only in live* |
+| maxplayers                  | =do_maxplayers= (CMD)                                                         | *nobody* (write-only record)                      | *only in live* |
+| ideas, typos, bugs          | =do_idea=, =do_typo=, =do_bug= append (CMD)                                   | nobody                                            | *only in live* |
+
+** logs/
+:PROPERTIES:
+:CUSTOM_ID: logs
+:END:
+
+=logs/log= is the live stdout+stderr of =pr3= (all =vlog= output, command
+logging included). Only the script touches it: on each restart it copies
+to =recent/log.1= (shifting 1→5) and renames to =YYMMDDhhmmss.log=, then
+=prune_logs= keeps the current year or the last three months, whichever is
+longer. Excluded from the full backup.
+
+* Redundancy
+:PROPERTIES:
+:CUSTOM_ID: redundancy
+:END:
+
+- *Derived indexes*: =players.new=, =account.list=, =lockers.save= are
+  listings of their directories. =players.new= is also appended by the
+  game, =account.list= is not (a new account is counted only after the
+  next restart's =rebuild_indexes=). =IMMORTALS=, =wizlist=,
+  =account.report= are regenerated every boot from the player/account scan.
+- *Compiled world and display text* (=*.out=, =classes=, =help*=, =motd=,
+  =area.list= and the 18 =MISC= files) duplicate the =world/= repo and are
+  regenerated by =world/compile=.
+- *Limited-item counts* (=limited.obj=) duplicate what a scan of player
+  files and the world would count; the file exists to skip that scan.
+- *Room state three ways*: a room's definition lives in =world.out=
+  (from the repo), possibly overridden by =UPDATE/*=, possibly re-dumped
+  to =Area/= or =WORLD/= by a builder; its *runtime* contents live in
+  =WorldSave/zone.N= or, if AUTOSAVE, in =RoomSave/<vnum>.room=. Nothing
+  reconciles =Area/=, =WORLD/= and the repo.
+- *Mobs*: definition in =mob.out=; every live instance's full state in the
+  zone save of whatever room it is standing in. No instance identity, so
+  a mob that walked into another zone's range is saved by that zone's
+  file next time round.
+- *Objects*: prototype in =obj.out=; instances exist in exactly one of
+  player file, locker file, room save (zone or RoomSave), or nowhere (if
+  carried by a mob that is not in a saved room).
+- *Backups*: the player tar covers =stash/= and =account/= only; the full
+  tar covers all of =lib=. Everything in the "only in live" column below
+  survives only through the full backup.
+
+* What exists only in live/lib
+:PROPERTIES:
+:CUSTOM_ID: only-live
+:END:
+
+Not in any repo, not derivable, and (except the first group) not in the
+players tar:
+
+1. =stash/=, =account/= — the player database (players tar, full tar).
+2. =WorldSave/=, =RoomSave/=, =LockerSave/= — all runtime room, mob,
+   floor-object and locker state (full tar only).
+3. =*.board=, =*.auction= — board posts, in-progress auctions.
+4. =Area/=, =BUILD.LOG=, =WORLD/=, =TextSave/=, =UPDATE/= — builder work
+   that has not been moved into the world repo.
+5. =wizlocked no-new always-sites norent disable maxplayers trashcan=
+   — admin state.
+6. =ideas typos bugs= — player feedback.
+7. =StoryFiles/= — storyteller texts; no repo copy.
+8. =PURGED/= — deleted characters and accounts, kept for =unpurge=.
+9. =logs/= — the only record of commands and events.
+
+A rebuild from the two repos plus the players tar therefore comes up with
+a fresh world (no floor objects, no locker contents, no board posts, no
+builder edits, default admin lists). Display text, help and the fight
+messages all come back from the world repo via =world/compile=.

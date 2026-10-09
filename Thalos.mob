@@ -1,0 +1,313 @@
+5200
+{
+  name { The mighty beholder }
+  namelist { beholder }
+  shortdesc { You meet a beholder's deadly gaze! }
+  longdesc {
+It has a large central eye that projects an anti-magic ray and ten
+eyestalks atop the round body which can do anything from charm you
+to disintegrate you.  Beholders are not known for their personality.
+  }
+  race { none }
+  level { 69 }
+  alignment { -1000 }
+  gold { 2400 }
+  hit_bonus { 3 }
+  dam_bonus { 3 }
+  attacks_per_round { 4 }
+  head { 0, 0 }
+  body { 0, 0 }
+  arms { 0, 0 }
+  legs { 0, 0 }
+  feet { 0, 0 }
+  hp { 25, 8, 450  }
+  move { 300 }
+  experience { 14133 }
+  damage { 2, 6, 7  }
+  immune { charm }
+  affected { detect-invisible }
+  act { special, sentinel, aggressive, wimpy }
+}
+
+5201
+{
+  name { The lamia }
+  namelist { lamia beast }
+  shortdesc { A strange lamia stands here waiting for her next meal. }
+  longdesc {
+This is a creature with the upper torso of a beautiful woman, but the lower
+body of a four-legged beast. She licks her lips as she looks at you greedily.
+  }
+  race { none }
+  level { 43 }
+  alignment { -300 }
+  gold { 1500 }
+  hit_bonus { 2 }
+  dam_bonus { 2 }
+  attacks_per_round { 2 }
+  head { 30, 1 }
+  body { 30, 1 }
+  arms { 30, 1 }
+  legs { 30, 1 }
+  feet { 30, 1 }
+  hp { 50, 8, 50  }
+  move { 300 }
+  experience { 5230 }
+  damage { 2, 4, 3  }
+  act { aggressive, stay-zone }
+}
+
+5202
+{
+  name { The mimic }
+  namelist { mimic chest }
+  shortdesc { A strong chest lies in one corner of the room. }
+  longdesc {
+A strong, wooden chest bound with iron straps and a heavy pad-lock on the
+front.
+  }
+  race { none }
+  level { 24 }
+  alignment { 10 }
+  gold { 1175 }
+  hit_bonus { 1 }
+  dam_bonus { 1 }
+  attacks_per_round { 1 }
+  head { 10, 0 }
+  body { 10, 0 }
+  arms { 10, 0 }
+  legs { 10, 0 }
+  feet { 10, 0 }
+  hp { 22, 8, 22  }
+  move { 300 }
+  experience { 2286 }
+  damage { 2, 7, 1  }
+  act { sentinel }
+}
+
+5203
+{
+  name { The mimic }
+  namelist { mimic boulder }
+  shortdesc { Two skeletons lie crushed under a large boulder. }
+  longdesc {
+You see nothing special.
+  }
+  race { none }
+  level { 24 }
+  alignment { -10 }
+  gold { 1175 }
+  hit_bonus { 1 }
+  dam_bonus { 1 }
+  attacks_per_round { 1 }
+  head { 10, 0 }
+  body { 10, 0 }
+  arms { 10, 0 }
+  legs { 10, 0 }
+  feet { 10, 0 }
+  hp { 22, 8, 22  }
+  move { 300 }
+  experience { 2286 }
+  damage { 3, 5, 1  }
+  act { sentinel }
+}
+
+5204
+{
+  name { The mimic }
+  namelist { mimic floor }
+  shortdesc { The stone floor of this house has been ripped apart. }
+  longdesc {
+You see nothing special.
+  }
+  race { none }
+  level { 24 }
+  alignment { 0 }
+  gold { 1175 }
+  hit_bonus { 1 }
+  dam_bonus { 1 }
+  attacks_per_round { 1 }
+  head { 30, 0 }
+  body { 30, 0 }
+  arms { 30, 0 }
+  legs { 30, 0 }
+  feet { 30, 0 }
+  hp { 22, 8, 22  }
+  move { 300 }
+  experience { 2171 }
+  damage { 2, 6, 1  }
+  act { sentinel }
+}
+
+5205
+{
+  name { The mimic }
+  namelist { mimic potery }
+  shortdesc { Some broken shards of potery lie strewn about the floor. }
+  longdesc {
+You see nothing special.
+  }
+  race { none }
+  level { 24 }
+  alignment { 200 }
+  gold { 1175 }
+  hit_bonus { 1 }
+  dam_bonus { 1 }
+  attacks_per_round { 1 }
+  head { 0, 0 }
+  body { 0, 0 }
+  arms { 0, 0 }
+  legs { 0, 0 }
+  feet { 0, 0 }
+  hp { 22, 8, 22  }
+  move { 300 }
+  experience { 2344 }
+  damage { 2, 5, 1  }
+  act { sentinel }
+}
+
+5206
+{
+  name { The mimic }
+  namelist { mimic planks }
+  shortdesc { A few wooden planks lie stacked on a low shelf. }
+  longdesc {
+You see nothing special.
+  }
+  race { none }
+  level { 24 }
+  alignment { 0 }
+  gold { 1175 }
+  hit_bonus { 1 }
+  dam_bonus { 1 }
+  attacks_per_round { 1 }
+  head { 0, 0 }
+  body { 0, 0 }
+  arms { 0, 0 }
+  legs { 0, 0 }
+  feet { 0, 0 }
+  hp { 22, 8, 22  }
+  move { 300 }
+  experience { 2344 }
+  damage { 4, 3, 1  }
+  act { sentinel }
+}
+
+5207
+{
+  name { The horned lizard }
+  namelist { lizard horned }
+  shortdesc { A small horned lizard flicks his tounge and slithers away. }
+  longdesc {
+A cute little lizard, that is, if you like reptiles!
+  }
+  race { none }
+  level { 4 }
+  alignment { 0 }
+  gold { 400 }
+  hit_bonus { 1 }
+  dam_bonus { 1 }
+  attacks_per_round { 1 }
+  head { 40, 0 }
+  body { 40, 0 }
+  arms { 40, 0 }
+  legs { 40, 0 }
+  feet { 40, 0 }
+  hp { 9, 8, 9  }
+  move { 300 }
+  experience { 615 }
+  damage { 1, 4, 1  }
+  immune { charm }
+  act { wimpy }
+}
+
+5208
+{
+  name { The stone golem }
+  namelist { golem stone }
+  shortdesc { In the corner you see a large, stone golem faithfully standing watch. }
+  longdesc {
+It is a big chunk of rock that has been magically formed into a giant
+stone creature. He stands here still guarding the city.
+  }
+  race { giant }
+  level { 42 }
+  alignment { 0 }
+  gold { 1500 }
+  hit_bonus { 2 }
+  dam_bonus { 2 }
+  attacks_per_round { 1 }
+  head { -50, 10 }
+  body { -50, 10 }
+  arms { -50, 10 }
+  legs { -50, 10 }
+  feet { -50, 10 }
+  hp { 1, 12, 240  }
+  move { 300 }
+  experience { 5497 }
+  damage { 5, 5, 6  }
+  immune { fire, poison, charm }
+  resistant { cold, energy, blunt, pierce }
+  act { sentinel }
+}
+
+5209
+{
+  name { The iron golem }
+  namelist { golem iron }
+  shortdesc { A Huge iron golem stands here.  He raises his sword to strike you. }
+  longdesc {
+It has been set here to guard the nexus gate.  It will allow no intruders
+to pass.
+  }
+  race { giant }
+  level { 275 }
+  alignment { 0 }
+  gold { 20000 }
+  hit_bonus { 14 }
+  dam_bonus { 14 }
+  attacks_per_round { 1 }
+  head { 0, 0 }
+  body { 0, 0 }
+  arms { 0, 0 }
+  legs { 0, 0 }
+  feet { 0, 0 }
+  hp { 140, 8, 2400  }
+  move { 300 }
+  experience { 247430 }
+  damage { 3, 10, 15  }
+  immune { fire, poison, charm }
+  resistant { cold, energy, blunt }
+  susceptible { electricity }
+  act { sentinel }
+}
+
+5210
+{
+  name { The lamia }
+  namelist { lamia beast }
+  shortdesc { A strange lamia stands here waiting for her next meal. }
+  longdesc {
+This is a creature with the upper torso of a beautiful woman, but the lower
+body of a four-legged beast. She licks her lips as she looks at you greedily.
+  }
+  race { none }
+  level { 72 }
+  alignment { -300 }
+  gold { 3400 }
+  hit_bonus { 3 }
+  dam_bonus { 3 }
+  attacks_per_round { 2 }
+  head { 30, 2 }
+  body { 30, 2 }
+  arms { 30, 2 }
+  legs { 30, 2 }
+  feet { 30, 2 }
+  hp { 40, 8, 400  }
+  move { 300 }
+  experience { 11286 }
+  damage { 2, 4, 1  }
+  affected { detect-invisible }
+  act { aggressive, stay-zone }
+}
+
