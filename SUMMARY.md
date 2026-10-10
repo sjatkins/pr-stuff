@@ -1547,3 +1547,24 @@ Barrows mobs/zone, Halloween, new MOTD). `saveworld` still drops the
 last area and anything above the last base; not fixed. Nitemare's 1,127
 rooms are still only in `Area/Nitemare`, not in pr-world; `sync_rooms
 Area/Nitemare --write` is ready when wanted.
+
+### saveworld fixed; area.list duplicate (2026-10-10)
+
+`src/builder.c` (cabarius/pr): `save_world` now writes every area
+including the last (which runs to `top_of_world`), and `save_range`
+starts each `WORLD/` file with `#offset <base>` so tsave/saveworld
+output is self-describing. Verified with a throwaway harness that boots
+world.out and calls save_world: 162 area files, all with offsets; the
+dump compiles with tran; room-by-room it matches the repo except
+`sector { Inside }` omitted (index 0, same meaning), key order, and the
+known overruns (Chat_room 38, Abyss 4, Thaumlore 1 rooms past the next
+base, which land in the next area's file). Zone-based saveworld was
+tried and rejected: area.list + file contents is the definition of an
+area; zone ranges are a separate list.
+
+pr-world: `_Unknown9` was defined twice (124800 and 129000); tran takes
+the lowest, so the 129000 line was dead; removed (compiled world.out
+identical). Still open in area.list: 16 areas whose base sits inside
+another zone's range and 25 with no zone; 3 files with rooms past the
+next base. Both tran and boot_areas ignore anything after the base on a
+#define line, so an end column could be added without breaking either.
