@@ -340,8 +340,11 @@ file. None reads another's output; none reads =Area/=, =UPDATE/= or
   larger one duplicates the neighbour's, a wrong =lo= shifts everything.
   Not safe as a manual copy.
 - =saveworld= (I10): =tsave= for every area in =area.list= from its true
-  base to the next base minus one, plus =WORLD/world= as the include
-  list. Never writes the last area, nor anything above the last base.
+  base to the next *higher* base minus one (=add_area= keeps the list
+  sorted by base, so file order is irrelevant), plus =WORLD/world= as
+  the include list. Bug: the loop stops before the last entry, so the
+  highest-based area is never written and nothing above its base is in
+  any range (Nitemare's 500000+).
 
 ** Admin lists and feedback files
 :PROPERTIES:

@@ -1539,7 +1539,10 @@ either in-game (Area/ + rsave, reaches the repo only via
 today nothing is in `UPDATE/` but two 2010 leftovers.
 
 pr-world `area.list` sorted by base (004b0d4d); compiled world.out was
-byte-identical. pr-world has recent commits from the builder (Grass
+byte-identical. Correction: this fixed nothing in `saveworld`, since
+`add_area` (builder.c) builds the in-memory area list in ascending base
+order whatever the file order; the claim that Underground, TurkeyDay
+and SinCastle were dropped was wrong. pr-world has recent commits from the builder (Grass
 Barrows mobs/zone, Halloween, new MOTD). `saveworld` still drops the
 last area and anything above the last base; not fixed. Nitemare's 1,127
 rooms are still only in `Area/Nitemare`, not in pr-world; `sync_rooms
