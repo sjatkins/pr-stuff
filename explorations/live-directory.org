@@ -275,6 +275,74 @@ UPDATE/<builder>=. =boot_update= opens entries with =fopen=, which follows
 the link, and =rsave= rewrites =Area/<builder>= under the same name, so
 the link always points at the latest save.
 
+** Builders: areas, zones, creating rooms, the three saves
+:PROPERTIES:
+:CUSTOM_ID: builder-model
+:END:
+
+*Area vs zone.* An area is a text-file convention: =#define Abyss 25000=
+in =world/ROOM/area.list= plus =#offset Abyss= at the top of
+=Abyss.room= mean "add 25000 to every room number in this file". That is
+its entire job; =tran= adds the base and the running game has no areas.
+A zone is a game object: a vnum range, reset schedule and rules, limits,
+save range. The two are independent lists that by habit share names and
+bases; nothing checks that. Nitemare's rooms (500000+) are in no area and
+only in the catch-all =last_room= zone (400000 and up, =reset never=, no
+save range).
+
+Cross-file room references are written =Area:n= (that area's base plus
+n, e.g. =Midgard:12= = 3012) and =Void:n= when no area covers the target
+(=Void= is base 0, so n is the absolute vnum). Changing a base in
+=area.list= or an =#offset= line silently moves every room in that file
+and every =Area:n= reference to it, while absolute references elsewhere
+(player locations, lockers, shops, placements) stay put. Nothing reports
+it. The database should carry absolute vnums only.
+
+*Zone overlap.* In the compiled game (129 files in =zone.list=) no two
+ranges and no two save ranges overlap. =Nether.zon= (114000-114999,
+wrapping five small zones) and =OnikumasClanRooms.zon= are in the repo
+but not in =zone.list=, so they are never compiled. A real overlap of
+save ranges would be a growing bug: =SaveZone= writes the shared rooms
+into both files, =ReadRoom= adds every saved mob without checking, so
+mobs double at each restart (objects do not: =ReadRoom= replaces the
+room's object list, leaking the first copy). =find_zone= returns the
+first zone in list order containing the vnum.
+
+*Creating rooms* (all in memory until =rsave=):
+- =rdig <direction>= (I2+, inside the builder's =build_lo..build_hi=,
+  stored in their player file and set by an immortal): takes the lowest
+  unused vnum in the range, makes a room there named from the direction
+  with description "Empty", and wires the exit there and back. The room
+  is a side effect of making an exit.
+- =goto <vnum>= to a nonexistent vnum (I2+): "You form order out of
+  chaos"; creates the room named by its number. This is where *blank
+  rooms* come from: name equals vnum. The game's =show= reports runs of
+  them as "rooms N-M are blank"; =room2tran= skips them; =tsave= writes
+  them.
+- =form <lo> <hi>=: creates every missing room in a range, all blank.
+=redit= (name, desc, sector, flags, extras, exits/doors/keys/timers,
+river, teleport, tracks, delete, swap, =max_people=) edits the room in
+memory. It cannot place or define mobs; =load mob= is an instance that
+lives only in =WorldSave=.
+
+*The three saves* are one function (=write_room= / =bin_write_room=
+over the in-memory room table) with three ways of picking range and
+file. None reads another's output; none reads =Area/=, =UPDATE/= or
+=world.out=.
+- =rsave= (I2): the builder's own range, binary, to =Area/<name>=,
+  absolute vnums. =rsave <file> lo hi= (I9) for any range. The reliable
+  source; what =scripts/sync_rooms= reads.
+- =tsave <file> lo hi= (I9): text, to =WORLD/<file>=, numbered from the
+  typed =lo=, no =#offset= line, blank rooms included, exits outside the
+  range as =Area:n= / =Void:n=. The file name is never interpreted. Only
+  a drop-in for =world/ROOM/<area>.room= when =lo= is exactly the area's
+  base and =hi= its end; a smaller range copied whole deletes rooms, a
+  larger one duplicates the neighbour's, a wrong =lo= shifts everything.
+  Not safe as a manual copy.
+- =saveworld= (I10): =tsave= for every area in =area.list= from its true
+  base to the next base minus one, plus =WORLD/world= as the include
+  list. Never writes the last area, nor anything above the last base.
+
 ** Admin lists and feedback files
 :PROPERTIES:
 :CUSTOM_ID: admin
