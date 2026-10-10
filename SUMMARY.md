@@ -1525,3 +1525,22 @@ and run under current clang (cabarius/pr 6c863152): includes, pointer
 return of read_one_room, basename for invented areas, NULL check, -lm,
 1000-vnum offset limit removed, summary on stderr. Nothing builds it on a
 fresh host (`setup_pr_home.sh` builds pr3, tran, Zone/syntax only).
+
+### Builder flow settled (2026-10-10)
+
+The builder edits mobs, zones and existing rooms directly in pr-world,
+commits, then `millie_compile.sh` + restart. So after every restart
+memory equals the repo except for `UPDATE/` ranges. Sam removed the
+`UPDATE/Nitemare` symlink (it would override repo edits at every boot)
+and pulled pr-world on production. Nitemare's own rooms come back after
+a restart with `rload`, as before. Rule going forward: a vnum range is
+either in-game (Area/ + rsave, reaches the repo only via
+`scripts/sync_rooms`, never hand-edited) or repo-edited (never rsaved);
+today nothing is in `UPDATE/` but two 2010 leftovers.
+
+pr-world `area.list` sorted by base (004b0d4d); compiled world.out was
+byte-identical. pr-world has recent commits from the builder (Grass
+Barrows mobs/zone, Halloween, new MOTD). `saveworld` still drops the
+last area and anything above the last base; not fixed. Nitemare's 1,127
+rooms are still only in `Area/Nitemare`, not in pr-world; `sync_rooms
+Area/Nitemare --write` is ready when wanted.
