@@ -1582,3 +1582,15 @@ variant after discussion. Digit validation now checks every digit
 (previously the last digit four times, so 7111 passed). Nine spot
 checks pass. Not yet on production (needs a pr3 build + restart; same
 for the saveworld fix).
+
+### Production rebuilt and moved to the pr user (2026-10-12)
+
+`src/pr3` rebuilt on pr3-pr as `pr` from 982be6a1 (saveworld, room2tran,
+crack, handler.c fixes). The old game was `una`'s, started 25 Sep from a
+stale copy at `live/PR_SERVER_SCRIPT` inside una's screen; its loop
+relaunched pr3 on the new binary the moment Sam killed the game. Sam
+then killed loop and game as una; restarted as `pr` via
+`scripts/restart_pr_server.sh` (loop now `/home/pr/scripts/PR_SERVER_SCRIPT`
+in screen `PR_SERVER_SESSION`). Booted 05:08:52 UTC, both ports answer,
+revision PR3.001.1769. Everything on the host is now one user: game,
+loop, cron check, backups. `una` is Sam's spare user. `pr` has no sudo.
