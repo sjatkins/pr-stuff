@@ -1600,3 +1600,7 @@ then pr3), the other make targets, the production deploy as `pr`
 (build, then `restart_pr_server.sh`; never kill by hand), millie_compile
 for world changes, and how to verify. The old `src/README` is the macOS
 Xcode guide and was left alone.
+
+Crack lock ideas, not done: digits are 1-6 (1,296 codes); a 0-9 code
+would be two bounds changes, a 6-digit code (46,656) was the original
+requester's wish and would need the 11-attempt limit raised with it.
