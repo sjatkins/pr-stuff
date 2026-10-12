@@ -1,0 +1,136 @@
+#+TITLE: Crack locks: per-object code length
+#+OPTIONS: ^:nil
+
+The =crack= command is a Mastermind lock on containers and doors: a code
+of digits 1-6, and after each guess the lock reports strong clicks (right
+digit, right place) and weak clicks (right digit, wrong place). This
+document is the plan and the implementation report for letting builders
+choose the code length per container. Written 2026-10-12. Doors are
+deliberately left alone.
+
+See also: [[file:objects.org][objects]], [[file:live-directory.org::#builders][builder files]].
+
+* How it worked before
+:PROPERTIES:
+:CUSTOM_ID: before
+:END:
+
+- A container is crackable when its =.obj= source says so:
+  #+begin_example
+  type {
+    container {
+      max_hold { 16000 }
+      key { -1 }
+      flags { closeable, closed, locked, crackable }
+    }
+  }
+  #+end_example
+  =crackable= is bit 5 of the container flags (=CONT_CRACKABLE=,
+  =h/const.h=). =crack= refuses unless the container is also =closed= and
+  =locked=. Three such objects exist in pr-world (Asgard, BorderTower,
+  GENERIC_OBJS "test crackable box").
+- No in-game command edited a container's flags or values; =set= works on
+  characters, =oedit= on applies only. So crackability came only from the
+  source, via =compile= and a restart.
+- The code is generated on the instance the first time it is needed
+  (=read_object= in =objdb.c=, or the first =crack=), stored in
+  =obj->mm_crack_code= with =mm_crack_attempts=, and both are written in
+  every object save (tags 79, 80), so a locked box keeps its code in a
+  player's inventory, a locker or a room save. Doors keep theirs on the
+  exit and in the room save.
+- Four digits was hardcoded in six places in =handler.c= and =move.c=:
+  the generator, the => 6666= and =< 4 digits= checks, three "4 digit
+  code" messages, and the loops. The scoring itself was fixed separately
+  on 2026-10-12 (cabarius/pr 982be6a1): classic Mastermind, each code
+  digit claimed once.
+
+* Design
+:PROPERTIES:
+:CUSTOM_ID: design
+:END:
+
+- The length lives in the container's fifth value slot, which containers
+  did not use (weapons and armour use theirs for other things). In the
+  source it is a new key in the container block:
+  #+begin_example
+  container {
+    max_hold { 100 }
+    flags { closeable, closed, locked, crackable }
+    code_length { 6 }
+  }
+  #+end_example
+  Allowed 4 to 6. Absent, 0, or out of range means 4, so every existing
+  box, door and saved object behaves exactly as before: templates and
+  saved objects are zeroed before their fields are read, and the value
+  array is saved and restored as all five slots.
+- One table defines the container block for both =tran= and the game
+  (=PRLib/fields.c=, =_container=), so one added line teaches the compiler
+  to accept the key and the loader to store it.
+- The generator and the validator take the length from the object (doors
+  always get 4). Messages print the length. The attempt limit stays 12.
+- An =oedit= subcommand lets an I10 tweak an instance in game:
+  #+begin_example
+  oedit <object> code            show length, tries used, and the code
+  oedit <object> code <4..6>     set the length, reroll, reset tries
+  oedit <object> code reset      keep the length, reroll, reset tries
+  #+end_example
+  It is an instance change: fresh copies from =load obj= or a zone reset
+  take the template's length. For a permanent change the builder adds
+  =code_length= to the source. =resetobject= already copies slot 5 from
+  the template when set, so a box updated in the source takes the new
+  length when reset.
+
+* Implementation (cabarius/pr, 2026-10-12)
+:PROPERTIES:
+:CUSTOM_ID: implementation
+:END:
+
+| file              | change                                                                                                                                 |
+|-------------------+----------------------------------------------------------------------------------------------------------------------------------------|
+| =PRLib/fields.c=  | =_container= gains ={ 5, S32, "code_length" }=                                                                                           |
+| =h/crack.h= (new) | =CRACK_DEFAULT 4=, =CRACK_MIN 4=, =CRACK_MAX 6=; prototypes for the helpers below (=h/fcns.h= is generated and gitignored, so a tracked header) |
+| =handler.c=       | =crack_code_length(obj)=: slot 5 if 4..6 for a container or pouch, else 4. =create_mm_code_len(n)=: n random digits 1-6. =create_mm_code()= now calls it with 4 (doors, and the 13 door call sites, untouched). =validate_mm_code=: length from the object or 4; the maximum code is that many sixes; the digit count must equal the length; buffers sized =CRACK_MAX+1=; scoring loops over the length; the reroll after 11 tries uses the length; messages say "%d digits". |
+| =move.c=          | the two object paths that reroll (=lock= on a crackable container, =crack ... reset=) use the object's length; "You need to input a %d digit code" |
+| =objdb.c=         | the two loaders that generate a code use the object's length; =oedit_code()= and the =code= branch in =do_oedit=; usage text               |
+
+Not changed: doors (always 4), the attempt limit (12), the save formats
+(a 6-digit code fits the existing 32-bit field), the scoring rule.
+
+* Verification
+:PROPERTIES:
+:CUSTOM_ID: verification
+:END:
+
+- =pr3=, =libPR.a= and =tran= build cleanly. Note for anyone editing
+  =PRLib=: =make pr3= does not rebuild the library once =libPR.a= exists;
+  run =make -f makefile.linux= in =PRLib/= first, then relink =pr3= and
+  =tran= (=src/README.md= says so now).
+- Harness linked against the game's objects: =crack_code_length= returns
+  4 for an empty slot, 6 for 6, 4 for 3 and for 9; 60,000 generated codes
+  across lengths 4, 5, 6 all had exactly their length of digits in 1-6.
+- =tran obj= compiles a test object with =code_length { 6 }=; loading the
+  result through the game's own =boot_obj= gives slot 5 = 6 and
+  =crack_code_length= = 6. (The template's own code field stays 0; that
+  is pre-existing: the boot-time generation check runs before the fields
+  are read, and codes are made on instances.)
+- The scoring arithmetic was checked separately against known answers
+  when it was fixed, including repeated digits on both sides.
+- Not exercised: the =oedit code= command and the =crack= flow in a
+  running game. They are straightforward branches over the tested
+  helpers, but a builder should try a 6-digit box on production after
+  the next deploy before relying on it.
+
+* For the builder
+:PROPERTIES:
+:CUSTOM_ID: builder
+:END:
+
+1. Add =code_length { 6 }= (or 5) inside the container block of the
+   object, keep =closed, locked, crackable= in =flags=, commit, =compile=,
+   restart.
+2. Or, in game as I10, =oedit <box> code 6= on a particular box to try it
+   out; =oedit <box> code= shows the current code and tries.
+3. Digits stay 1-6 and tries stay 12. From the solver measurements
+   (SUMMARY.md, 2026-10-12): a 6-digit code is solvable in 8 guesses by a
+   careful player and can take a naive one 12, so 12 tries is tight but
+   fair; raising it would be a separate change.

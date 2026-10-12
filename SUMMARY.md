@@ -1611,3 +1611,17 @@ minimax over consistent guesses worst 6 / avg 4.50. 6x6 (46,656):
 first-consistent worst 12 / avg 6.74; minimax worst 8 / avg 5.32. So a
 6-digit lock is solvable within 11 by a good player but a naive one can
 need 12; raise the attempt limit to ~14 if it is ever built.
+
+### Crack locks: per-container code length (2026-10-12)
+
+Implemented in cabarius/pr: `code_length { 4..6 }` in a container block
+(new line in `PRLib/fields.c`, so tran and the game both know it; slot 5
+of the container's values, 0 = 4), `crack_code_length()` /
+`create_mm_code_len()` in handler.c with a tracked `h/crack.h`,
+validation and messages by length, and `oedit <obj> code [n|reset]` for
+I10 to tweak or inspect an instance. Doors untouched (always 4), 12
+tries unchanged. Verified by harness (generator, length rule, tran
+accepting the key, loader storing slot 5); the in-game command itself is
+untested until the next deploy. Full plan and report in
+`explorations/crack-codes.org`. Build caveat recorded in src/README.md:
+`make pr3` never rebuilds PRLib once libPR.a exists.
