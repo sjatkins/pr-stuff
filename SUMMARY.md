@@ -1604,3 +1604,10 @@ Xcode guide and was left alone.
 Crack lock ideas, not done: digits are 1-6 (1,296 codes); a 0-9 code
 would be two bounds changes, a 6-digit code (46,656) was the original
 requester's wish and would need the 11-attempt limit raised with it.
+
+Measured 2026-10-12 with a decision-tree solver over all codes (classic
+scoring): 4x6 (1,296 codes): first-consistent worst 9 / avg 5.76;
+minimax over consistent guesses worst 6 / avg 4.50. 6x6 (46,656):
+first-consistent worst 12 / avg 6.74; minimax worst 8 / avg 5.32. So a
+6-digit lock is solvable within 11 by a good player but a naive one can
+need 12; raise the attempt limit to ~14 if it is ever built.
