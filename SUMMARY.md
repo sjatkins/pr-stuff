@@ -1594,3 +1594,9 @@ then killed loop and game as una; restarted as `pr` via
 in screen `PR_SERVER_SESSION`). Booted 05:08:52 UTC, both ports answer,
 revision PR3.001.1769. Everything on the host is now one user: game,
 loop, cron check, backups. `una` is Sam's spare user. `pr` has no sudo.
+
+`src/README.md` (cabarius/pr 9c963741): how to build pr3 (serverversion
+then pr3), the other make targets, the production deploy as `pr`
+(build, then `restart_pr_server.sh`; never kill by hand), millie_compile
+for world changes, and how to verify. The old `src/README` is the macOS
+Xcode guide and was left alone.
