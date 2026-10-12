@@ -1625,3 +1625,9 @@ accepting the key, loader storing slot 5); the in-game command itself is
 untested until the next deploy. Full plan and report in
 `explorations/crack-codes.org`. Build caveat recorded in src/README.md:
 `make pr3` never rebuilds PRLib once libPR.a exists.
+
+Deployed to production 2026-10-12 21:03 UTC as `pr`: src at 9d4b07d7
+(crack code length + oedit code), PRLib rebuilt first, pr3 and tran
+relinked, restart via restart_pr_server.sh; boot clean, both ports
+answer. Builder can now use `code_length { n }` in container blocks and
+`oedit <box> code [n|reset]`.
