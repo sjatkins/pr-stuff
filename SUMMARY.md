@@ -1568,3 +1568,17 @@ identical). Still open in area.list: 16 areas whose base sits inside
 another zone's range and 25 with no zone; 3 files with rooms past the
 next base. Both tran and boot_areas ignore anything after the base on a
 #define line, so an end column could be added without breaking either.
+
+### crack (Mastermind lock) fixed (2026-10-12)
+
+`validate_mm_code` in `src/handler.c` (cabarius/pr 982be6a1): weak
+clicks were counted with an uninitialised used-digit array (hence
+"sometimes" negative), a pre-subtraction per strong click, and one weak
+click per matching code digit (double counting on repeats). Now classic
+Mastermind: strong per matching position; weak = sum over digits 1..6 of
+min(count in guess, count in code) minus strong, so each code digit is
+claimed once. Sam chose classic over the "every present digit clicks"
+variant after discussion. Digit validation now checks every digit
+(previously the last digit four times, so 7111 passed). Nine spot
+checks pass. Not yet on production (needs a pr3 build + restart; same
+for the saveworld fix).
