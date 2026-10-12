@@ -71,9 +71,16 @@ See also: [[file:objects.org][objects]], [[file:live-directory.org::#builders][b
 - An =oedit= subcommand lets an I10 tweak an instance in game:
   #+begin_example
   oedit <object> code            show length, tries used, and the code
-  oedit <object> code <4..6>     set the length, reroll, reset tries
-  oedit <object> code reset      keep the length, reroll, reset tries
+  oedit <object> code <4..6>     set the length; forget the code and tries
+  oedit <object> code reset      keep the length; forget the code and tries
   #+end_example
+  =oedit= never generates a code; only =crack= does, on the first
+  attempt. Clearing is what makes a length change safe: the validator
+  compares the guess to the stored code before it checks the length, so
+  a stale 4-digit code on a 6-digit box would still open. Tries are
+  cleared with the code because the counter belongs to the code, not to
+  a player: the game's own reroll after 12 tries does the same. One code
+  and one counter per box, shared by everyone guessing at it (unchanged).
   It is an instance change: fresh copies from =load obj= or a zone reset
   take the template's length. For a permanent change the builder adds
   =code_length= to the source. =resetobject= already copies slot 5 from
@@ -91,7 +98,7 @@ See also: [[file:objects.org][objects]], [[file:live-directory.org::#builders][b
 | =h/crack.h= (new) | =CRACK_DEFAULT 4=, =CRACK_MIN 4=, =CRACK_MAX 6=; prototypes for the helpers below (=h/fcns.h= is generated and gitignored, so a tracked header) |
 | =handler.c=       | =crack_code_length(obj)=: slot 5 if 4..6 for a container or pouch, else 4. =create_mm_code_len(n)=: n random digits 1-6. =create_mm_code()= now calls it with 4 (doors, and the 13 door call sites, untouched). =validate_mm_code=: length from the object or 4; the maximum code is that many sixes; the digit count must equal the length; buffers sized =CRACK_MAX+1=; scoring loops over the length; the reroll after 11 tries uses the length; messages say "%d digits". |
 | =move.c=          | the two object paths that reroll (=lock= on a crackable container, =crack ... reset=) use the object's length; "You need to input a %d digit code" |
-| =objdb.c=         | the two loaders that generate a code use the object's length; =oedit_code()= and the =code= branch in =do_oedit=; usage text               |
+| =objdb.c=         | the two loaders that generate a code use the object's length; =oedit_code()= (show / set length / reset; clears code and tries, never generates) and the =code= branch in =do_oedit=; usage text |
 
 Not changed: doors (always 4), the attempt limit (12), the save formats
 (a 6-digit code fits the existing 32-bit field), the scoring rule.
@@ -115,10 +122,15 @@ Not changed: doors (always 4), the attempt limit (12), the save formats
   are read, and codes are made on instances.)
 - The scoring arithmetic was checked separately against known answers
   when it was fixed, including repeated digits on both sides.
-- Not exercised: the =oedit code= command and the =crack= flow in a
-  running game. They are straightforward branches over the tested
-  helpers, but a builder should try a 6-digit box on production after
-  the next deploy before relying on it.
+- Harness with a fake connected I10 and a crackable box in inventory,
+  driving the real =do_oedit= and =validate_mm_code=: =oedit sword code 6=
+  refused (not a crackable container); =oedit box code= shows "4 digit
+  code (default), no code yet"; =code 9= refused; =code 6= then shows 6
+  digits and no code; =reset= likewise; a 4-digit guess on the 6-digit
+  box is refused with "6 digits 1-6 are required"; a wrong 6-digit guess
+  counts a try; the right one opens; =code 4= goes back. Not exercised:
+  a human typing it on production, which a builder should do after the
+  next deploy.
 
 * For the builder
 :PROPERTIES:
