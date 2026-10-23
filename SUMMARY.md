@@ -1631,3 +1631,14 @@ Deployed to production 2026-10-12 21:03 UTC as `pr`: src at 9d4b07d7
 relinked, restart via restart_pr_server.sh; boot clean, both ports
 answer. Builder can now use `code_length { n }` in container blocks and
 `oedit <box> code [n|reset]`.
+
+### Hit point cap visible to players (2026-10-23)
+
+Rosie (Templar, 27 remorts, con 61) reported levels not raising hp.
+Not a bug: score shows hit_limit = min(earned, hp_cap); hp_cap = 3000 x
+(1 + fighter bonus: con_app[min(25,con)] 14% x multiclass dilution 0.5
+for "Cl Wa") + APEX hit points = 3210 + 684 = 3894, exactly her display.
+Con above 25 and remorts do not raise the cap. cabarius/pr: advance_level
+now tells a capped player, and score shows "capped at N; earned M"
+(hit_earned() helper). Verified with a harness at her numbers. Not yet
+deployed.
