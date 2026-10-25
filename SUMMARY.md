@@ -1688,3 +1688,11 @@ Lockable, can_wear, travel, position+lag, affect ticking, death). Nine
 first-tranche steps starting with loading the world into objects;
 combat, mob behaviour, specials and immortals later. Thirteen open
 issues recorded in the doc. No code yet.
+
+Scheduling settled (2026-10-25, commands.org d6028ba): a canned action
+is a `functools.partial(fn, issuer, *args, **kwargs)`; the issuer is
+the first argument or the bound method's owner, nothing else travels
+with it. Players each have a FIFO drained at most one action per pulse
+with lag honoured, as the C drains one input line per connection per
+pulse; the 6,000-slot wheel holds only timed partials (mob ticks,
+strikes, affects, teleports, rivers) and knows nothing about issuers.
