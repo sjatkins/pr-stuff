@@ -1659,3 +1659,15 @@ compiled zone; 309 loaded_by / 60 owned_by name characters that no
 longer exist; 103 item instances with no vnum; 88 exit keys and 62 exit
 destinations point at nothing; 13 shops without a room. Clan master and
 deputy strings not loaded (rank comes from the player records).
+
+Database consistency (2026-10-24, pr-be 76da4aa): `Store.delete_record(id)`
+deletes a record and the Related rows naming it, one pass, no cascade.
+`tools/clean_db.py` checks every id field with database-side lookups and,
+with --yes, deletes exits to rooms that do not exist, clears keys naming
+no object, removes dangling Related rows; never touches prototypes.
+Applied: 62 exits deleted (no triples named them); keys were already
+none; no dangling triples. 13 shops without a room left as is. Verified
+the structural findings are what production runs: its world.out matches
+a local compile of pr-world d7784128 byte for byte, and the recount at
+that commit gives the same 2,861 / 62 / 88 / 13. Lesson recorded as
+memory: work from the loaded database, no reloads, no all-ids sets.
