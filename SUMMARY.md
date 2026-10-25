@@ -1671,3 +1671,20 @@ the structural findings are what production runs: its world.out matches
 a local compile of pr-world d7784128 byte for byte, and the recount at
 that commit gives the same 2,861 / 62 / 88 / 13. Lesson recorded as
 memory: work from the loaded database, no reloads, no all-ids sets.
+
+### Commands design (2026-10-25)
+
+`pr-be/docs/commands.org` (b544d34): the architecture for the Python
+game, settled in discussion. The world lives in memory as objects
+(World, Room, Exit, Character with Player and Mob, Item, Storage,
+Zone) whose sets are the persisted Related triples; the database is
+the save, written at the C's save points, except that any change of
+location writes its triple immediately. Commands are functions with an
+issuer (possibly none), not methods on an actor; a typed line or a mob
+behaviour becomes a canned Action placed on the 6,000-slot event wheel
+and run when its slot comes, re-checked then. Twelve reusable pieces
+(find, can_see, gate/apply/narrate, narrate, relocate, capacity,
+Lockable, can_wear, travel, position+lag, affect ticking, death). Nine
+first-tranche steps starting with loading the world into objects;
+combat, mob behaviour, specials and immortals later. Thirteen open
+issues recorded in the doc. No code yet.
