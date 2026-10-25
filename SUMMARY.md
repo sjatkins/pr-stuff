@@ -1642,3 +1642,20 @@ Con above 25 and remorts do not raise the cap. cabarius/pr: advance_level
 now tells a capped player, and score shows "capped at N; earned M"
 (hit_earned() helper). Verified with a harness at her numbers. Not yet
 deployed.
+
+### Relationships in the store (2026-10-24)
+
+pr-be (10108e8): `roles.py` defines 48 roles in Python first (fixed
+ids); classes trimmed of every field a relationship replaces; `Exit`,
+`SavedObject`, `Kill` are records, `Learned` and `Mail` new; the
+singular fixed pointers are id fields (Exit room/to/key, container key,
+teleport target, instance template, mob home and spawn), per Sam's two
+tests: a relationship if it changes often or is navigated in bulk /
+without the holder in hand. `Zone.number` is the 1-based position in
+zone.list (0 = no zone in the C). `tools/init_db.py --yes` recreates the
+db (34 collections + roles); `tools/load_db.py` loads the JSONL into
+records and 116,772 triples in ~20 s. Loader findings: 2,861 rooms in no
+compiled zone; 309 loaded_by / 60 owned_by name characters that no
+longer exist; 103 item instances with no vnum; 88 exit keys and 62 exit
+destinations point at nothing; 13 shops without a room. Clan master and
+deputy strings not loaded (rank comes from the player records).
