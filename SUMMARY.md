@@ -1731,3 +1731,21 @@ mob.py), Citizen 50, Shopkeeper 62, Guildmaster 20, Storyteller 1, Mob
 pydantic's deferred build would cut it if it matters. Open: mob.race is
 still the name enum, not a Race reference; the 254 specials are named,
 not ported; generated classes are data only until combat exists.
+
+### Item kinds generated (2026-10-26, pr-be)
+
+`pr_be/item.py`: Item with every obj_data field; Weapon with Sword,
+Dagger, Bludgeon, Axe, Polearm, Whip, Claw, Bow, Missile, Fireweapon and
+one leaf per weapon proficiency (SmallSword is a Shortsword is a Sword
+is a Weapon); Armor with a subclass per wear slot carrying the wear
+flags (Helmet, Ring, Boots, Shield, ...); Container/Pouch (crack lock
+fields), Light, Potion/Scroll, Wand/Staff, Food, DrinkContainer,
+Key/Component, Treasure/Money, gems, Board, Audio, Trap, and Dimensioned
+markers. `tools/gen_items.py` wrote 4,855 kinds into `pr_be/items/<kind>.py`
+(62 modules by kind, the world source in each docstring; mobs stay by
+area). Class names are global: generators reserve every persistent
+class name. Importing mobs + items costs ~37 s (pydantic model builds);
+pydantic deferred build is the likely fix. Open (in item.py): slot
+subclasses worth it?; Container.key should be the key class;
+SavedObject/ObjectPrototype remain until the instance loader builds
+kinds; Mob.race still a name enum.
