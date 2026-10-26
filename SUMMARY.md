@@ -1696,3 +1696,24 @@ with it. Players each have a FIFO drained at most one action per pulse
 with lag honoured, as the C drains one input line per connection per
 pulse; the 6,000-slot wheel holds only timed partials (mob ticks,
 strikes, affects, teleports, rivers) and knows nothing about issuers.
+
+### Identity, meta context, first behaviours, mobs as classes (2026-10-26, pr-be e13b7b1)
+
+Persistent (id is the key) / PersistentObject (class_id-prefixed ids,
+one collection per concrete class) / MetaType (bare ids; Role); Related
+has no id, the triple is its key, six indexes. `Store.meta` is a
+MetaContext: classes by reflection over the roots and roles from the
+db, each a ByNameId (by id and by name); specializations in memory;
+relation methods take role names; `find(only=...)` projects. Game
+objects get behaviour in place: room(), carried(), worn(), contents(),
+exits(), people(); acquire/drop/put/give/wear/remove/move_to change one
+location triple immediately; per-character private caches. `mob.py`:
+a kind of mob is a class (Mob abstract base with the think tick, event
+hooks, flag predicates, relationship-backed hates/fears/fighting;
+Shopkeeper etc. for the C specials; PeasantBoy and CityGuard as the
+pattern for kinds generated once from the sources and kept as code,
+each with its own class_id and collection). Decisions: no global
+in-memory world; pydantic classes are the game objects and are code;
+the old sources and extractor fall away when the rewrite is done.
+Open: Located/Holder as classes vs functions; Shopkeeper-as-Mob;
+generator for the ~3,450 mob and ~4,855 item kinds.
