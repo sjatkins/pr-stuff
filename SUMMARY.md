@@ -1717,3 +1717,17 @@ in-memory world; pydantic classes are the game objects and are code;
 the old sources and extractor fall away when the rewrite is done.
 Open: Located/Holder as classes vs functions; Shopkeeper-as-Mob;
 generator for the ~3,450 mob and ~4,855 item kinds.
+
+### Mob kinds generated (2026-10-26, pr-be)
+
+`tools/gen_mobs.py` wrote 3,450 mob kinds as classes into
+`pr_be/mobs/<area>.py` (107 modules mirroring the world .mob files, as
+the bridge for anyone moving between old and new); class_ids minted once
+and read back on regeneration; vnum and special-procedure name kept per
+class; values as fields where they differ from Mob. Bases: Monster
+(aggressive/hateful/evil, 1,528; the home of combat and aggression, in
+mob.py), Citizen 50, Shopkeeper 62, Guildmaster 20, Storyteller 1, Mob
+1,789. Importing the package costs ~18 s (pydantic builds 3,450 models);
+pydantic's deferred build would cut it if it matters. Open: mob.race is
+still the name enum, not a Race reference; the 254 specials are named,
+not ported; generated classes are data only until combat exists.
