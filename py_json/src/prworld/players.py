@@ -150,6 +150,7 @@ class Options:
     include_secrets: bool = False
     strict: bool = False
     warnings: list[str] = field(default_factory=list)
+    records: list[tuple[int, int, int]] | None = None   # (tag, start, end) of each top-level record, if wanted
 
     def warn(self, msg: str) -> None:
         if self.strict:
@@ -620,6 +621,7 @@ def read_player(data: bytes, source: str, opt: Options) -> dict[str, Any]:
         if r.eof():
             opt.warn(f"{source}: file ends without EOF marker")
             break
+        start = r.pos
         tag = r.u16()
         if tag == EOF_MARK:
             break
@@ -627,6 +629,8 @@ def read_player(data: bytes, source: str, opt: Options) -> dict[str, Any]:
         if h is None:
             raise FormatError(f"{source}: unknown load type {tag} at offset {r.pos - 2}")
         h()
+        if opt.records is not None:
+            opt.records.append((tag, start, r.pos))
     if r.pos < len(r.d):
         opt.warn(f"{source}: {len(r.d) - r.pos} trailing bytes after EOF marker")
 

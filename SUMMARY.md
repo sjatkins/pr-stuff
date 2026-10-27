@@ -1749,3 +1749,57 @@ pydantic deferred build is the likely fix. Open (in item.py): slot
 subclasses worth it?; Container.key should be the key class;
 SavedObject/ObjectPrototype remain until the instance loader builds
 kinds; Mob.race still a name enum.
+
+### Instance migration to kinds (2026-10-26, pr-be, not yet run)
+
+`tools/migrate_instances.py`: one-time, in the loaded database, no
+reload. Every SavedObject/SavedMob document becomes an instance of the
+kind its template's vnum names (pr_be.items / pr_be.mobs), inserted in
+the kind's collection under a new id; an old->new id map rewrites every
+Related row (subject and object) in bulk; then the old document goes.
+Field names change to the kinds' (weight, wear, bits, value, rent ...);
+applies change from the save file's (APPLY name, modifier) list to the
+obj file's {field: value} dict via an apply table built from
+constants.c; spell numbers become names; base_armor/base_stopping fold
+into Defense. Item gained phaseout (timer2) and deposited (time_stamp);
+Mob gained energy, rage, hit_shield, regens, remort_count, extradam,
+spell_casting_vamp. Dry run: 80,711 convert (72,260 items, 8,451
+mobs), 103 template-less items to be deleted with their relations, 0
+failures. Not carried: 43 items whose type was changed in game (value
+slots don't fit the kind), 5 mobs' saving-throw modifiers, 1
+story_teller, 4 applies without a modifier. Instances persist only what
+differs from the kind. Prototype collections untouched. Run with
+`uv run tools/migrate_instances.py --write` once approved.
+
+### Viller's gear restored (2026-10-27)
+
+Viller (account oleg, Paladin 500, 30 remorts) was killed by Pyros at The
+Dragon Halls [66049] on 2026-10-12 00:27 UTC; the link dropped at 00:51 and
+the save then wrote a file with no equipment or inventory (`make_corpse`
+moves all worn and carried items and the carried gold into the corpse).
+The corpse was in a non-saveable zone, so the 05:05 UTC reboot that same
+morning (the rebuild above) destroyed it 4.6 h after the death; his next
+reconnect was 14:21. A PC corpse lasts 2500 ticks x 75 s (about 52 h),
+only its owner can loot it, and the Mortician mobs (vnums 5514, 102037,
+60008) summon a live corpse for level x 1000 gold; none of that helps once
+the corpse is gone.
+
+Fixed by file surgery, no immortal and no restart: the server reads a
+character's file only at login. `py_json/tools/restore_gear.py <base>
+<donor> <out>` keeps every record of the base file (level, exp, quest
+points, bank, affects ...), replaces its SUB_OBJECT and WEAR records with
+the donor's, adds the donor's carried gold to the base's (that gold was
+in the corpse), takes the donor's kill list when the base has none (death
+frees it), re-reads the result and checks it before writing. `Options`
+in `prworld.players` gained `records`, a list of (tag, start, end) for
+each top-level record, which the tool uses. Base: production's
+`stash/v/viller` saved 2026-10-27 12:37 UTC (he was offline after the
+20:50 reboot). Donor: `stash/v/viller` from
+`s3://pr-player-backup/players_2026-10-11.tar.gz`, the last pre-death
+save (2026-10-07 13:45 UTC, after his 6.9M gift to Rosie): 22 worn, 369
+carried, 402,350,600 gold. Installed on pr3-pr 21:42 UTC as
+`stash/v/viller` (140,717 bytes, md5 165710ea...); the replaced file is
+`~pr/Backups/viller/viller.2026-10-27.post-death` and the restored one
+beside it. Kept outside `stash/` because anything in a letter directory
+becomes a player at the next index rebuild. Not yet confirmed by a login.
+Fallback if it fails to load: the plain pre-death file from the backup.
