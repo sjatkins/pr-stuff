@@ -1915,3 +1915,16 @@ old collection was empty); the skills.tran `Skill` record class (one
 junk row) removed since it collided with the Skill kinds' base. Next: Learned to
 name spell/skill kinds by class_id (and weapon class names), then
 SpellDefinition retires like the prototypes.
+
+### Learned -> Character.learned (2026-10-30, pr-be)
+
+Sam: Learned was a general proficiency instance. Now `Proficiency(PRModel)`
+embedded: `ability` (Spell/Skill kind class_id, or weapon class name such
+as Longsword for a weapon proficiency; no Proficiency kinds exist) and
+`level` 0..100; `Character.learned: list[Proficiency]` with
+`proficiency(ability)`. 19,926 Learned records folded onto 683 players
+(all resolved), Learned class and collection gone. gen_spells.py gained
+EXTRA: the remort talents 240-269 (REMORT_ADVANCED_* in const.h) as
+Advanced*Spell/Skill kinds so every learned ability resolves (now 258
+spells, 91 skills). Nothing references SpellDefinition any more except
+gen_spells.py (its one-time source).
