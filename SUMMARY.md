@@ -1750,7 +1750,7 @@ subclasses worth it?; Container.key should be the key class;
 SavedObject/ObjectPrototype remain until the instance loader builds
 kinds; Mob.race still a name enum.
 
-### Instance migration to kinds (2026-10-26, pr-be, not yet run)
+### Instance migration to kinds (2026-10-27, pr-be, done)
 
 `tools/migrate_instances.py`: one-time, in the loaded database, no
 reload. Every SavedObject/SavedMob document becomes an instance of the
@@ -1764,12 +1764,34 @@ constants.c; spell numbers become names; base_armor/base_stopping fold
 into Defense. Item gained phaseout (timer2) and deposited (time_stamp);
 Mob gained energy, rage, hit_shield, regens, remort_count, extradam,
 spell_casting_vamp. Dry run: 80,711 convert (72,260 items, 8,451
-mobs), 103 template-less items to be deleted with their relations, 0
+mobs), 103 template-less items deleted with their relations, 0
 failures. Not carried: 43 items whose type was changed in game (value
 slots don't fit the kind), 5 mobs' saving-throw modifiers, 1
-story_teller, 4 applies without a modifier. Instances persist only what
-differs from the kind. Prototype collections untouched. Run with
-`uv run tools/migrate_instances.py --write` once approved.
+story_teller, 4 applies without a modifier.
+Prototype collections untouched. Documents are
+full objects, every field, always (store.to_doc no longer uses
+exclude_unset). Ran 2026-10-27: 91,338 Related subjects and 11,047
+objects rewritten, SavedObject and SavedMob now empty, 0 Related rows
+name an old id. The 42 retyped items: Item gained `saved_as` (the save
+file's type and slots verbatim); 41 were matched to their documents by
+holder + vnum + container chain via `tools/instance_index.py` (writes
+py_json/out/instance_index.json: id, kind, vnum, role, holder, top,
+path for every placed item; rebuild after loads) and annotated; the one
+left is wolff's account warehouse, two orbs (vnum 659), one retyped,
+indistinguishable. The 103 "template-less" items were game-made things
+in player inventories (3 corpses, 8 spell lights, 89 spell/butchered
+food, 1 gold pile, 2 conjured bags); Sam's rule: a non-corpse item with
+no vnum is broken and stays deleted, a corpse is real. Added
+`Corpse(Container)` (item.py, vnum 999001, unused) and role `corpse_of`
+/ `has_corpse` (one-to-one Corpse -> Character; roles.py + db).
+`tools/restore_corpses.py` put the 3 corpses back in Milo's, Ogh's and
+Zalen's inventories with their contents (a Barbed Blade, Apollo's Manly
+Beauty) inside; all three are mob corpses so no corpse_of row. Maeve's
+two keys (from a deleted bag) went to her inventory. An interrupted
+first --write had left 56,978 short documents (no relations); deleted
+by id. Rule from Sam: a truly homeless instantiated object or mob is
+not possible. Next: retire SavedObject/SavedMob/ObjectPrototype/Mob
+prototype classes and the loader paths that build them.
 
 ### Viller's gear restored (2026-10-27)
 
@@ -1801,5 +1823,21 @@ carried, 402,350,600 gold. Installed on pr3-pr 21:42 UTC as
 `stash/v/viller` (140,717 bytes, md5 165710ea...); the replaced file is
 `~pr/Backups/viller/viller.2026-10-27.post-death` and the restored one
 beside it. Kept outside `stash/` because anything in a letter directory
-becomes a player at the next index rebuild. Not yet confirmed by a login.
-Fallback if it fails to load: the plain pre-death file from the backup.
+becomes a player at the next index rebuild. Fallback if it ever fails to
+load: the plain pre-death file from the backup.
+
+Verified with the real loader before he logged in, using a throwaway
+harness (since deleted at Sam's request): a 70-line program linked like
+`playerstats` that booted a scratch copy of the local `live/lib`, ran the
+login path, `load_char` then `menu_enter`, on the character with a fake
+connection and printed the result without saving. Entered game in room
+64491, 22 worn, 370 carried plus 189 inside containers, values as above;
+no warnings. The pre-death file through the same path gives 369 carried;
+the extra item is "a note" (vnum 1000), handed out at login, not from
+the file. Sam's preferred way next time: attach gdb to the running local
+game and `call` those functions, which needs the game started from the
+same shell or sudo (ptrace scope 1 here).
+
+`do_reboot` now logs who scheduled, cancelled or clean-flagged a reboot
+(cabarius/pr f22f1145); the 2026-10-27 20:50 UTC auto reboot had no
+record of who set it. Not yet deployed to production.
