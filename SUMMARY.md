@@ -1790,8 +1790,28 @@ Beauty) inside; all three are mob corpses so no corpse_of row. Maeve's
 two keys (from a deleted bag) went to her inventory. An interrupted
 first --write had left 56,978 short documents (no relations); deleted
 by id. Rule from Sam: a truly homeless instantiated object or mob is
-not possible. Next: retire SavedObject/SavedMob/ObjectPrototype/Mob
-prototype classes and the loader paths that build them.
+not possible.
+
+### Prototype and saved-instance classes retired (2026-10-30, pr-be)
+
+Removed from classes.py: the Mob prototype, ObjectPrototype, the ItemType
+family (value-slot models), SavedApply/SocketApply, SavedObject and
+SavedMob. Auction.forsale is an item id; its inventory is relationships.
+Removed the JSONL-era tools that could only exist with those classes:
+load_db, load_mongo, roundtrip, validate_jsonl, gen_items, gen_mobs,
+migrate_instances, restore_corpses (all in git history; each ran once).
+clean_db keeps the Exit/ObjectPrototype key checks. The ObjectPrototype
+and Mob *collections* stay in the database untouched (prototypes are
+never deleted); Exit.key and Container.key still hold ObjectPrototype
+ids at first. Then (same day, after talking it through: a lock names the
+*shape* of key that fits, a class; copies are instances with their own
+state): Exit.key, Container.key on instances, and the 38 generated
+container kinds' key defaults now hold the key kind's class_id (702
+exits, 23 instances, 38 defaults converted; 0 prototype ids remain).
+Nothing references the ObjectPrototype or Mob collections any more;
+they are loading artifacts and can be dropped when Sam says. Kinds with
+no instances have no collection yet; create_collections makes them on
+demand.
 
 ### Viller's gear restored (2026-10-27)
 
@@ -1841,3 +1861,57 @@ same shell or sudo (ptrace scope 1 here).
 `do_reboot` now logs who scheduled, cancelled or clean-flagged a reboot
 (cabarius/pr f22f1145); the 2026-10-27 20:50 UTC auto reboot had no
 record of who set it. Not yet deployed to production.
+
+### Spells, skills and class specs (2026-10-30, pr-be, uncommitted)
+
+Decided with Sam: a spell is a kind (class) with definition and, in time,
+behaviour; `pr_be/spell.py` has `Ability` (name, beats, min_position,
+flags, targets, wore_off_msg, damage_type: Element, category, and
+`cast(caster, target)` raising "not ported yet"), `Spell`, `Skill`, and
+the `Element` enum (the nine resistance kinds). `tools/gen_spells.py`
+wrote 235 Spell kinds and 84 Skill kinds into `pr_be/spells/`
+(FireballSpell, BackstabSkill: the suffix keeps them apart from item
+kinds; 59 table placeholders skipped; the C handler name is in each
+docstring). Weapon proficiencies are NOT kinds: a proficiency is a pair
+(weapon class name, how well) held by the character; 33 generated
+kinds were dropped on Sam's point that they carry nothing.
+CharacterClass: the spell/skill/prof tables became embedded specs,
+plain records with no class_id: `CharacterClassAbilitySpec` base
+(character_class id, min_level, difficulty, cost, max_at_guild,
+max_learn, prereqs), `CharacterClassSpellSpec` (spell class_id, `pool`
+mana|power and `pool_cost`: which of the character's two pools a cast
+draws on; `required_items`: item kinds a member must hold to cast, the
+class's study texts, NOT spell ingredients, they differ per class),
+`CharacterClassSkillSpec` (skill: a Skill kind class_id or a weapon
+class name; proficiencies are skill specs, no separate class).
+`starting_items` by item kind class_id. All 40 classes converted:
+1,749 spell specs, 1,381 skill specs (587 skills + 794 proficiencies),
+nothing unresolved.
+
+Class model rules settled with Sam the same day: (1) PersistentObject
+is the root of everything that is or can be a persistent thing; those
+are the classes the meta context maps, each abstract or concrete.
+Concrete = `abstract = False` + its own class_id (never inherited;
+PersistentObject forces class_id per class); a concrete class has
+instances: Mob and its seven types (Shopkeeper, Citizen, Monster ...),
+Board, BoardMessage, Room, Player all say abstract=False. Abstract =
+shared shape, named by class name: Item, Sword, Ability, Character and
+everything under Item/Ability without a class_id (`abstract = True` on
+the root, inherited). A class with neither is refused at definition.
+Mixins (Located) are plain classes outside the tree, unmarked and
+unmapped. (2) a class_id only for classes with persistent or related
+instances; (3) the meta context
+maps every class by name (abstract ones too) and by id where it has
+one, so specs name Sword by name and FireballSpell by class_id through
+one map; (4) mixins are plain classes: `Located` (location/holder/
+relocate) is no longer a PersistentObject; `Holder` is gone (module
+function `held(holder_id, role)`); there is ONE `Item` (item.py; the
+classes.py behaviour base folded in); the classes.py `Board` record
+(board messages) was an error: Board is the item (concrete); a
+`BoardMessage` is its own persistent thing (author, title, body,
+posted, expires, priority) related to its Board by the new role
+`posted_on` / `has_message`, and `Board.messages()` follows it (the
+old collection was empty); the skills.tran `Skill` record class (one
+junk row) removed since it collided with the Skill kinds' base. Next: Learned to
+name spell/skill kinds by class_id (and weapon class names), then
+SpellDefinition retires like the prototypes.
