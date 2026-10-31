@@ -1942,3 +1942,38 @@ roles, what is a field or embedded, the cleanup), abilities.org
 enums.org (names.py vocabularies, flags, Element), persistence.org
 (documents, ids, collections, store, tools, rules). The older
 role-considerations.org and commands.org stay as the working documents.
+
+### Combat: the attack family as Character methods (2026-10-31, pr-be, uncommitted)
+
+Discussion first: the C has three layers (command, one blow, the damage
+sink). Sam: the general part lives in Character, subclasses add their
+considerations; a skill check gates an attack but the attack is not run
+from the skill; damage is computed from both sides so it is a plain
+function, not `take_damage`; ticks are implementation, the actor owns its
+strikes; attack first because it gives the overall shape across classes
+fastest, so what is not ported yet is a TBD stub on the owning class, not
+left out. First version used a `Combatant` mixin; Sam: no mixin, same
+thing on Character; stat tables as dicts behind methods;
+`available_locations()` for the height rule. Now: methods on `Character`
+in classes.py (attack, slay, swing, round, kick, bash, batter, pummel,
+backstab, assassinate, vital_stab, execute, sunder_armor, strike,
+holy_strike, whirlwind, garrote, cheapshot, crippling_strike, mute_strike,
+daze, ambush, slicendice, breath, cast_spell, die/make_corpse, can_see,
+can_see_in_dark, available_locations, rolled_location, strength_to_hit/
+_to_damage, dexterity_reaction/_defense, purity_multiplier) and the shared
+pieces (_target, _may_attack, _skill_roll/_grade, _base_damage,
+_special_damage, _bleed, _miss). `src/pr_be/combat.py` holds
+`resolve_damage()` (the C's damage()), `weapon_check`, dice, the data as
+dicts (STRENGTH, DEXTERITY, PURITY_PERCENT, HIT_LOCATIONS, race strokes,
+BodyPart, remort numbers). Player and Mob override hit points, pools,
+affect bits, immortality, after_death (player: spirit back with 1 hp; mob:
+record and relationships deleted). Corpse for both, corpse_of only for a
+player. 20 TBD stubs listed in docs/combat.org (law, affects, resistances,
+messages, flee, exp/kill, weapon spells, penalties, apex, Room.is_dark,
+Mob.choose_attack). Renames: Player.assassinate field -> assassinate_bonus
+(alias assassinate, doc key unchanged); hit_points()/max_hit_points()/
+resist_damage() to avoid Mob.hp and Player.resist. Private combat state on
+Character: _aim, _hit_location, _wait, _next_strike. Mob's old fighting
+methods folded in. Verified with an in-memory fake store (scratchpad) and
+read-only loads of real player/mob docs. Noted: the Mob base class's
+collection `Mob` shares its name with the prototype artifact collection.
