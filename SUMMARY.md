@@ -1928,3 +1928,17 @@ EXTRA: the remort talents 240-269 (REMORT_ADVANCED_* in const.h) as
 Advanced*Spell/Skill kinds so every learned ability resolves (now 258
 spells, 91 skills). Nothing references SpellDefinition any more except
 gen_spells.py (its one-time source).
+
+### pr-be/docs guide (2026-10-30)
+
+`pr-be/docs/` now carries the guide to the Python form of the game:
+README.org (index), class-model.org (identity, abstract/concrete,
+class_id, meta context, full documents, the rules), class-hierarchy.org
+(every family with [a]/[c]), prototypes-to-classes.org (the decision,
+the generators, the instance migration and what it taught, what went,
+consolidation later), fields-and-relationships.org (the rule, the 50
+roles, what is a field or embedded, the cleanup), abilities.org
+(spell/skill kinds, no proficiency kinds, class specs, learned, pools),
+enums.org (names.py vocabularies, flags, Element), persistence.org
+(documents, ids, collections, store, tools, rules). The older
+role-considerations.org and commands.org stay as the working documents.
