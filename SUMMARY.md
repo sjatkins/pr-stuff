@@ -1918,7 +1918,7 @@ SpellDefinition retires like the prototypes.
 
 ### Learned -> Character.learned (2026-10-30, pr-be)
 
-Sam: Learned was a general proficiency instance. Now `Proficiency(PRModel)`
+Sam: Learned was a general proficiency instance. Now `Proficiency(Embedded)`
 embedded: `ability` (Spell/Skill kind class_id, or weapon class name such
 as Longsword for a weapon proficiency; no Proficiency kinds exist) and
 `level` 0..100; `Character.learned: list[Proficiency]` with
@@ -1977,3 +1977,28 @@ Character: _aim, _hit_location, _wait, _next_strike. Mob's old fighting
 methods folded in. Verified with an in-memory fake store (scratchpad) and
 read-only loads of real player/mob docs. Noted: the Mob base class's
 collection `Mob` shares its name with the prototype artifact collection.
+
+### Renames: PRModel -> Embedded, apply location -> applies_to (2026-11-01, pr-be, uncommitted)
+
+Sam, after the pulse-affect walkthrough: PRModel is just the pydantic
+base for records embedded in another document, so it is now `Embedded`
+(classes.py, store.py, item.py, docs). The C's APPLY_ "location" (which
+stat, slot or resistance a modifier changes) is now `applies_to` on
+Affect, and `applies_to` / `applies_to_initial` / `applies_to_finish` on
+PulseAffect; the keys were renamed in place in the database: 1,341
+documents in 309 collections (684 players, the rest mob instances with
+affects). `EffectFields.location` (the 2011 world/SKILL effect records) renamed
+the same way, in code and in its documents. Walkthrough findings kept for the affects design: the
+C's one number space for "what caused it" (spell / remort talent /
+weapon stroke / proficiency / skill / 57 named conditions 10084-10140
+that are none of those); pulse-affect bitvectors are never set, Affect
+bitvectors carry real bits (flying, true-sight, catform) plus three
+unnamed tag bits (38 remort bonus, 39 double weapon spell, 46 item set
+bonus); 4,048 Affects on players of which 3,842 are permanent item-set,
+remort or weapon-spell markers and ~200 timed spell affects; six
+players carry pulse affects. Sam's direction: pulse affects are a
+schedule; land/pulse/finish become increments and decrements on the
+clock list, caps by scheduling only what fits, re-landing cancels and
+reschedules; proposed one `Effect` record replacing Affect and
+PulseAffect, with `cause` a kind class_id or condition name and `caster`
+an id. Not built.
