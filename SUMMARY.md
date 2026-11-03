@@ -2002,3 +2002,24 @@ clock list, caps by scheduling only what fits, re-landing cancels and
 reschedules; proposed one `Effect` record replacing Affect and
 PulseAffect, with `cause` a kind class_id or condition name and `caster`
 an id. Not built.
+
+### Effects and the clock: design (2026-11-03, pr-be docs/effects.org)
+
+One `Effect` record (Embedded, `Character.effects`) to replace Affect and
+PulseAffect: cause (Spell/Skill class_id or a Condition name for the 57
+C states that are neither), caster id, started, duration (None =
+permanent), three optional `Change`s (on_land, each_pulse, on_end:
+kind buff/heal/damage/shield, applies_to, amount, area flags),
+pulse_every, pulses_done, stacking (stacks, max_stacks, stack_scale,
+cap, reset_on_reland), finishing spell with thresholds, sets_bits,
+quiet, dispellable, message overrides, totals. Cooldowns become a dict
+cause -> expiry. Verbs on Character: land, pulse, end; re-landing adds a
+stack or resets. The clock, after discussion with Sam: the C's 6,000
+slot wheel for anything within a revolution plus a flat far list; a
+time is (cycle, slot) = (due // 6000, due % 6000), the clock a cycle
+counter and slot index; at each wrap the far list is walked and entries
+whose cycle matches drop into their slot. A heap was proposed and
+rejected. An effect keeps at most two pending calls (next pulse, end),
+rebuilt from the record on load; expired ones end quietly. Live stats:
+paired increments through one `adjust`, caps applied on read, so no
+rebuild-from-scratch. Migration of the stored lists sketched. Not built.
