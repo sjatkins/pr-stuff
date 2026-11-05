@@ -1918,7 +1918,7 @@ SpellDefinition retires like the prototypes.
 
 ### Learned -> Character.learned (2026-10-30, pr-be)
 
-Sam: Learned was a general proficiency instance. Now `Proficiency(Embedded)`
+Sam: Learned was a general proficiency instance. Now `Proficiency(Model)`
 embedded: `ability` (Spell/Skill kind class_id, or weapon class name such
 as Longsword for a weapon proficiency; no Proficiency kinds exist) and
 `level` 0..100; `Character.learned: list[Proficiency]` with
@@ -1978,10 +1978,10 @@ methods folded in. Verified with an in-memory fake store (scratchpad) and
 read-only loads of real player/mob docs. Noted: the Mob base class's
 collection `Mob` shares its name with the prototype artifact collection.
 
-### Renames: PRModel -> Embedded, apply location -> applies_to (2026-11-01, pr-be, uncommitted)
+### Renames: PRModel -> Model, apply location -> applies_to (2026-11-01, pr-be, uncommitted)
 
 Sam, after the pulse-affect walkthrough: PRModel is just the pydantic
-base for records embedded in another document, so it is now `Embedded`
+base for records embedded in another document, so it is now `Model`
 (classes.py, store.py, item.py, docs). The C's APPLY_ "location" (which
 stat, slot or resistance a modifier changes) is now `applies_to` on
 Affect, and `applies_to` / `applies_to_initial` / `applies_to_finish` on
@@ -2005,7 +2005,7 @@ an id. Not built.
 
 ### Effects and the clock: design (2026-11-03, pr-be docs/effects.org)
 
-One `Effect` record (Embedded, `Character.effects`) to replace Affect and
+One `Effect` record (Model, `Character.effects`) to replace Affect and
 PulseAffect: cause (Spell/Skill class_id or a Condition name for the 57
 C states that are neither), caster id, started, duration (None =
 permanent), three optional `Change`s (on_land, each_pulse, on_end:
@@ -2023,3 +2023,21 @@ rejected. An effect keeps at most two pending calls (next pulse, end),
 rebuilt from the record on load; expired ones end quietly. Live stats:
 paired increments through one `adjust`, caps applied on read, so no
 rebuild-from-scratch. Migration of the stored lists sketched. Not built.
+
+### Clock and Effect built (2026-11-05, pr-be, uncommitted)
+
+`src/pr_be/clock.py`: the wheel (6,000 slots) plus far list, (cycle,
+slot) times, `seconds()` from an epoch so tests drive time;
+`context.clock()`. `Effect`, `Change`, `Thresholds`, `Messages`,
+`Totals` in classes.py with the verbs on Effect (land/pulse/end/reland/
+schedule); `Character.effects`, `cooldowns` dict, `bonuses` dict for
+applies without a field, `adjust()` as the one way a stat changes,
+`stat()` clamped on read (caps 99/90 players, 90/80 mobs), `wake_effects`
+on load. `names.Condition` (49 members with C codes). Sam: "Embedded"
+conflates a pydantic base with where instances live, so the base is now
+`Model`, a plain pydantic class with the project config (renamed in
+code, docs, SUMMARY). The 2011 effect-definition class `Effect` became
+`EffectDefinition` and its collection was renamed (2 docs). Tests:
+tests/test_clock.py (5), tests/test_effects.py (8), all passing under
+`uv run pytest`. Combat still writes the old affect records; the switch
+and the data migration are next, dry-run first.
