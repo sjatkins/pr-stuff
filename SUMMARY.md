@@ -2041,3 +2041,21 @@ code, docs, SUMMARY). The 2011 effect-definition class `Effect` became
 tests/test_clock.py (5), tests/test_effects.py (8), all passing under
 `uv run pytest`. Combat still writes the old affect records; the switch
 and the data migration are next, dry-run first.
+
+### Combat on Effects; affect records migrated (2026-11-05, pr-be, uncommitted)
+
+The combat methods now land `Effect`s and use `Character.cooldowns`
+(combo points, stun/confuse, the bleeds with finishing spell, garrote,
+ambush, slice and dice, shadowform, sunder armor, strike/ambush
+after-effects, vital stab's poison); `Effect.same_as` joins re-landings
+by cause + caster + what the changes apply to (the C's rule); caps
+compare magnitudes so negative stacks (sunder) work; a stat-less buff
+(combo points) is a tally in `land_applied`. `tools/migrate_effects.py`
+dry-run then `--write`: 1,341 docs in 309 collections, 5,909 affects +
+63 pulse affects -> effects (3,882 permanent markers/forms), 56 expired
+cooldowns dropped, mob casters by namelist (22 by room), 7 unresolved
+(no caster). Empty old fields unset from 7,807 more docs. `Affect`,
+`PulseAffect`, `PulseCooldown` classes and the three fields removed from
+Player and Mob. `names.Condition` gained `double_weapon_spell` (301).
+Tests 13/13; combat smoke test passes; migrated players load and
+`wake_effects` reschedules them.
