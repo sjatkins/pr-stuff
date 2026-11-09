@@ -2084,3 +2084,22 @@ after the saves (most of the rest). Sam: run the fix. `check_stats.py
 --fix` set every stored live value to base + current gear + effects and
 saved the players; the report is now clean: 697 players, 0 differing.
 `bonuses` (the applies without a field) is now stored on every player.
+
+### Resistances (2026-11-09, pr-be, uncommitted)
+
+`resist_damage` implemented: combat.py `element_of`, `stroke_flag`,
+`resistance_check`, `adjusted_resistance_damage`, `resist_elemental`,
+`resist_physical` (the C's CalcResistanceCheck, CheckResistanceDamageType
+WithMinScale, PreProcDam, AdjustedResistanceDamage; RESIST_BASE 100.99,
+SANC/RESIST/IMMUNE_STOP 50/35/100, the per-stroke stopping figures).
+Character: `resistance(element)` = class resists by level/500 + race +
+resist applies in `bonuses` + flag worth (`flag_resistance`, the C's
+affect_resist_bits mapping); `spell_penetration`, `melee_penetration`
+(soft cap), `stopping_at` (material share TBD), `sanctuary_bonus`,
+`race_record` (Race by vnum, cached), `all_immune/resistant/susceptible`
+incl. race flags. Mob adds its own resistances/penetration. Specials that
+pre-resist pass `already_resisted=True`. The spell kinds already carried
+the full GetSpellType element/category table (checked: 90 elements, 46
+categories), so no regeneration; `Element.water` added. Races: only 1 of
+54 has resist data; players store no base resistances (the C computes
+them). Tests: tests/test_resistances.py (6); 23 total passing.
