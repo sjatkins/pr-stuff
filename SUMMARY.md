@@ -2059,3 +2059,28 @@ cooldowns dropped, mob casters by namelist (22 by room), 7 unresolved
 Player and Mob. `names.Condition` gained `double_weapon_spell` (301).
 Tests 13/13; combat smoke test passes; migrated players load and
 `wake_effects` reschedules them.
+
+### Equipment through adjust; recompute (2026-11-05, pr-be, uncommitted)
+
+`wear`/`remove` apply and take back an item's applies (obj-file names
+via `names.APPLY_BY_FIELD_NAME`, socket gems' applies), its
+`spell_affect` bits, and for armour the C's apply_ac (effective_ac off
+the covered part's armour, absorb onto its stopping; shield covers body
+and head). `Item.applies()`, `Item.grants_bits()`. `Character.recompute
+(fix)` replays base + gear + effects through `adjust` and reports what
+differs; `bonuses` always recomputed. `tools/check_stats.py` read-only
+over players: 447 of 697 differed before armour was wired, 37 after
+(small stat differences, a few armour values); not fixed yet, causes to
+look at (C clamp-on-write, remort stat bonuses outside the lists). tests/
+conftest.py has the in-memory FakeStore; 17 tests.
+
+### Stat fix run (2026-11-09)
+
+The 37 players' differences were all traced: strength capped at 99 on
+write (6), nothing ever applied over base (17 values, Tasha the clearest),
+the retyped Black Knight's Hammer counted as a 34-AC shield by the C
+(Kyle, Pomme, Treffert), and the immortal-built chess-set kinds edited
+after the saves (most of the rest). Sam: run the fix. `check_stats.py
+--fix` set every stored live value to base + current gear + effects and
+saved the players; the report is now clean: 697 players, 0 differing.
+`bonuses` (the applies without a field) is now stored on every player.
