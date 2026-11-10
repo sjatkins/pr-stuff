@@ -2103,3 +2103,14 @@ the full GetSpellType element/category table (checked: 90 elements, 46
 categories), so no regeneration; `Element.water` added. Races: only 1 of
 54 has resist data; players store no base resistances (the C computes
 them). Tests: tests/test_resistances.py (6); 23 total passing.
+
+### Damage messages (2026-11-09, pr-be, uncommitted)
+
+`damage_message` implemented in combat.py: `act()` (comm.c's $-codes with
+sex pronouns and "you" for the viewer), `tell_three`, `weapon_message`
+(dam_message: the 18 damage tiers, armour/miss/shield/death triples,
+limb by race, verbs by stroke or druid form), `ability_message` (the
+DamageMessage records by attack number, hit/miss/die/god, yellow wrap,
+`damage_keyword` ladder), `limb_name`, `pronouns`. Colour marks kept
+verbatim for the output layer. Tests: tests/test_messages.py (5); 28
+passing.
