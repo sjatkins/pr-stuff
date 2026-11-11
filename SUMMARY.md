@@ -2114,3 +2114,21 @@ DamageMessage records by attack number, hit/miss/die/god, yellow wrap,
 `damage_keyword` ladder), `limb_name`, `pronouns`. Colour marks kept
 verbatim for the output layer. Tests: tests/test_messages.py (5); 28
 passing.
+
+### The first spells (2026-11-09, pr-be, uncommitted)
+
+18 `cast` methods written by hand into spells/spells.py (fireball,
+lightning bolt, burning hands, chill touch, magic missile, acid blast,
+holy word; armor, bless, strength, dexterity, stone skin, shield,
+sanctuary, fly, invisibility, detect invisibility; poison), each the C's
+spell_<name>() for players and mobs. Spell base gained `effective_level`,
+`hurt`, `bestow` (one Effect per change), `power_scale` (the C's
+ScaleSpellPowertoSpell table by name), `hours()`. resolve_damage adds
+spell power (class multiplier table + scaled spell power, 55%/45%) and
+spell vamp. Item forms written too (bless flag on an item, invisibility
+on an item, poison on food or a drink container). `Character.in_group`/
+`leader()` (follows relationship),
+`total_spell_power`, `Effect.grants_resistant` (stone skin's pierce
+resistance). `Element` moved to names.py (import cycle). gen_spells.py
+refuses to overwrite hand-written casts without --force. Tests:
+tests/test_spells.py (7); 35 passing.
