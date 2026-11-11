@@ -2132,3 +2132,25 @@ on an item, poison on food or a drink container). `Character.in_group`/
 resistance). `Element` moved to names.py (import cycle). gen_spells.py
 refuses to overwrite hand-written casts without --force. Tests:
 tests/test_spells.py (7); 35 passing.
+
+### Mob.choose_attack (2026-11-11, pr-be, uncommitted)
+
+fight.c mob_attack ported: `Mob.magic_use()` (the `caster` field; 40 for
+the assassinate-fifteen class hack), two rolls, a random pick from the
+mob's skills or spells lists by name past the C's banned lists and
+position rule, skipping skills with no Python method and spells with no
+cast; `SKILL_METHODS`, `SELF_SKILLS`, `SELF_SPELLS` (the C's selfCast
+list), class-spec cost, the mob_skill/mob_cast delays. Sam: the quips
+are part of the experience; all 143 extracted from mob_attack onto the
+Spell kinds as `incantation` (Ability field), used by the mob's cast. `_abilities_by_name()` maps names
+to kinds. Tests: tests/test_mob_round.py (4); 39 passing.
+
+### Rule: every message to a player is preserved (2026-11-11)
+
+Sam: all messages sent to players in the C must exist and be sent in the
+Python; a rule not to be broken (memory: preserve-all-player-messages).
+Fixed what had slipped: the fireball's "You feel a blast of hot air" to
+the rest of the zone (`Room.zone_people`), and the debug-flag variants
+(`Character.in_debug`, PlayerFlag.debug): the number on an ability
+message, the roll against the check on a resist, the percentage that
+landed. Test added; 40 passing.
