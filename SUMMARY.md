@@ -1,6 +1,6 @@
 # Perilous Realms — Project State and Handoff
 
-**Last updated:** 2026-09-28 (built master here with production players; use-after-free fix merged; production ops scripts in git)
+**Last updated:** 2026-11-11 (detritus search request noted, questions out to Nitemare; spells batch 5 in pr-be)
 **Goal:** revive Perilous Realms (`pr3`) and package it as an installable
 Docker image for its maintainer, preserving the existing player base.
 
@@ -2154,3 +2154,166 @@ the rest of the zone (`Room.zone_people`), and the debug-flag variants
 (`Character.in_debug`, PlayerFlag.debug): the number on an ability
 message, the roll against the check on a resist, the percentage that
 landed. Test added; 40 passing.
+
+### All spells, batch 1: the protection spells (2026-11-11, pr-be, uncommitted)
+
+Sam: all spells first, then travel and movement. Inventory of the 240
+kinds without a cast: 209 have a C function (8,008 lines, dispel magic
+934 of them), 31 do not (8 NULL table entries, 23 Advanced* remort
+talents); for those the base `Spell.cast` now says the C's "That magic
+is unimplemented/disabled." Batch 1, magic_prot.c: 30 casts (haven,
+detect evil/magic, protection from evil, fireshield, invulnerability,
+nosleep/nopoison/nosummon/nocharm, sense life, magic haste, haste, slow,
+metalskin, heroism, protect/resist elemental fire/cold, shimmer, true
+sight, infravision, aid, divine hand, shield of air, hand beyond death,
+petrify (stone encase), crystal shield, aura of faith). Under the
+message rule the cast_ wrappers' own lines were ported too, and the
+first 18 spells gained theirs ("$N is protected.", the "Nothing seems to
+happen." cases). `Spell.power_share` (calc_spell_power for buffs). The
+REMORT and REMORT_ADVANCED tables corrected to the C's numbers and the
+generator's Advanced-kind numbering. 48 of 258 spells cast. Tests 41.
+
+### All spells, batch 2: the damage spells (2026-11-11, pr-be, uncommitted)
+
+magic_dam.c: 26 casts (shocking grasp, colour spray, shriek, mage fire,
+full harm, true word, ice lance, freeze, fire bolt, thors lightning (a
+one-second Effect whose landing is the damage), repulsor, mind thrust,
+disruptor, cause light/serious/critical, flamestrike, meteor swarm,
+pword kill, call lightning (outdoors: `Room.is_outside`), harm,
+corrosive spray, squeezed porcupine, thrown fire, thanosis word of
+fire/cold (take `power=`, the C's second argument; cast_spell does not
+pass extra words yet)), with their wrappers' lines. 74 of 258 cast.
+
+### All spells, batch 3: magic.c (2026-11-11, pr-be, uncommitted)
+
+magic.c: 73 casts (energy drain, dispel evil, blindness, clone, control
+weather, create food, cure blind/light/serious/critical, curse, dispel
+negation, detect poison, heal, regrowth, lifebloom, the five curses
+(agony, corruption, doom, weakness, exhaustion: pulsing Effects that
+stack per caster, a cleric keeps two going, others one; the oldest other
+curse ends when over), soul link, silence, confusion, remove poison,
+ventriloquate (does nothing, as the C), charm monster/person (follow +
+charm Effect), the five breaths, drain vigor x3, wither, summon demon
+(TBD: the burnt item and the demon), fury, calm, summon elemental (the
+four midgard Elemental kinds, one in five hostile), vitalize power,
+rejuvenate, age, ageing, heroes feast, full heal, the seven blessings
+(group-wide, a landing buff plus a slow pulse buff to a cap, cooldown;
+same family limit as the curses), divine light, shared light, faith
+heal, divine shield, renew, flash heal, mystic heal, scry, sleep,
+recharger, chilly, sunray, vampiric touch, vigorize x3, vitality,
+farsee, fear, remove curse). Helpers in spells.py: `_crit` (the
+critical-heal ladder), `_three`, `_restore`, `_cleric_purity`,
+`_heal_shield`, `_shield_chance`, `_breath`, `_his/_him/_he`;
+`_CURSE_IDS` / `_BLESSING_IDS` families. 148 of 258 cast.
+
+Remort table fixed while doing it: `combat.REMORT` is now every
+`REMORT_*` of const.h by lowercased name (366 entries). Eight thief
+talents had wrong numbers (shadowform 306 not 112, whirlwind 358,
+cheapshot 315, garrote 317, mute strike 344, crippling strike 304, daze
+302, slicendice 313). The C's "advanced" checks are remort talents
+(`REMORT_ADVANCED_SPELL_X`, `REMORT_ADVANCED_SKILL_X`), not the
+Advanced* kinds: `Character.has_advanced(name)` and the new
+`advanced_multiplier(name, divisor)` look up `advanced_spell_<name>` /
+`advanced_skill_<name>` in REMORT. All 23 spell uses rewritten to
+`caster.advanced_multiplier(...)`.
+
+Tests: tests/test_spells_magic.py (5): curses pulse and are limited,
+blessings land on the group and cool down, heals and renew, charm
+person follows + silence/sleep/scry, vampiric touch + vigorize. 47 pass.
+
+Next: magic2.c (24), magic_area.c (19), magic_obj.c (11), magic_relo.c
+(10), spells1/2/3.c (17), DispelMagic; then travel and movement.
+
+### All spells, batch 4: magic2.c (2026-11-11, pr-be, uncommitted)
+
+magic2.c: 24 casts (mana, second wind, refresh, dispel good, turn, remove
+paralysis, succor (a ScrollOfRecall), weakness, ineptitude, water
+breath, know alignment, dispel magic (the 934-line C as a table of
+`strip(kind, line, room_line)` calls over the same checks: self /
+immortal / lower mob always, else a magic check with the resist-dispel
+talent; the dispel negation stop; undispellable effects only by their
+caster; I1..I5 only on oneself; the I10 extras), paralyze, conjure
+elemental and cacaodemon (take `item=`; TBD: the stones/items that pick
+the mob), faerie fire, green slime, pword blind, scare, find familiar
+(kinds by C vnum 3090-3094; 17007 golem absent -> "You failed."), slow
+poison, armour as air, replicate and mirror (a Demiwolf / Ghoul_223
+reshaped as the C reshapes mob 1306 / 223)). Helpers: `_mob_kind(vnum)`,
+`_summon`, `_tame`, `_charm_hours`, `_replica_names`, `_mirror_names`.
+`Character.flee()` TBD stub (movement). 172 of 258 cast.
+
+names.AffectBit: bits 38 and 39 named from const.h (`remort_bonus`,
+`cacaodemon`; were bit38/bit39). Flags are stored by name, so the
+Player documents were updated in place (684 had bit38, 330 bit39; 0
+left). conftest `_Classes` iterates for the vnum lookup.
+
+Tests: tests/test_spells_magic2.py (4): dispel magic strips with lines,
+paralyze + weakness, replicate + familiar, refresh. 51 pass.
+
+### All spells, batch 5: magic_area.c (2026-11-11, pr-be, uncommitted)
+
+magic_area.c: 19 casts (nova (the rooms next door too, through
+`Room.exits()`), firestorm, ice storm, cone of cold, chain lightning
+(dealt as lightning bolt, as the C), geyser, gust of wind, faerie fog,
+porcupine, bloodspines, gathered wings, sphere of no seeing, acid
+cloud, clinging vines, poison cloud, all to stone (petrify on each),
+speed time, inferno (untyped damage, power spent), with their wrappers'
+lines). `_area(spell, caster, each)` is the C's generic_area_room: a
+resistance check at modifier 10 per bystander. Casts the C fires from
+a weapon take `weapon_spell=True` for the improved-weapon-spell scale.
+190 of 258 cast. Tests: tests/test_spells_area.py (3). 54 pass.
+
+
+## C game request: detritus search (2026-11-11, not started)
+
+Nitemare asked for object 15442 "detritus" to be searchable: `search
+detritus` rolls a D100 with vision-spell bonuses, hands out one of four
+prize tiers, and sets a 1-hour cooldown on the player and on the pile.
+Doable as a new `search` command plus a C object special registered for
+15442 in `spec_assign.c`; the game has no attachable scripts. Full ask,
+the C pieces that fit, and the questions sent back are in
+`explorations/detritus-search.org`. Add answers there as they arrive.
+
+### All spells, batch 6: magic_obj.c, magic_relo.c, the wrapper-only kinds (2026-11-11, pr-be, uncommitted)
+
+magic_obj.c (10): create water, enchant weapon, locate object (`name=`),
+identify, dispel invisibility, create light, continual light, animate
+dead (Zombie_100 reshaped from the corpse), portal (MistyPortal now has
+`to` and `owner`), warp weapon. magic_relo.c (11): beacon
+(`set_beacon=`; the beacon is a private attr, not saved, as the C),
+delayed teleport (a clock call), telelook, translook, teleimage,
+transmove / telemove / astral walk (the C's room picker is compiled
+out, so they fail as the C does), word of recall, teleport, summon.
+spells1/2/3.c wrapper-only (14): multiple magic missile, knock (an
+Exit or a Container), monsum one to seven (`_create_monster`), minor
+creation (`what=`), spirit war, levitate, knowledge to health / power.
+Earthquake (missed in batch 5) added. **226 of 258 kinds cast**; the 32
+without are the 23 Advanced kinds, offensive/defensive mastery and the
+7 the C table has no handler for (phase, restore, polymorph self,
+summon object, sending, golem, command): all answer with the base
+"That magic is unimplemented/disabled."
+
+Built for them:
+- `Item.identify_to(viewer, percent, say)`: cmds1.c identify_new in
+  full (item lore; also what the identify/lore commands, shops and
+  auctions will use). TBD inside it: item sets (no record yet), the
+  special-procedure note, gem removal costs.
+- `Item.take_damage(attacker, owner, element)` / `scrap(owner)`:
+  fight.c DamageOneItem / ItemSave / DamageItem / MakeScrap with the
+  ItemSaveThrows and materials tables; `Weapon.average_damage()`,
+  `Armor.reduction_rating()`, `Corpse.consents(who)`.
+- classes.py: `Character.flee/look/look_at_room/death_trap/fall_down/
+  drop_everything` TBD stubs (movement next), `home_room()` (bound_to),
+  `clan()` (member_of), `Player.age()`, `Room.with_vnum/allows/
+  magic_ok/teleport_target/is_raining(TBD)`, `Exit.reverse()`; the
+  corpse now records the dead one's level and hit points (real_cost,
+  value) as the C does.
+- The C's `eff_level` (uncapped) vs `ELVL20`: `Spell.effective_level`
+  is the capped one; locate object and create water use the level.
+
+Tests: tests/test_spells_objects.py (4). conftest: `find` now matches
+equality and $regex; roles bound_to/member_of. Whole suite: 58 pass.
+
+Spells are done. Next: travel and movement (do_move, do_flee, look,
+consider_fleeing, wander/go_home, the auto-look after teleports, the
+death trap and fall rooms), which fills the stubs above.
+
