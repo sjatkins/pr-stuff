@@ -1,6 +1,6 @@
 # Perilous Realms — Project State and Handoff
 
-**Last updated:** 2026-11-11 (detritus search request noted, questions out to Nitemare; spells batch 5 in pr-be)
+**Last updated:** 2026-11-12 (detritus search: all answers in, search block proposed, awaiting builder feedback, not built; spells batch 5 in pr-be)
 **Goal:** revive Perilous Realms (`pr3`) and package it as an installable
 Docker image for its maintainer, preserving the existing player base.
 
@@ -2271,7 +2271,13 @@ prize tiers, and sets a 1-hour cooldown on the player and on the pile.
 Doable as a new `search` command plus a C object special registered for
 15442 in `spec_assign.c`; the game has no attachable scripts. Full ask,
 the C pieces that fit, and the questions sent back are in
-`explorations/detritus-search.org`. Add answers there as they arrive.
+`explorations/detritus-search.org`. Prize vnums 15449-15455 received
+2026-11-12 (four items on a 100, not six). Top prize on a natural 100 only;
+only the highest vision bonus counts; `search` on nothing says "Huh?" and
+is meant for reuse (grass, etc.). Nitemare wants to set the prize table
+in their own data: a `search { find {...} ... }` block in the .obj file is
+proposed, modelled on the existing `touch` block; waiting on builder
+feedback. Not built.
 
 ### All spells, batch 6: magic_obj.c, magic_relo.c, the wrapper-only kinds (2026-11-11, pr-be, uncommitted)
 
@@ -2316,4 +2322,79 @@ equality and $regex; roles bound_to/member_of. Whole suite: 58 pass.
 Spells are done. Next: travel and movement (do_move, do_flee, look,
 consider_fleeing, wander/go_home, the auto-look after teleports, the
 death trap and fall rooms), which fills the stubs above.
+
+### Travel and movement (2026-11-12, pr-be, uncommitted)
+
+move.c, offensive.c do_flee, look.c, utils.c event_teleport / event_river,
+trap.c, mobact.c: ported as Character, Room, Exit, Mob and Trap behaviour.
+
+Character (classes.py, the "Travel and movement" block):
+- `go(where)` (do_move), `go_through(exit)` (Move: vines, paralysis,
+  confusion, stone; followers come along; autoclose doors), `raw_move`
+  (RawMove: charm, capacity, the barring flags, the sector's boat / fly /
+  gills and move cost, delay and exhaustion, crippling, tracks, move
+  traps, the look, death and fall rooms, sector damage), `display_move`,
+  `valid_move` (auto open / unlock unless manual_unlock), `enter`,
+  `leave`, `go_raw` and `run(path)` (do_go: a run on the clock, each step
+  after the wait less the constitution's walking bonus), `stop_running`.
+  Named `go_through`, not `move`: `move` is the Player / Mob pool field.
+- `flee` (do_flee in full: the fled one hunts and hates a player who
+  got away, a mob fears), `fall_down` / `_fall` (the fall rooms on the
+  clock, damage by rooms fallen and weight), `death_trap`, `drop_everything`.
+- `move_to` now also starts the room's events on arrival: a timed
+  teleport (`_teleport_event`, reading `_teleport`), a river's current
+  (`_river_event`), a dispel-magic room's dispel.
+- Doors on an Exit or a Container: `open_`, `close_`, `lock`, `unlock`,
+  `pick`, `crack(target, guess)` (the Mastermind lock, strong and weak
+  clicks, twelve tries), `has_readied(key)` (a Key kind by class name or
+  id, carried, inside a container, or worn; keys with uses crack and
+  crumble), `raw_open_door`, `raw_close_door`, `raw_lock_door`,
+  `phys_unlock_door`.
+- Positions: `stand`, `sit`, `rest`, `sleep`, `wake(other)`, `pray`;
+  `follow_command(leader)` (do_follow), `max_followers`, `followers()`,
+  `count_following`.
+- Looking: `look(argument)` (the room: name, description unless brief or
+  running, exits, "A road leads to the ...", things, people, tracks; "at",
+  "in", an exit, "room"), `look_at`, `look_in`, `look_dir`, `scry_dir`,
+  `look_room`, `look_at_room(room)`, `show_room`, `show_char(other, mode)`
+  (room line / a look / a peek), `show_item`, `list_items` (alike things
+  counted, traps by the find-trap skill), `list_people`, `item_condition`,
+  `describe_pos`, `describe_flags`, `find_here(word)` (generic_find with
+  n.word), `can_see_item`. `show_track` keeps its lines; the track skill
+  itself is TBD.
+- Still TBD inside: `remove_arena_only`, `in_contest` / `sports_cast`,
+  `show_map`, `is_connected` (link dead), the player's auto-aggressive
+  setting (no field yet), night darkness (`Room.is_dark` is the flag
+  without a light burning).
+
+Room: `direction_number`, `exit_toward(n)`, `exit_named(name)`,
+`sector_record()` (the Sector by name, cached), `extra(key)` (the `_fall`,
+`_teleport`, `_ex<n>` markers), `say(text)`, `leave_tracks` / `tracks()`
+(the newest three, in memory), `spring_move_trap`, `is_lit`, `zone_id`.
+Exit: `flags()` (state over info), `set_flags` / `clear_flags`, `name()`,
+`first_keyword`, `has_keyword`, `is_secret`, `can_go`, `can_go_human`,
+`new_crack_code`. Container: `new_crack_code`. Trap: `trigger(who)`
+(TriggerTrap by level and dexterity reaction), `hurt(victim)` (the words
+by kind; TBD: TrapSleep, TrapTeleport). `Position.running` added.
+combat.py: `CON_SPEED_WALK`, `DEX_REACTION`, `WAIT_QTR_SEC`,
+`PULSE_VIOLENCE`, `MAX_ACHIEVABLE`.
+
+Mob (mob.py): `think()` is mobact.c act_state in order: grouping with its
+kind, the special procedure's cadence, hatred decay (TBD), healer,
+hunting (`hunt_step`: MobHunt with `choose_exit`, a breadth-first
+find_path; Count Buntavic's `ambush_quarry`), `act_aggressive`
+(`find_victim`: FindVictim's class weights), `aid_friends`, `scavenge`
+(with the trap check), `maintain_position`, `act_hateful`
+(`knows_hatee_location`), fear (`find_a_fearee` then flee), `wander`
+(mobile_wander; a stay-zone mob without a spawn zone treats the zone it
+stands in as home), `guard_master`. `go_direction` (a humanoid opens and
+unlocks), `mob_initiate` (a skill before the first blow), `check_peaceful`,
+`can_fight`, `blocks_move` (the hook for kinds that bar the way),
+`consider_fleeing` (a wimpy mob under a fifth). TBD: `decay_hatred`,
+`cast_buff_spell`, `spread_hatred`, `find_items`, `discard_items`.
+
+Tests: tests/test_travel.py (6): walking with both rooms' lines and the
+move cost, a locked door opened with a key that crumbles, followers and
+flee, fall rooms and a death trap, look and the positions, a sentinel
+stays while a mob wanders and a hunter finds its quarry. 64 pass.
 
