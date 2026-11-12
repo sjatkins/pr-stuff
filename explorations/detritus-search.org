@@ -1,0 +1,158 @@
+#+TITLE: Detritus search — a C game request from Nitemare
+#+AUTHOR: notes from the request and from reading src/
+#+DATE: 2026-11-11
+#+STARTUP: overview
+
+* Status
+
+Requested 2026-11-11. Questions sent back to Nitemare (section 4).
+All answers in 2026-11-12. A builder-written =search= block is proposed
+(section 6); waiting on Nitemare's feedback. Nothing built.
+
+* The ask (Nitemare, 2026-11-11, verbatim in substance)
+
+Object 15442 "detritus" (hidden, hold, in zone they are building; several
+placed around the zone). A player types =search detritus=.
+
+Roll D100, plus modifiers for spell affects the player has:
+infravision +1, detect invisible +5, truesight +10.
+
+| roll    | result                                                        |
+|---------+---------------------------------------------------------------|
+| < 50    | "You search the detritus and find nothing but a bad smell."   |
+| 50-74   | a treasure object worth 10,000g                               |
+| 75-90   | a treasure object worth 100,000g                              |
+| 91-99   | a treasure object worth 500,000g                              |
+| 100     | 1 of a set of 6 rings, legendary to godly                     |
+
+Whatever the result, the player gets a 1-hour cooldown on searching any
+detritus, and that pile is unusable by anyone for 1 hour: "This pile of
+detritus has already been thoroughly ransacked, there's nothing of value
+left."
+
+Nitemare will make the prize objects once the mechanism is confirmed.
+
+* What the C code offers (read 2026-11-11)
+
+- No data-driven object scripts. Object specials are C functions
+  registered by vnum in =assign_objects()=, =src/spec_assign.c:597=
+  (the =touch_object= table). This is a new special plus one entry for
+  15442.
+- No =search= command exists (=h/inter.h=). Specials fire only after the
+  command matches the table (=interpreter.c:289=), so a =search= entry
+  and a =CMD_SEARCH= number in =h/cmd_num.h= are needed, with a plain
+  fallback =do_search= for everything else.
+- =special()= (=interpreter.c:314=) walks room contents regardless of
+  the hidden bit, so a hidden pile still gets the command.
+- Spell affects: =SPELL_INFRAVISION= 54, =SPELL_DETECT_INVISIBLE= 19,
+  =SPELL_TRUE_SIGHT= 94 (=h/spells.h=), tested with =affected_by_spell=.
+- Pile cooldown: =obj_data= already has =last_use_time= and
+  =use_cooldown= in real seconds (=h/structs.h:273=). Resets when the
+  zone reloads the pile or the server reboots.
+- Player cooldown: =affected_pulse_cooldown= list, expiry in epoch
+  seconds, saved in the player file (=player.save.c=), so it survives
+  logout. Add with =pulse_affect_cooldown_to_char=, read with
+  =get_remaining_pulse_cooldown_seconds=.
+- Prizes: created from a prototype with =get_obj(vnum, 0)= then
+  =obj_to_char=, as =touch_object= does. Needs each prize's vnum, or
+  the pile made a container whose contents are the prize pool.
+- Rolls: =number(1,100)= (=h/fcns.h:2701=).
+
+* Questions sent to Nitemare (2026-11-11)
+
+1. Ring on a natural 100 only, or on any modified total of 100+? With
+   all three bonuses a player reaches 100+ about 16% of the time.
+2. Do the three vision bonuses stack (+16), or only the best one?
+3. Prize vnums (three treasures, six rings) when made; or make the pile
+   a container and draw prizes from its contents so loot is set in the
+   world files.
+4. Default message for =search= on anything else: "You search but find
+   nothing."
+
+* Answers
+
+** Prize vnums (Nitemare, 2026-11-12)
+
+Question 3 answered: the prizes are new objects, created by vnum. Four
+items on a 100, not six.
+
+| roll  | vnum  | what                                                   |
+|-------+-------+--------------------------------------------------------|
+| 50-74 | 15449 | small coins                                            |
+| 75-90 | 15450 | medium coins                                           |
+| 91-99 | 15451 | large coins                                            |
+| 100   | 15452 | a godly ring, 'Aylariel's Tear'                        |
+| 100   | 15453 | an epic neck armour, 'Balgor's Lost Torque'            |
+| 100   | 15454 | a rare pair of stealthy gloves, 'a pair of ratty gloves'|
+| 100   | 15455 | a rare trinket, melee and regeneration, 'Aszhera's Favourite Doll' |
+
+On a 100 pick one of the four at random. Nitemare stressed the 1-hour
+player cooldown again: without it the pool is emptied in minutes.
+
+** Questions 1, 2, 3, 4 answered (Nitemare, 2026-11-12)
+
+1. The 100 is a *natural* 100 only. Modifiers never make the top prize.
+2. Bonuses do not stack: only the highest of the three counts
+   (truesight 10 over detect invisible 5 over infravision 1).
+3. Nitemare would like to specify, in their own data, which items a
+   pile can give and the chance of each (or "one of a selection"), so
+   the prize table is not fixed in C. The natural 100 stays as the rule
+   for the top tier. Design to settle on the C side: where a builder can
+   write that table (object values, extras, or the pile as a container
+   holding the prize prototypes with the chance on each).
+4. No default message. =search= on something not in the room answers
+   like an unknown command ("Huh?" or similar). The command is expected
+   to be reused for other searchable objects later, such as grass in
+   other zones.
+
+Nothing open on Nitemare's side. The builder-editable prize table in
+answer 3 is a design choice for Sam before building.
+
+* Proposed: a builder-written =search= block in the .obj file (2026-11-12)
+
+Sent to Nitemare for feedback; waiting.
+
+The .obj format is a fixed schema (=src/PRLib/fields.c=, compiled by
+=tran=). The existing =touch { transport_room, msg_to_room, msg_to_char,
+msg_to_dest }= block is the precedent: builder data read by a hardcoded
+special (=cmds3.c:3741=). A =search= block would work the same way:
+
+#+BEGIN_EXAMPLE
+search {
+  find { min { 50 } max { 74 } item { 15449 } }
+  find { min { 75 } max { 90 } item { 15450 } }
+  find { min { 91 } max { 99 } item { 15451 } }
+  find { natural { 100 } item { 15452, 15453, 15454, 15455 } }
+  nothing { You search the detritus and find nothing but a bad smell. }
+  ransacked { This pile of detritus has already been thoroughly ransacked, there's nothing of value left. }
+}
+use_cooldown { 3600 }
+#+END_EXAMPLE
+
+- =find= entries: a modified-roll range or a =natural= roll, and one or
+  more item vnums; several items means one picked at random.
+- =use_cooldown= already exists as a builder key and is the per-pile hour.
+- The player hour stays in code (pulse cooldown list, saved in the
+  player file).
+- The highest vision bonus only (truesight 10, detect invisible 5,
+  infravision 1) is applied to the roll for the ranged tiers; the
+  natural tier ignores it.
+- Any object with a =search= block becomes searchable, which covers the
+  grass-in-other-zones reuse. =search= on anything else: "Huh?".
+
+Cost: schema entries in =fields.c=, new fields on =obj_data=, read and
+write in =objdb.c=, rebuild =tran=, recompile the world, the =search=
+command, and the special that reads the block (no vnum table entry
+needed if the special keys off the block).
+
+Alternatives considered and set aside:
+- =type { hierarchical { ... } }=: an int list of any length, unread by
+  the game except the loader (seven card objects use it). Works today as
+  threshold/vnum pairs but changes the item type, is bare numbers, and
+  gives no per-item chance.
+- =other { a, b, c, d }=: only four ints.
+- A table in an =extras= desc: text parsing at runtime.
+
+* Build notes
+
+(none yet)
