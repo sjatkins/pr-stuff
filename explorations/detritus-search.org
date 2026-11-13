@@ -6,8 +6,8 @@
 * Status
 
 Requested 2026-11-11. Questions sent back to Nitemare (section 4).
-All answers in 2026-11-12. A builder-written =search= block is proposed
-(section 6); waiting on Nitemare's feedback. Nothing built.
+All answers in 2026-11-12; block approved 2026-11-13. Built and tested on
+the local dev pr3 (section 7). src commit 2936b8e8 pushed; not deployed.
 
 * The ask (Nitemare, 2026-11-11, verbatim in substance)
 
@@ -153,6 +153,70 @@ Alternatives considered and set aside:
 - =other { a, b, c, d }=: only four ints.
 - A table in an =extras= desc: text parsing at runtime.
 
-* Build notes
+* Build notes (2026-11-13, built and tested locally; src commit 2936b8e8 pushed)
 
-(none yet)
+Block approved by Nitemare 2026-11-13; built as proposed.
+
+** src (9 files, +171)
+- =h/structs.h=: =search_find= / =search_data= structs; =obj_data->search=
+  pointer (prototype-owned, shared by instances, never freed).
+- =PRLib/fields.c=: =_search_find= (min, max, natural, item A32),
+  =_search_fields= (find SUB, nothing STR, ransacked STR); obj field 83
+  =search=.
+- =objdb.c=: prototype reader case 83 (nested loops to END_OF_RECORD).
+- =h/spells.h=: =AFFECT_SEARCH_COOLDOWN= 10141, =LAST_SKILL= 10142;
+  =h/spell_list.h=: "*searching" at 141 (the cooldown's display name).
+- =h/cmd_num.h=: =CMD_SEARCH= 98; =h/inter.h=: "search", STA, do_search.
+- =h/const.h=: =SEARCH_PLAYER_COOLDOWN= and =SEARCH_OBJECT_COOLDOWN= (3600).
+- =cmds3.c=: =do_search= before =do_touch=. Finds the object in room or
+  inventory; no search block or NPC -> "Pardon?". Pile locked
+  (=last_use_time > now=) -> ransacked message. Player cooldown (pulse
+  cooldown list, survives logout) -> "You are too worn out to search
+  again for another N minutes." Roll D100; bonus is the highest of true
+  sight 10 / detect invisible 5 / infravision 1 (the AFF bits, so items
+  granting the affect count too). Natural finds checked first on the raw
+  roll; a modified total past the highest range max is clamped to it.
+  Prize via =get_obj(vnum, 1)= (respects max_exist; at the limit the
+  search finds nothing), =setup_obj_ev=, =obj_to_char=. Logs
+  "search: <who> found <what> [vnum] in <obj> [vnum] (roll r+b)" at
+  LOG_MISC. Messages use act(), so =$p= works in builder text.
+- Also rebuilt =tran= (it does not relink when libPR changes; rm tran/tran
+  first).
+
+** world
+No world change is part of this. The block for 15442 is Nitemare's to
+add (she is the builder). For the test it was put on 15442 locally and
+reverted afterwards; =live/lib/obj.out= still holds that test compile
+until the next =world/compile=. The block to give her:
+
+#+BEGIN_EXAMPLE
+  use_cooldown { 3600 }
+  search {
+    find { min { 50 } max { 74 } item { 15449 } }
+    find { min { 75 } max { 90 } item { 15450 } }
+    find { min { 91 } max { 99 } item { 15451 } }
+    find { natural { 100 } item { 15452, 15453, 15454, 15455 } }
+    nothing { You search the detritus and find nothing but a bad smell. }
+    ransacked { This pile of detritus has already been thoroughly ransacked, there's nothing of value left. }
+  }
+#+END_EXAMPLE
+
+** Test (local dev pr3 on 5024, 2026-11-13)
+New account sbtester / character Sbtester (warrior) made for the test;
+still in live/lib. Pile injected with gdb (ptrace scope set to 0 by Sam):
+=call (void)obj_to_room(get_obj(15442,0), 3000)=. Results:
+- =search frame= -> Pardon?
+- =search detritus= -> "You search detritus and find a valuable treasure!"
+  (roll 90, item 15450, log line written).
+- same pile again -> Nitemare's ransacked message.
+- fresh pile -> "too worn out ... 60 minutes" (player cooldown).
+Injected piles removed with =extract_obj= afterwards. The temporary zone
+line used before the gdb route was reverted; zone.out recompiled.
+
+** Noted on the way
+- =save_acct= (=account.c:41=) fwrites to an unchecked fopen: a missing
+  =account/<letter>/= directory segfaults the whole server on account
+  creation. Pre-existing; hit twice in a scratch copy.
+- The prototype reader exits on unknown ids, so an obj.out with a search
+  block needs this binary; the old binary would die at boot. Deploy the
+  code before (or with) the recompiled world.

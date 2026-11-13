@@ -2281,7 +2281,7 @@ modelled on the existing `touch` block. Approved and built 2026-11-13: new
 saved pulse cooldown, pile lock via `use_cooldown`. Tested on the local
 dev pr3 (prize found, pile lock, player cooldown, "Pardon?" elsewhere).
 The block for 15442 is Nitemare's to add (text in the explorations
-note); the world repo is clean. src changes uncommitted; not deployed. Deploy code with or before the
+note); the world repo is clean. src commit `2936b8e8` (pushed); not deployed. Deploy code with or before the
 recompiled world: the old binary exits on the unknown obj field. Test
 account sbtester left in local live/lib. Pre-existing bug found: an
 unchecked fopen in `save_acct` segfaults the server when
