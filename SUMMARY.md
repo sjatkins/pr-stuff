@@ -1,6 +1,6 @@
 # Perilous Realms — Project State and Handoff
 
-**Last updated:** 2026-11-12 (detritus search: all answers in, search block proposed, awaiting builder feedback, not built; spells batch 5 in pr-be)
+**Last updated:** 2026-11-13 (item commands get/drop/wear/remove in pr-be, uncommitted; graphify rebuilt over pr-be and src)
 **Goal:** revive Perilous Realms (`pr3`) and package it as an installable
 Docker image for its maintainer, preserving the existing player base.
 
@@ -2275,9 +2275,17 @@ the C pieces that fit, and the questions sent back are in
 2026-11-12 (four items on a 100, not six). Top prize on a natural 100 only;
 only the highest vision bonus counts; `search` on nothing says "Huh?" and
 is meant for reuse (grass, etc.). Nitemare wants to set the prize table
-in their own data: a `search { find {...} ... }` block in the .obj file is
-proposed, modelled on the existing `touch` block; waiting on builder
-feedback. Not built.
+in their own data: a `search { find {...} ... }` block in the .obj file,
+modelled on the existing `touch` block. Approved and built 2026-11-13: new
+`search` command, obj field 83 in the schema, loader, player cooldown as a
+saved pulse cooldown, pile lock via `use_cooldown`. Tested on the local
+dev pr3 (prize found, pile lock, player cooldown, "Pardon?" elsewhere).
+The block for 15442 is Nitemare's to add (text in the explorations
+note); the world repo is clean. src changes uncommitted; not deployed. Deploy code with or before the
+recompiled world: the old binary exits on the unknown obj field. Test
+account sbtester left in local live/lib. Pre-existing bug found: an
+unchecked fopen in `save_acct` segfaults the server when
+`account/<letter>/` is missing.
 
 ### All spells, batch 6: magic_obj.c, magic_relo.c, the wrapper-only kinds (2026-11-11, pr-be, uncommitted)
 
@@ -2423,3 +2431,58 @@ limit), `meets_level_limit`, `death_cry` (TBD). combat.py: `STR_CARRY`,
 Tests: tests/test_mob_minds.py (3); conftest has every wear slot role.
 67 pass. docs/travel.org has the section.
 
+
+### The item commands: get, drop, wear, remove (2026-11-13, pr-be, uncommitted)
+
+The first commands as commands. `pr_be/command.py` is the core from
+docs/commands.org: `@command(*words, position, level, lag, mobs,
+disabled, arena, **options)` registers a function of (issuer, argument)
+in `COMMANDS` (the C's cmd_info[] without the numbers; the options are
+what the C passed as the sub-command number); `find_command` (exact,
+then abbreviation in registration order), `split_line`, `one_argument`,
+`two_arguments`, `only_argument`, `how_many` ("all.x" / "n*x" capped at
+9); `may_run` is interpreter.c command_process's gate with every message
+(Pardon?, the arena referee, disabled, creatures, paralysed, confused,
+the nine position lines; stops a runner, clears hide); `interpret` (a
+line to a partial, "Arglebargle, glop-glyf!?!" when unknown), `run`
+(gate, function, lag), `execute` (both). The player FIFO and the wheel
+are still to come; `execute` is what tests and mobs use now.
+
+`pr_be/commands/things.py`: `get`/`take` and `getnodrop` (do_get, all
+eight forms including "all corpses" and the locker refusal), `drop`
+(do_drop: n*x, all*x, n x, coins, all), `wear` (do_wear, with the
+eighteen body locations by prefix), `wield`/`grab`/`hold`
+(do_specific_wear), `remove` (do_remove: a thing, all, or "1,3" by
+position in the worn list), `junk` (do_junk). Each is the C handler as
+a top-level function that reads the words and asks the objects.
+
+classes.py, what the objects know: `isname` (utils.c isname in full:
+prefix after one letter, the ' and ` forms, the trailing '.'),
+`split_count`, `find_item` (get_obj_in_list_vis); on Character
+`find_carried`, `find_worn`, `find_accessible` (get_obj_vis_accessible),
+`worn_items` in the C's slot order (`WEAR_ORDER`), `holds_count`
+(obj_count_char), `too_many` (the per-player limit; the world limit is
+still TBD), `can_shift`, `can_carry` (obj1.c can_carry with its
+messages; `can_carry_item` stays the bare CAN_CARRY_OBJ),
+`can_get_unbound_nodrop`, `can_drop` (CAN_DROP), `_drop_timer`
+(DROP_TICKS = 30 into `phaseout`, ×200 for nodrop, not for an immortal
+or in an autosave room), `drop_item` (phys_drop), `drop_coins`,
+`shift_item` (phys_shift), `is_auctioneer` (TBD: no kind marked).
+`get_item` now uses `Money.worth` (it read a field Money never had).
+item.py: `Item.owner` (the C's obj->owner, for nodrop items; it was
+read by getattr before and never existed), `Money.pile(amount)`
+(create_money with the coin-count guesses), `Trap.springs_on_any`,
+`Trap.springs_on_get`, `Container.spring_inside_trap`. combat.py: `I6`.
+
+Tests: tests/test_things.py (11). 78 pass. docs/commands.org has a
+"Built" section pointing at the modules.
+
+graphify: reinstalled (uv tool `graphifyy` 0.9.108, skill under
+~/.claude/skills/graphify). The September graph had only src/py_json/
+world; `graphify update .` with the home repo's .gitignore honoured
+pruned src and pr-be (both are ignored sub-repos), so
+graphify-out/.graphify_build.json now sets `"gitignore": false` with
+explicit excludes (live, world, Backups, .venv, node_modules,
+__pycache__). The graph covers pr-be (14k nodes) and src (4k). Use
+`graphify explain "<symbol>"` for where a C or Python function lives
+and what calls it, before any grep.

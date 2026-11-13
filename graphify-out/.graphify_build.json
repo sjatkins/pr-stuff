@@ -1,0 +1,1 @@
+{"gitignore": false, "excludes": ["live/**", "world/**", "Backups/**", "**/.venv/**", "**/node_modules/**", "**/__pycache__/**", "**/.git/**", "graphify-out/**"]}
