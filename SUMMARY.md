@@ -1,6 +1,6 @@
 # Perilous Realms — Project State and Handoff
 
-**Last updated:** 2026-11-13 (item commands get/drop/wear/remove in pr-be, uncommitted; graphify rebuilt over pr-be and src; detritus search in src 2936b8e8, not deployed)
+**Last updated:** 2026-11-13 (commands as parser + action in pr-be, uncommitted; graphify rebuilt over pr-be and src)
 **Goal:** revive Perilous Realms (`pr3`) and package it as an installable
 Docker image for its maintainer, preserving the existing player base.
 
@@ -2486,3 +2486,21 @@ explicit excludes (live, world, Backups, .venv, node_modules,
 __pycache__). The graph covers pr-be (14k nodes) and src (4k). Use
 `graphify explain "<symbol>"` for where a C or Python function lives
 and what calls it, before any grep.
+
+### Commands are a parser and an action (2026-11-13, pr-be, uncommitted)
+
+Sam: the single command function mixed two levels, what the player
+types and a Python function with real arguments. Rewritten: each
+command is a pair. The parser is what `@command` registers; it takes
+(issuer, text), does that command's word work with the C's messages for
+what is missing, and returns the action, a `partial` of a level-two
+function with objects (or None). The action is a plain function of
+issuer and objects, or an existing object method (`drop_item`,
+`drop_coins`, `wear_item`, `junk`); mobs and timers call it directly.
+`interpret` is find, gate, parse; `run` is the action then the lag.
+things.py: `parse_get`/`take_all`/`take_from_floor`/
+`take_from_container`/`empty_container`/`loot_corpses`; `parse_drop`/
+`drop_items`/`drop_all`; `parse_wear`/`wear_all`; `parse_wield`;
+`parse_remove`/`remove_items`/`remove_all`; `parse_junk`. An action
+skips a thing that has moved since the line was read. 79 pass.
+docs/commands.org "Built" describes the shape.
