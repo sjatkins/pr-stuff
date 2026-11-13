@@ -7,7 +7,7 @@
 
 Requested 2026-11-11. Questions sent back to Nitemare (section 4).
 All answers in 2026-11-12; block approved 2026-11-13. Built and tested on
-the local dev pr3 (section 7). src commit 2936b8e8 pushed; not deployed.
+the local dev pr3 (section 7). src commit 2936b8e8 deployed to production 2026-11-13 20:14 UTC; world recompile waits on her block.
 
 * The ask (Nitemare, 2026-11-11, verbatim in substance)
 
@@ -258,6 +258,13 @@ still in live/lib. Pile injected with gdb (ptrace scope set to 0 by Sam):
 - fresh pile -> "too worn out ... 60 minutes" (player cooldown).
 Injected piles removed with =extract_obj= afterwards. The temporary zone
 line used before the gdb route was reverted; zone.out recompiled.
+
+** Production follow-up (2026-11-13)
+Nitemare's compile failed: "Unrecognized token: search". Production's
+=tran= was the 10-12 build; its makefile depended only on its own objects,
+so the libPR schema change never relinked it. Relinked by hand (20:26 UTC),
+verified it parses ALLOBJS; makefile fixed (src 0c6003ce: tran depends on
+../PRLib/libPR.a and the shared objects) and pulled onto pr3-pr.
 
 ** Noted on the way
 - =save_acct= (=account.c:41=) fwrites to an unchecked fopen: a missing

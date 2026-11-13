@@ -1,6 +1,6 @@
 # Perilous Realms — Project State and Handoff
 
-**Last updated:** 2026-11-13 (put and give in pr-be, uncommitted; graphify rebuilt over pr-be and src)
+**Last updated:** 2026-11-13 (put and give in pr-be, uncommitted; graphify rebuilt over pr-be and src; detritus search 2936b8e8 live on production)
 **Goal:** revive Perilous Realms (`pr3`) and package it as an installable
 Docker image for its maintainer, preserving the existing player base.
 
@@ -2283,7 +2283,11 @@ dev pr3 (prize found, pile lock, player cooldown, "Pardon?" elsewhere).
 The block for 15442 is Nitemare's to add (text in the explorations
 note); the world repo is clean. src commit `2936b8e8`, deployed to pr3-pr 2026-11-13 20:14 UTC (pulled, built,
 `restart_pr_server.sh`; bun reconnected within seconds). World not yet
-recompiled: waiting on Nitemare's block. Deploy code with or before the
+recompiled: waiting on Nitemare's block. Her first compile failed with
+"Unrecognized token: search": production's `tran` was stale (its makefile
+did not depend on libPR.a). Relinked by hand 20:26 UTC; makefile fixed in
+src 0c6003ce and pulled onto pr3-pr. A deploy is pull, `make all`, check
+`tran` relinked, restart. Deploy code with or before the
 recompiled world: the old binary exits on the unknown obj field. Test
 account sbtester left in local live/lib. Pre-existing bug found: an
 unchecked fopen in `save_acct` segfaults the server when
