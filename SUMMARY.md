@@ -2526,3 +2526,22 @@ of someone's no-drop, the rarity log), `give_coins`, `_refuses_gift`,
 `find_person_here` (get_char_room_vis). item.py: `Container.fits`
 (OBJECT_FITS_IN_OBJECT, volume and the three sorted dimensions),
 `contents_volume`. Tests: 2 more in test_things.py; 81 pass.
+
+### The door and look commands (2026-11-13, pr-be, uncommitted)
+
+commands/doors.py: open, close, lock, unlock, pick, crack as parsers
+returning the Character's own `open_`, `close_`, `lock`, `unlock`,
+`pick`, `crack` (a container carried or here first, else `find_door`).
+commands/looking.py: look/l, read, inventory/i, equipment/eq, exits,
+scan, examine, describe. New on Character: `say` (comm.c do_say, with
+the stupid flag, timestamps, echo), `show_inventory`, `show_equipment`
+(every slot numbered, "<nothing>", dual-wield shown as wielded),
+`show_exits` (cmds3.c, mortal and immortal forms), `nice_name`, `scan`
+(cmds1.c with the class, race track and scan-skill bonus), `examine`
+(cmds1.c do_examine on a thing: material, weight, volume, measurements,
+the appraise skill's estimate with the C's hash, sockets, socket gem
+lines, set name, socket bonuses, then `identify_to` for a common item or
+an immortal; describe says every line to the room). `_hash_string` is
+look.c hash_string. Left out: examining an item set by name (the set
+bonus display is the item-set feature). Tests: tests/test_doors_looking.py
+(3) over the travel world; 84 pass.
