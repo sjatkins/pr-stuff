@@ -201,6 +201,52 @@ until the next =world/compile=. The block to give her:
   }
 #+END_EXAMPLE
 
+** Message for Nitemare (drafted 2026-11-13)
+
+#+BEGIN_EXAMPLE
+Hi Nitemare,
+
+The search command is in. To make the detritus searchable, add these
+lines to object 15442, inside its outer braces (after the extras block
+is fine):
+
+  use_cooldown { 3600 }
+  search {
+    find { min { 50 } max { 74 } item { 15449 } }
+    find { min { 75 } max { 90 } item { 15450 } }
+    find { min { 91 } max { 99 } item { 15451 } }
+    find { natural { 100 } item { 15452, 15453, 15454, 15455 } }
+    nothing { You search the detritus and find nothing but a bad smell. }
+    ransacked { This pile of detritus has already been thoroughly ransacked, there's nothing of value left. }
+  }
+
+How it reads:
+
+- Each 'find' is one row of your table. 'min' and 'max' are the roll
+  range after the vision bonus is added. 'natural' means the raw die
+  must show exactly that number, so the 100 can't be reached with a
+  bonus. If 'item' lists several vnums, one is picked at random.
+- The vision bonus is the highest one the player has: truesight +10,
+  detect invisible +5, infravision +1. They don't stack.
+- 'nothing' is what a player sees on a miss. 'ransacked' is what anyone
+  sees while the pile is on cooldown. You can write $p in either to
+  name the object.
+- 'use_cooldown' is the pile's lock in seconds. 3600 is the hour you
+  asked for. Leave it out and it still defaults to an hour.
+- The player's own one-hour wait is built in and applies to every
+  searchable object, not just this one.
+
+You can put a 'search' block on any other object the same way, with its
+own table and messages, so grass piles in other zones work without code
+changes. Anything without a block just gets "Pardon?".
+
+One thing for the deploy: the new server has to be running before the
+world is recompiled with this block, otherwise the old server won't
+boot. Sam will handle that order.
+
+Sam
+#+END_EXAMPLE
+
 ** Test (local dev pr3 on 5024, 2026-11-13)
 New account sbtester / character Sbtester (warrior) made for the test;
 still in live/lib. Pile injected with gdb (ptrace scope set to 0 by Sam):
