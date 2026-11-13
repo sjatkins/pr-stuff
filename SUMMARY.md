@@ -1,6 +1,6 @@
 # Perilous Realms — Project State and Handoff
 
-**Last updated:** 2026-11-13 (item commands get/drop/wear/remove in pr-be, uncommitted; graphify rebuilt over pr-be and src)
+**Last updated:** 2026-11-13 (item commands get/drop/wear/remove in pr-be, uncommitted; graphify rebuilt over pr-be and src; detritus search in src 2936b8e8, not deployed)
 **Goal:** revive Perilous Realms (`pr3`) and package it as an installable
 Docker image for its maintainer, preserving the existing player base.
 
