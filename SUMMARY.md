@@ -1,6 +1,6 @@
 # Perilous Realms — Project State and Handoff
 
-**Last updated:** 2026-11-13 (commands as parser + action in pr-be, uncommitted; graphify rebuilt over pr-be and src)
+**Last updated:** 2026-11-13 (put and give in pr-be, uncommitted; graphify rebuilt over pr-be and src)
 **Goal:** revive Perilous Realms (`pr3`) and package it as an installable
 Docker image for its maintainer, preserving the existing player base.
 
@@ -2504,3 +2504,19 @@ things.py: `parse_get`/`take_all`/`take_from_floor`/
 `parse_remove`/`remove_items`/`remove_all`; `parse_junk`. An action
 skips a thing that has moved since the line was read. 79 pass.
 docs/commands.org "Built" describes the shape.
+
+### Put and give (2026-11-13, pr-be, uncommitted)
+
+things.py: `parse_put` / `put_items`, `parse_give` / `give_items` (and
+`Character.give_coins` for "give n coins"). On Character: `put_item`
+(do_put's rules: a no-drop item or a container of them only into a
+container on you, not a container, cursed, test, the insurance token,
+a pouch takes only spell components or socket gems, no corpse, closed,
+into itself, fit), `give_item` (can_carry for the receiver, a humanoid
+mob's polite refusal via rate_armor/rate_weapon, cursed/test, the
+no-drop transfer window `NODROP_TRANSFER_WINDOW` = 24 hours, a container
+of someone's no-drop, the rarity log), `give_coins`, `_refuses_gift`,
+`is_spell_component` (the class spell specs' required_items),
+`find_person_here` (get_char_room_vis). item.py: `Container.fits`
+(OBJECT_FITS_IN_OBJECT, volume and the three sorted dimensions),
+`contents_volume`. Tests: 2 more in test_things.py; 81 pass.
