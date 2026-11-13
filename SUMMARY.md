@@ -2398,3 +2398,28 @@ move cost, a locked door opened with a key that crumbles, followers and
 flee, fall rooms and a death trap, look and the positions, a sentinel
 stays while a mob wanders and a hunter finds its quarry. 64 pass.
 
+### The remaining mob TBDs (2026-11-12, pr-be, uncommitted)
+
+mob.py: timed hatred and fear (`hate`/`fear` record the expiry in
+memory beside the relationship, as the C's opinion lists; `hates`/`fears`
+honour it), `decay_hatred`, `spread_hatred` (the whisper, "Kill <name>
+on sight!"), `forget_hatred`, `is_police` (TBD: no kinds marked),
+`keeps_shop`; the item mind: `rate_effects`, `rate_armor`, `rate_object`,
+`rate_weapon` (-5000 as the C), `find_good_pos`, `find_best`,
+`find_items`, `discard_items`; `cast_buff_spell` (mob_cast_buff_spell
+with the 44-spell `_BUFF_WORDS` table; druid forms and shadowform call
+TBD stubs until the skills). The hatefield preferences (race, sex,
+class, alignment) are not in the mob data, so Hates is the list alone.
+
+classes.py, handling things (for the mobs and for the item commands to
+come): `get_item` (phys_get, money counted in), `remove_item`
+(phys_remove), `junk` (phys_junk), `wear_item` (obj2.c wear() in full,
+every check and message), `wear_in_slot`, `wield`, `wear_keyword`,
+`worn_in`, `can_carry_item`, `carry_weight_limit`, `carry_volume_limit`,
+`wield_weight_limit`, `can_loot`, `can_have` (TBD: limited-item world
+limit), `meets_level_limit`, `death_cry` (TBD). combat.py: `STR_CARRY`,
+`STR_WIELD`, `ONE_POUND`. item.py: `Trap.send_to_sleep`, `Trap.teleport`.
+
+Tests: tests/test_mob_minds.py (3); conftest has every wear slot role.
+67 pass. docs/travel.org has the section.
+
