@@ -1,18 +1,18 @@
-# Graph Report - pr-stuff  (2026-11-13)
+# Graph Report - pr-stuff  (2026-11-14)
 
 ## Corpus Check
-- 454 files · ~2,813,410 words
+- 456 files · ~2,814,241 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 248 file(s) not represented in the graph (top: .o 108, .org 35, (none) 32)
-- WARNING: 248 of 705 files seen (35%) have no supported extractor and are missing from this graph entirely. It may look complete while representing only part of the codebase.
+- WARNING: 248 of 707 files seen (35%) have no supported extractor and are missing from this graph entirely. It may look complete while representing only part of the codebase.
 
 ## Summary
-- 19033 nodes · 85041 edges · 1048 communities (183 shown, 865 thin omitted)
-- Extraction: 49% EXTRACTED · 51% INFERRED · 0% AMBIGUOUS · INFERRED: 43606 edges (avg confidence: 0.93)
+- 19056 nodes · 85100 edges · 808 communities (182 shown, 626 thin omitted)
+- Extraction: 49% EXTRACTED · 51% INFERRED · 0% AMBIGUOUS · INFERRED: 43620 edges (avg confidence: 0.93)
 - Token cost: 91,595 input · 3,983 output
 
 ## Graph Freshness
-- Built from commit: `8ee26663`
+- Built from commit: `5ce5c426`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -20,13 +20,14 @@
 - players.py
 - tranparse.py
 - extras.py
+- re
 - package.json
 - Parser
 - api_server.py
 - structs.h
 - restart_pr_server.sh
 - us_debt.sh
-- sendf
+- room_data
 - pr_functions.sh
 - Web front end for Perilous Realms — the working pieces
 - py-json: Perilous Realms world sources to JSONL
@@ -47,7 +48,7 @@
 - .echo
 - Sex
 - names.py
-- cmds1.c
+- handler.c
 - RaceName
 - Dimensions
 - obj_data
@@ -55,13 +56,13 @@
 - act
 - Dice
 - ClassName
-- Store
+- pr_be/classes.py
 - dice
 - WearFlag
 - Material
 - necklace.py
-- combat.py
-- test_things.py
+- Item
+- longsword.py
 - cmds3.c
 - ObjectFlag
 - ring.py
@@ -73,7 +74,7 @@
 - body_armor.py
 - DamageType
 - connection_data
-- CharmPersonSpell
+- warhammer.py
 - SparseResistances
 - Rarity
 - belt.py
@@ -95,12 +96,12 @@
 - Effect
 - shield.py
 - item.py
-- .room
+- online.c
 - Clock
 - Armor
-- other.py
+- Other
 - shortsword.py
-- BiKnightOfPentacles
+- Dimensions
 - skills.py
 - utils.c
 - store
@@ -141,13 +142,13 @@
 - wings.py
 - Purge/utl1.c
 - scimitar.py
-- obj_color_short_description
+- str_cmp
 - flail.py
 - whip.py
 - shop_data
 - tran_ruby.c
-- _area
-- ExtraDescription
+- boat.py
+- .has_readied
 - AMPL/parser.c
 - Proc.c
 - CodedFlag
@@ -157,7 +158,7 @@
 - Uniform Persistence Doc
 - py-json Project
 - Session View Doc
-- apex_level_data
+- event_t
 - Schema.c
 - BodyPart
 - SectorMapStrings
@@ -170,12 +171,12 @@
 - apply_stats
 - .cast_buff_spell
 - Range
-- find_path
-- re
-- remort_options
-- Audio
+- check_bin.py
+- prworld/classes.py
+- string_list
 - audio.py
-- pr_be/classes.py
+- search_data
+- CodedStrEnum
 - util.c
 - submit.c
 - babble_stuff
@@ -202,66 +203,65 @@
 - _item_lore
 - mail_item
 - sale_data
-- ControlWeatherSpell
 - .bestow
 - txt_q
-- ClumpOfGrass
-- ClumpOfGrass_112001
-- ClumpOfGrass_112002
-- ClumpOfGrass_112003
-- ClumpOfGrass_112004
-- ClumpOfGrass_112005
-- ClumpOfGrass_112006
-- ClumpOfGrass_112007
-- ClumpOfGrass_112008
-- ClumpOfGrass_112009
-- ClumpOfGrass_112010
-- ClumpOfGrass_112011
-- ClumpOfGrass_112012
-- ClumpOfGrass_112013
-- ClumpOfGrass_112014
-- SlabOfRubble
-- SlabOfRubble_16512
-- SomeDust
-- SomeDust_112112
-- SomeDust_112113
-- SomeDust_112114
-- SomeDust_112115
-- SomeDust_112116
-- SomeDust_112117
-- SomeDust_112118
-- SomeDust_112119
-- SomeDust_112120
-- SomeDust_112121
-- SomeDust_112122
-- SomeDust_112123
-- SomeDust_112124
-- SomeDust_112125
-- SomeDust_112126
-- SomeDust_112127
-- SomeDust_112128
-- SomeDust_112129
-- SomeDust_112130
-- SomeDust_112131
-- SmokeyTorch
+- .fits
+- .cast
+- Charged
+- BeltOfGoldenDiscs
+- BeltOfValor
+- BeltOfWovenAngelFeathers
+- BroadSilverBelt
+- GirdleOfTheFallen
+- HeavyMithrilAnchorCable
+- ObsidianBelt
+- RedLeatherBelt
+- SilverGirdle
+- ShinyBelt
+- SmallLoinCloth
+- RuneCoveredBeltARENA
+- WhiteDragonscaleBelt
+- AnuranBandedPlatemail
+- ArcaneIncineratorSRobe
+- AztazsPowerArmor
+- BlackDragonScaleShirt
+- BloodRedShirt
+- BlueDragonScaleShirt
+- BombadilsBombProofChestPlate
+- BrassDragonScaleShirt
+- BreastplateOfValor
+- BrightGreenShirt
+- BumblebeePatternedPyjamaTop
+- CheckeredShirt
+- DarkTrollSkinJacket
+- DragonboneBreastPlate
+- DragonscaleBreastPlate
+- DragonscaleBreastPlateTEST
+- DrowChainShirt
+- DwarvenPlateMail
+- FishScaleRobe
+- FullSuitOfBoneArmour
+- GangasGnarlyJacket
+- GlowingSuitOfBandedMail
+- GreenDragonScaleShirt
 - .tell
 - obj_room_pair
 - medit.c
 - DictionaryCreate
-- spell.py
-- topic_list_node
+- HeavyStenchcoat
+- IntricatelyDetailedSilverPlatemail
 - LargeDiamond_2700
 - strip.c
-- LockedSafe
-- ContinualLightSpell
-- CureBlindSpell
-- HeartOfTheSerpent
-- KnowAlignmentSpell
-- KnowledgeToHealthSpell
-- SummonDemonSpell
-- TelelookSpell
-- TeleimageSpell
-- TransmoveSpell
+- IntricatelyWovenKelpBreastplate
+- IronScalemailShirt
+- LayeredAndPatchedSteelPlatemail
+- LimosChestPlateOfGlory
+- MotherSApron
+- MudSplatteredTabard
+- ObsidianChestPlate
+- OldBattledress
+- OldBattlerobe
+- OldDentedAndRustyBreastplate
 - acct_edit
 - sale_info
 - string_node
@@ -340,77 +340,53 @@
 - ShimmeringRobeOfMidnight
 - TatteredClothRobe
 - TrollSkinGambeson
-- BlueDragonHorn
-- GlintingSilverBraceletARENA
-- GlintingSilverBraceletTEST
-- LizardmanFetish
-- MedallionOfSuffering
-- Staff_13806
-- SomeChainShackles
+- OldRustySuitOfPlateMail
+- OldSuitOfRustyChainMail
+- PatchedSteelPlatemail
+- PondersDiamondChestPlate
+- ProtectorOfTheAngelicAvenger
+- PurpleWormHide
+- SuitOfPaddedArmor
 - ShreddedRedTunic
 - RedTunic
-- BeltPouch_1577
-- BlackCauldron
+- SuitOfQuiltedArmor
+- SilverscaleVestment
 - Bookcase
-- BookOfMagic
-- CorpseOfADwarvenDefender
-- DeadBody
-- EquipmentLocker
-- GiantClam
-- GlowingFrogHead
-- GrainSack
-- HolsteredBelt
-- HugeCloset
-- LargeBlueClam
-- BandOfAngelicHeroism
-- BandOfAngelicPurity
-- Bracelet
-- BraceletOfAncientWhaleBone
-- BraceletOfBirdSkulls
-- BraceletOfBlackDeath
-- BraceletOfYellowBone
-- BracersOfHadal
-- ChainsOfTheLightbringer
-- CrystallineBracelet
-- DragonboneVambrace
-- FettersOfImprisonment
-- FlamingBraceletARENA
-- GlintingSilverBracelet
-- GlossyBloodyBracelet
-- GoldenBracelet
-- IvoryBracelet
-- LargeWraithBand
-- LinkOfThePit
-- MarksBlackBracelet
-- MithrilBracelet
-- WraithBand
-- SpiderBracelet
-- ShinyGemstoneBracelet
-- LargeChest
-- LargeGreenClam
-- LargeGreyClam
-- Ace
-- Alpha0
-- AntiqueBook
-- AquaPotionRaisesWisdomOnePoint
-- BluePotionRaisesIntelligenceOnePoint
-- BrassPlaque_41039
-- BrassPlaque_41054
-- BrassPlaque_41055
-- BrassPlaque_41056
-- BrassPlaque_41085
-- ClearPotionRaisesCharismaOnePoint
-- CoilOfRope
-- DiValkyrieOfPentacles
+- RuneCoveredBreastPlateARENA
+- SuitOfOrnateWraithMail
+- SuitOfWraithMail
+- WhaleboneBreastplate
+- VestOfFishScales
+- SturdyLeatherBreastplate
+- RedEnamelledSteelHauberk
+- WhiteSteelBreastplate
+- TightFittingGreenDragonScaleShirt
+- SaladinsChestPlateMadeFromOldRags
+- TraditionalBlackDuergarDress
+- WovenKelpBreastplate
+- SahuaginChampionsBreastPlate
+- EmptyCarrionCrawlerHead
+- GoldenCrown
+- IronCrown
+- PairOfSpectacles
+- ShimmeringMaskOfTrueNight_107012
+- ShapelessHat
+- SilverCrown_16061
+- FreshKelp
+- GoldenKey_5024
+- GreenFrogEye
+- IntricatelyCarvedKey
+- Key_16005
+- Key_6502
+- KeyToTheLabyrinth
+- ObsidianLavaCrystals
+- SquareStoneKey
+- TWOATicketToNewHavenFromMidgard
+- RustyKey
+- TowerKey
+- LargeWaterbed
+- CreateWaterSpell
 - Fireplace
-- DullPurplePotionRaisesLuckOnePoint
-- Eight
-- EiXIITheHangedMan
-- EyeOfTheGuardian
-- EyeOfTheNewt
-- LargeLeatherChest
-- Five
-- Four
 - BagOfGreenDragonScales
 - Barrel
 - Barrel_6013
@@ -457,21 +433,9 @@
 - SomeFingerlessLacyGloves
 - RustyPairOfGauntlets
 - ShimmeringSilkGloves
-- LargeRedClam
-- FrameOfProtection
 - HelmOfTheDragonsARENA
-- LargeSatchel
-- LeatherBackpack
-- GlowingTetrahedron
 - SilverLaurels
 - SilverFiligreeHairnet
-- LeatherPouch
-- GoldPlatedTankard
-- GreenPotionRaisesDexterityOnePoint
-- HeartOfTheMidnightThicket
-- IIITheEmpress
-- IIThePriestess
-- ITheMagus
 - BlackAndWhiteSkirtOfMagpieFeathers
 - BlackDragonScaleSkirt
 - BronzeGreaves
@@ -502,62 +466,28 @@
 - RustyPairOfGreaves
 - SomeSilverGreaves
 - SomeSeaweedCoveredSilverGreaves
-- LeatherPouch_16008
-- LongCylindricalTube
-- MangledCorpseOfAKobold
-- MarkOfTheWidow_510
-- MoundOfHumanBodies
-- AncientSpellPouch
-- IVTheEmperor
 - BagOfHolding_16768
-- OakRack
-- IXTheHermit
-- King18
-- Knave12
-- Knight16
 - Cabinet
-- Chest
-- LeNineOfMirrors
-- MarkOfTheMonksOfAgatar_2206
-- MeSixOfMirrors
-- DirtCakedSpellPouch
-- DriedWartyToad
-- PizzaBox
-- SkexieChest
-- Mob0TheFool
-- Fridge
-- GoldenAltar
-- MoSixOfSwords
-- Nine
-- IronBoundChest
-- NoSevenOfSwords
 - AaITheMagus
 - LargeAltarOfSet
 - AeIIITheEmpress
 - AiIIThePriestess
 - LargeBarrel
 - AlphaOfCups
-- OAlphaOfSwords
 - AoIVTheEmperor
-- Other
+- other.py
 - AuVTheHierophant
 - BaKnightOfCups
 - BeautifulLargeStatueOfMaleria
 - BeKnightOfMirrors
-- OeXVIITheStar
-- OiXVITheTower
-- Omega11
 - BoKnightOfSwords
-- OrbOfNuahlon
 - BrassPlaque
-- PerfectPearl
 - BrassPlaque_41033
 - BrassPlaque_41034
 - BrassPlaque_41035
 - BrassPlaque_41036
 - BrassPlaque_41037
 - BrassPlaque_41038
-- PrimitiveScarecrow
 - BrassPlaque_41040
 - BrassPlaque_41041
 - BrassPlaque_41042
@@ -572,170 +502,90 @@
 - BrassPlaque_41051
 - BrassPlaque_41052
 - BrassPlaque_41053
-- Prince14
-- Princess13
-- Queen17
 - BrassPlaque_41057
-- RobeOfTheMonksOfAgatar
-- SpirallingBanister
 - BrassPlaque_41060
 - BrassPlaque_41061
-- RedPotionRaisesStrengthOnePoint
 - BrassPlaque_41063
 - BrassPlaque_41064
 - BrassPlaque_41065
 - BrassPlaque_41066
-- WhitePotionRaisesConstitutionOnePoint
-- Seashell
-- Two
-- Three
-- Seven
-- Ten
 - DaValkyrieOfCups
 - DeValkyrieOfMirrors
-- Valkyrie15
 - DoValkyrieOfSwords
-- VTheHierophant
 - DuValkyrieOfWands
 - EAlphaOfMirrors
-- VITheLovers
 - EeXIIIDeath
-- VIITheChariot
-- VIIIStrength
 - EoXXIITheLabyrinth
 - EuXIVTemperance
-- XIJustice
-- XIITheHangedMan
 - FaPrinceOfCups
 - FePrinceOfMirrors
 - FiPrinceOfPentacles
-- SilverChasedCabinet
 - SilverChasedCabinet_1522
 - FoPrinceOfSwords
-- XIIIDeath
-- XIVTemperance
 - FrostStone
 - FuPrinceOfWands
 - GaQueenOfCups
 - GeQueenOfMirrors
 - GiQueenOfPentacles
-- WoodenChest_16037
 - GlowingLightBlueCrystal
-- XVTheDevil
-- XVITheTower
-- XVIITheStar
 - GoQueenOfSwords
-- XVIIITheMoon
 - GuQueenOfWands
 - HaThreeOfCups
-- XXJudgement
 - HeartShapedMedallion
-- XXITheWorld
 - HiThreeOfPentacles
 - HoThreeOfSwords
 - HuThreeOfWands
 - IAlphaOfPentacles
 - IaVITheLovers
-- SmallWickerBasket
-- XXIITheLabyrinth
 - SmallWickerBasket_5008
 - IiVIIIStrength
-- XXIIIPrudence
 - SmallWickerBasket_5010
 - IuVIITheChariot
-- XXIVCharity
 - Component
 - JaPrincessOfCups
 - JePrincessOfMirrors
 - JiPrincessOfPentacles
-- SiTwoOfPentacles
 - JuPrincessOfWands
 - KaAceOfCups
 - KeAceOfMirrors
 - KiAceOfPentacles
-- Uo0TheFool
-- UeXXJudgement
-- ZiKnaveOfPentacles
 - KoAceOfSwords
 - KuAceOfWands
 - LaNineOfCups
 - LargeSign
-- Signpost_308
 - LiNineOfPentacles
 - LongGrayBranch_6105
 - LoNineOfSwords
 - LuNineOfWands
-- SoulStone
 - MaSixOfCups
-- WoodenChest
 - MidgardBakeryOven
 - MiSixOfPentacles
 - RowOfArchiveBookcases
-- SomeFloatingBloatedCorpses
 - MountingSpike
 - MuSixOfWands
 - NaSevenOfCups
 - NeSevenOfMirrors
 - SmallMushroom
 - NiSevenOfPentacles
-- SaltedCorpse
 - number
 - OaXVTheDevil
-- SaltedCorpse_16057
-- SaltedCorpse_16058
 - OoXXIIIPrudence
-- WretchedHeartOfTheNightHag
-- SmallWickerBasket_5009
 - OuXXIVCharity
 - PaFiveOfCups
 - PeFiveOfMirrors
-- AncientMithrilFigurineOfAShark
-- ArchonsTrumpet
 - PiFiveOfPentacles
-- BeautifulSilverFiligreeSpider
 - PoisonSpike
-- ChaliceOfNasis
-- EpirusBow
-- EyeOfAWraithSpider
 - PuFiveOfWands
-- FragmentOfShadows
 - RaEightOfCups
-- GoblinMedicinePouch
-- Illuminomicon
 - ZapStone
-- ImperialsRock
-- LockOfLankSlimeyBlackHair
-- NeatlySignedEnchantedGuestBook
 - StaffOfJudgement
 - WardMinor
-- Necronomicon
-- OneOfTheHeadsOfAHydra
-- RodOfReigning
-- WardMajor
 - Six
-- WardMajorARENA
-- CircletOfShadows
-- DragonboneBascinet
-- MarcosSCap
-- SmallPaddedHelmet
-- XTCGoggles
-- WizardSHat_16518
-- RustyOldHelmet
 - BoneKey
-- BoneKey_16702
-- BrightGoldenKey
-- CarvedKey
-- ElvenKey
-- EmeraldKey_16701
 - FlamingKey_4268
-- GoldPlatedToken
-- GreyFrogEye
-- GuestBedroomKey_112110
-- GuestBedroomKey_112111
 - IronGrateKey
 - JetBlackKey
 - UAlphaOfWands
-- JewelEncrustedKey
 - StatueOfAShepherd
 - Brace
 - SeTwoOfMirrors
@@ -834,24 +684,6 @@
 - RustyPairOfVambrace
 - TrollSkinBracers
 - SilverscalePaudron
-- BlackCross
-- BlackStaff
-- DogwoodStaff
-- EbonyStaff
-- EchoSStaff
-- GleamingSilverStaff
-- GoldenFlute
-- HornOfSilenus
-- LongBlackStick
-- SceptreOfTheDragonborneTEST
-- SceptreOfTheDragonborne
-- SintarStaff
-- SmallFigurine
-- SomeSparklingDust
-- RedwoodStaff
-- RedOakStaff
-- RunedStaff
-- WhiteCross
 - BarOfAdamantium
 - BarOfGold_1511
 - BarOfMithril
@@ -901,33 +733,12 @@
 - SmallDiamond_16041
 - TigerJewel
 - RedEyedJewel
-- AshenWand
-- BlackenedWand
-- BlackRod
-- BlackWand
 - BlueElementalWand
 - BrownElementalWand
-- DarkMaroonWand
-- DullGrayWand
-- EbonyWand
-- FrozenWand
-- GlassWand
-- GreenElementalWand
-- IvoryWand
-- LittleDrummerStatue
-- MagicalEyeglass
-- MagicalWand
-- MetalWand
-- MulticolouredWand
-- PlatinumWand
-- PotionGlobeBottle
-- SparklingWhiteWand
 - WandOfGreenDragonScales
-- WandOfBlueDragonScales
+- LittleDrummerStatue
 - ThornyWand
-- RedElementalWand
 - WoodenStick
-- WandOfFireballs
 - BrassRing
 - ChameleonPoncho
 - EmeraldBracelet
@@ -968,22 +779,8 @@
 - Wheelbarrow
 - SkullOfTiamat
 - Key_13826
-- Key_16001
-- Key_16002
-- KeyOfDwarfishOrigin
 - KeyToBloodclawKeep
-- Mob100PointQuestToken
 - Mob10PointQuestToken
-- Mob1PointQuestToken
-- Mob20PointQuestToken
-- Mob50PointQuestToken
-- Mob5PointQuestToken
-- NightshadeLeaves
-- OldKey_1523
-- RareArtifact
-- VialOfMountainSpringWater
-- SprigOfWolfsbane
-- SmallBrassKey
 - SilveryKey
 - AlbinoBeholderCentralEye
 - ArchonsLantern
@@ -1013,34 +810,6 @@
 - Torch_16039
 - RubyRedEye
 - YellowBeholderCentralEye
-- AmuletOfBone
-- AmuletOfEternalDarkness
-- BlackAmulet
-- BlackAmulet_237
-- BlackAndSilverCloakARENA
-- BlackNecklace
-- BlueShroud
-- BowTie
-- BroochProtection
-- BrownCloak
-- DiamondNecklace
-- DragonboneAventail
-- EmeraldNecklace
-- FingerBoneNecklace
-- GoblinMadeIronGorget
-- GoldenNecklace
-- GypsyMedallion
-- NecklaceOfSeveredFingers
-- NecklaceOfSharkTeeth
-- PlainNecklace
-- SilverscaleGorget
-- ShroudedCloak
-- RedNecklace
-- RedLeatherCloak
-- WhiteLeatherCloak
-- WhiteCloak
-- SilverNecklace
-- SeaweedNecklace
 
 ## God Nodes (most connected - your core abstractions)
 1. `Dice` - 4303 edges
@@ -1059,11 +828,11 @@
   py_json/README.md → src/fight.c
 - `The binary record format (the core of everything)` --references--> `pipe_or_file()`  [INFERRED]
   explorations/102626.md → src/PRLib/misc.c
+- `2. Runtime structures` --references--> `char_data`  [INFERRED]
+  explorations/102626.md → src/h/structs.h
 - `5. graphify` --references--> `char_data`  [INFERRED]
   explorations/102626.md → src/h/structs.h
 - `7. Players and accounts` --references--> `char_data`  [INFERRED]
-  explorations/102626.md → src/h/structs.h
-- `5. graphify` --references--> `connection_data`  [INFERRED]
   explorations/102626.md → src/h/structs.h
 
 ## Import Cycles
@@ -1075,7 +844,7 @@
 - **MUD Rearchitecture Pattern** — data_model_graph, global_view, session_view, persistence_layer [EXTRACTED 0.90]
 - **PR Build and Run Process** — makefile_linux, pr_world_compile, pr3_server [EXTRACTED 1.00]
 
-## Communities (1048 total, 865 thin omitted)
+## Communities (808 total, 626 thin omitted)
 
 ### Community 0 - "players.py"
 Cohesion: 0.05
@@ -1083,19 +852,19 @@ Nodes (47): attack_name(), attack_type(), _ext_bits(), read_saved_mob(), f(), se
 
 ### Community 1 - "tranparse.py"
 Cohesion: 0.09
-Nodes (30): F, find_field(), arg_subst(), repl(), atof(), atoi(), balanced(), Context (+22 more)
+Nodes (28): F, find_field(), arg_subst(), repl(), atof(), atoi(), Context, convert() (+20 more)
 
 ### Community 2 - "extras.py"
 Cohesion: 0.12
 Nodes (26): targets(), convert_type(), _c_string_table(), convert_applies(), convert_boards(), convert_commands(), convert_help(), convert_limited() (+18 more)
 
+### Community 3 - "re"
+Cohesion: 0.10
+Nodes (9): class_name(), main(), py(), apply_fields(), c_array(), define_table(), item_type_ids(), main() (+1 more)
+
 ### Community 4 - "package.json"
 Cohesion: 0.09
 Nodes (29): dependencies, react@^18.3.1, react-dom@^18.3.1, react-router-dom@^6.26.0, @xterm/addon-fit@^0.10.0, @xterm/xterm@^5.5.0, devDependencies, vite@^5.4.0 (+21 more)
-
-### Community 5 - "Parser"
-Cohesion: 0.26
-Nodes (4): convert_zones(), Parser, Tok, tokenize()
 
 ### Community 6 - "api_server.py"
 Cohesion: 0.15
@@ -1103,7 +872,7 @@ Nodes (8): health(), _picture(), room_image(), _safe(), zone_image(), strip_teln
 
 ### Community 7 - "structs.h"
 Cohesion: 0.01
-Nodes (335): 3. Feasibility of JSONL per type, 7. Players and accounts, Loaders, grouped by what they read, load_acct(), load_auc_data(), ReadSale(), free_boards(), special_mob_mail() (+327 more)
+Nodes (300): 2. Runtime structures, 7. Players and accounts, Loaders, grouped by what they read, load_acct(), free_boards(), add_area(), bin_write_room(), boot_areas() (+292 more)
 
 ### Community 8 - "restart_pr_server.sh"
 Cohesion: 0.15
@@ -1113,9 +882,9 @@ Nodes (33): attempt_server_restart(), check_running_instance(), clear_files_befo
 Cohesion: 0.26
 Nodes (16): check_db_file(), check_deps(), Cleanup(), format_number_m2_money(), format_number_repo_balance(), format_number_to_currency(), get_latest_debt(), remove_duplicates() (+8 more)
 
-### Community 10 - "sendf"
+### Community 10 - "room_data"
 Cohesion: 0.02
-Nodes (301): acct_name_to_path(), add_ignore(), ch_acct(), ch_acct_actual(), char_account_valid(), clear_acct(), delete_account(), free_acct() (+293 more)
+Nodes (150): 3. Feasibility of JSONL per type, boot_update(), do_form(), do_rload(), find_entrances(), calc_damage_reduction_rating(), ComputeHashValueForKey(), CreateRoomFromEntrance() (+142 more)
 
 ### Community 11 - "pr_functions.sh"
 Cohesion: 0.38
@@ -1138,8 +907,8 @@ Cohesion: 0.83
 Nodes (3): check_lock_file(), check_server_online(), check_and_restart_pr_server.sh script
 
 ### Community 27 - "pathlib"
-Cohesion: 0.08
-Nodes (13): ident(), main(), canonical_records(), canonicalize(), default_players_src(), default_world_dir(), main(), rooms_main() (+5 more)
+Cohesion: 0.09
+Nodes (15): ident(), main(), canonical_records(), canonicalize(), default_players_src(), default_world_dir(), main(), rooms_main() (+7 more)
 
 ### Community 29 - "BodyPartDefense"
 Cohesion: 0.00
@@ -1151,11 +920,7 @@ Nodes (754): Defense, Mob, KitchenGhost, WarriorMonkOfAgatar, YoungMonkOfAgatar,
 
 ### Community 31 - "spells.py"
 Cohesion: 0.01
-Nodes (212): Change, resist_physical(), stroke_flag(), ApplyLocation, Element, Immunity, Spell, AcidBlastSpell (+204 more)
-
-### Community 32 - ".echo"
-Cohesion: 0.03
-Nodes (4): fill(), pronouns(), clock(), go()
+Nodes (253): ScrollOfRecall, AffectBit, ApplyLocation, Element, Form, Spell, AcidBlastSpell, AcidBreathSpell (+245 more)
 
 ### Community 33 - "Sex"
 Cohesion: 0.01
@@ -1165,9 +930,9 @@ Nodes (388): AbbotOfAgatar, WitheredSoldier, LordHester, CountMontyOfCastlePytho
 Cohesion: 0.01
 Nodes (239): SavingThrows, Stats, Banker, Guildmaster, Healer, Shopkeeper, Storyteller, Bluering (+231 more)
 
-### Community 35 - "cmds1.c"
-Cohesion: 0.05
-Nodes (74): calc_average_weapon_damage(), calc_damage_reduction_rating(), calc_weapon_rating(), ComputeHashValueForKey(), CreateRoomFromEntrance(), CreateRoomWithFrame(), do_appraise(), do_examine() (+66 more)
+### Community 35 - "handler.c"
+Cohesion: 0.03
+Nodes (109): bountyhunter_death(), special_mob_mail(), purge_one_obj(), do_examine(), do_mail(), append_apex_point_bonuses(), get_highest_active_setbonus(), get_highest_setbonus_for_set() (+101 more)
 
 ### Community 36 - "RaceName"
 Cohesion: 0.01
@@ -1179,15 +944,15 @@ Nodes (286): Key, AdmantiumTowerKey, AppleColouredKey, BarbWireKey, BasementKey,
 
 ### Community 38 - "obj_data"
 Cohesion: 0.02
-Nodes (407): 5. graphify, send_to_char(), mob_attack(), funcp, obj_data, action_description, activate_thresholds, apply (+399 more)
+Nodes (419): 5. graphify, do_mat(), do_aid(), send_to_char(), schedule(), FindAnAttacker(), funcp, obj_data (+411 more)
 
 ### Community 39 - "char_data"
 Cohesion: 0.01
-Nodes (403): 2. Runtime structures, append_apex_point_bonuses(), do_score(), reset_time(), mob_by_name(), raw_kill_no_move(), GainLevel(), char_data (+395 more)
+Nodes (412): do_offset(), do_beep(), do_cls(), do_commune(), do_edit_desc(), do_emote(), do_plan(), do_reset() (+404 more)
 
 ### Community 40 - "act"
-Cohesion: 0.03
-Nodes (325): berserk_setBerserk(), berserk_setRecover(), do_aid(), do_berserk(), do_consider(), gain_apex_points(), set_mock(), actf() (+317 more)
+Cohesion: 0.04
+Nodes (277): berserk_setBerserk(), berserk_setRecover(), do_berserk(), do_throw(), do_consider(), gain_apex_points(), get_spell_or_skill_name(), set_mock() (+269 more)
 
 ### Community 41 - "Dice"
 Cohesion: 0.01
@@ -1197,41 +962,41 @@ Nodes (357): Dice, ArchMagi, ArchWizard, Balrog, BalrogDragon, Bishop, BlackSlay
 Cohesion: 0.01
 Nodes (249): ClericFromAgatarSOrder, GuardianWarrior, BattleMaster, Bull, Chicken, ChicUrbanite, CountryBumpkin, Cow (+241 more)
 
-### Community 43 - "Store"
-Cohesion: 0.03
-Nodes (32): MongoDB store, MetaType, Persistent, Related, Role, Totals, define_roles(), member_as() (+24 more)
+### Community 43 - "pr_be/classes.py"
+Cohesion: 0.01
+Nodes (96): Canonical JSONL, Identity, MongoDB store, Persisted things the extractor covers beyond the world files, pr-be: the Perilous Realms back end, Account, ApplyDefinition, Auction (+88 more)
 
 ### Community 44 - "dice"
 Cohesion: 0.02
-Nodes (12): dice(), CauseSeriousSpell, drain(), MagicMissileSpell, ManaSpell, RefreshSpell, SecondWindSpell, TelemoveSpell (+4 more)
+Nodes (5): dice(), MagicMissileSpell, MultipleMagicMissileSpell, RefreshSpell, VigorizeLightSpell
 
 ### Community 45 - "WearFlag"
-Cohesion: 0.01
-Nodes (226): Food, AlmondJoyTMBar, ApplePie, ArturianShapedCookie, BagOfChips, BagOfGreasyChips, Biscuit, BlackDragonEgg (+218 more)
+Cohesion: 0.02
+Nodes (229): Food, AlmondJoyTMBar, ApplePie, ArturianShapedCookie, BagOfChips, BagOfGreasyChips, Biscuit, BlackDragonEgg (+221 more)
 
 ### Community 46 - "Material"
 Cohesion: 0.02
-Nodes (231): Helmet, AdamantiumHelmet, AncientForgedSteelCrown, AncientForgedSteelHelmet, AncientGlowingMithrilHelmet, AntQueenSHead, Aquahelmet, ArturianSFestiveBobbleHat (+223 more)
+Nodes (232): Helmet, AdamantiumHelmet, AncientForgedSteelCrown, AncientForgedSteelHelmet, AncientGlowingMithrilHelmet, AntQueenSHead, Aquahelmet, ArturianSFestiveBobbleHat (+224 more)
 
 ### Community 47 - "necklace.py"
-Cohesion: 0.02
-Nodes (171): Necklace, AeonCloak, AmberPendant, Amulet, Amulet_2123, Amulet_2194, Amulet_2195, AmuletOfBrown (+163 more)
+Cohesion: 0.01
+Nodes (198): Necklace, AeonCloak, AmberPendant, Amulet, Amulet_2123, Amulet_2194, Amulet_2195, AmuletOfBone (+190 more)
 
-### Community 48 - "combat.py"
-Cohesion: 0.03
-Nodes (21): adjusted_resistance_damage(), _big(), element_of(), _is_melee(), resistance_check(), _same(), spell_power_bonus(), weapon_check() (+13 more)
+### Community 48 - "Item"
+Cohesion: 0.05
+Nodes (13): _average_damage(), _container_spring_inside_trap(), _damaged_by(), Item, _lose(), _reduction_rating(), _save_against(), _take_damage() (+5 more)
 
-### Community 49 - "test_things.py"
-Cohesion: 0.17
-Nodes (17): Longsword, Bread, last(), on_floor(), plain(), test_coins_are_counted_in(), test_drop_in_all_its_forms(), test_dropping_coins_makes_a_pile() (+9 more)
+### Community 49 - "longsword.py"
+Cohesion: 0.04
+Nodes (66): AncientDwarvenBattlesword, BlackLongswordOfTheUnderworld, BlackLongswordOfTheUnderworld_2190, BlueHeronMarkedBlade, CrystalSword, Darkfire, DethSUselessStick, DirtySword (+58 more)
 
 ### Community 50 - "cmds3.c"
 Cohesion: 0.03
-Nodes (175): bprintf(), do_entrances(), is_granted(), add_apex_point(), arena_who_string(), compare_strings(), describe_char(), describe_conn() (+167 more)
+Nodes (186): board(), board_display_msg(), board_remove_msg(), board_reply_msg(), BoardFileName(), FindBoard(), load_board(), post_message() (+178 more)
 
 ### Community 51 - "ObjectFlag"
-Cohesion: 0.03
-Nodes (134): Handheld, AngelicRod, AuorStuffie, BlackWaspQueenStuffie, BrokenSpyglass, BronzeBadgeWithTheNumber2StitchedUponIt, BronzeBadgeWithTheNumber3StitchedUponIt, BronzeBadgeWithTheNumber4StitchedUponIt (+126 more)
+Cohesion: 0.02
+Nodes (187): Handheld, AncientMithrilFigurineOfAShark, AngelicRod, ArchonsTrumpet, AuorStuffie, BeautifulSilverFiligreeSpider, BerkStuffie, BlackAndGoldRod (+179 more)
 
 ### Community 52 - "ring.py"
 Cohesion: 0.02
@@ -1239,39 +1004,39 @@ Nodes (152): Ring, AjakanSSignet, AmberRing, ArgSRingOfGrunting, ArgSRingOfSlamm
 
 ### Community 53 - "potion.py"
 Cohesion: 0.02
-Nodes (128): Potion, AncientDwarvenPotion, AquamarinePotionOfMinorRefresh, AzurePotion, BabybluePotionOfFly, BlackFlask, BlackPotion, BlackPotion_5210 (+120 more)
+Nodes (129): Potion, SpellItem, AncientDwarvenPotion, AquamarinePotionOfMinorRefresh, AzurePotion, BabybluePotionOfFly, BlackFlask, BlackPotion (+121 more)
 
 ### Community 54 - "Room"
-Cohesion: 0.02
-Nodes (59): HitPoints, Player, Pool, Room, AffectBit, Direction, MobAction, Position (+51 more)
+Cohesion: 0.01
+Nodes (83): HitPoints, Player, Pool, Room, ability_message(), adjusted_resistance_damage(), attack_number(), _big() (+75 more)
 
 ### Community 55 - "things.py"
 Cohesion: 0.03
-Nodes (61): find_item(), isname(), split_count(), command(), register(), Command, execute(), find_command() (+53 more)
+Nodes (58): find_item(), isname(), command(), register(), Command, execute(), find_command(), how_many() (+50 more)
 
 ### Community 56 - "container.py"
-Cohesion: 0.04
-Nodes (89): Container, ArturianSFestiveStocking, ArturianSFestiveStocking_114102, ArturianSFestiveStocking_114104, ArturianSFestiveStocking_114105, Backpack, Bag, BagOfCuriosities (+81 more)
+Cohesion: 0.02
+Nodes (152): Container, AncientSpellPouch, ArturianSFestiveStocking, ArturianSFestiveStocking_114102, ArturianSFestiveStocking_114103, ArturianSFestiveStocking_114104, ArturianSFestiveStocking_114105, Backpack_18223 (+144 more)
 
 ### Community 57 - "towersorcery.py"
 Cohesion: 0.01
 Nodes (78): AdamantiteGolem, AgedWizard, AmerisTheBlackLich, AnimatedGhoul, AnimatedSkeleton_1550, AnimatedZombie, BattleMistress, BlackCat_1558 (+70 more)
 
 ### Community 58 - "body_armor.py"
-Cohesion: 0.01
-Nodes (199): BodyArmor, AdamantiumBreastplate, AdamantiumChainHalterTop, AncientBlackBreastplate, AncientForgedSteelBreastPlate, AncientForgedSteelHauberk, AnuranBandedPlatemail, ArcaneIncineratorSRobe (+191 more)
+Cohesion: 0.03
+Nodes (142): BodyArmor, AdamantiumBreastplate, AdamantiumChainHalterTop, AncientBlackBreastplate, AncientForgedSteelBreastPlate, AncientForgedSteelHauberk, ArmorOfSockets, BaggyWhiteShirt (+134 more)
 
 ### Community 59 - "DamageType"
-Cohesion: 0.02
-Nodes (163): Dagger, Dart, Arrow, AuorSDaggerOfArcaneMastery, BarbedBlade, BarbedDagger, BattlemastersDirk, BluntGoblinMadeDagger (+155 more)
+Cohesion: 0.03
+Nodes (97): Dagger, Dart, Arrow, AuorSDaggerOfArcaneMastery, BarbedBlade, BarbedDagger, BattlemastersDirk, BluntGoblinMadeDagger (+89 more)
 
 ### Community 60 - "connection_data"
 Cohesion: 0.05
-Nodes (134): process_negotiation(), create_entry(), connection_data, acct, buf, char_in_buf, char_list, character (+126 more)
+Nodes (133): create_entry(), connection_data, acct, buf, char_in_buf, char_list, character, connected (+125 more)
 
-### Community 61 - "CharmPersonSpell"
-Cohesion: 0.03
-Nodes (14): Form, _charm_hours(), CharmPersonSpell, _create_monster(), DispelEvilSpell, DispelGoodSpell, _mirror_names(), MirrorSpell (+6 more)
+### Community 61 - "warhammer.py"
+Cohesion: 0.13
+Nodes (16): Bludgeon, Quarterstaff, Warhammer, BlackSplinteredRoyalWarhammer, BurntAndBlackenedWarhammer, Gnaddlefus, Hammer_6504, HammerOfJustice (+8 more)
 
 ### Community 62 - "SparseResistances"
 Cohesion: 0.01
@@ -1282,8 +1047,8 @@ Cohesion: 0.05
 Nodes (104): SocketGem, Amethyst, BalgorSLostChickenSkull, BlackBoldBlackOCyanBoldKyberCrystalO, BlueBoldBlueOCyanBoldKyberCrystalO, ClericSGem, CorruptBrainstem, CraftedGem (+96 more)
 
 ### Community 64 - "belt.py"
-Cohesion: 0.03
-Nodes (85): Belt, AdamantiumBeltOfSpiders, AncientForgedSteelGirdle, BeltMadeFromHumanSkin, BeltMadeOfMonstrousHide, BeltOfAncestors, BeltOfAThousandEntrails, BeltOfEvisceration (+77 more)
+Cohesion: 0.05
+Nodes (72): Belt, AdamantiumBeltOfSpiders, AncientForgedSteelGirdle, BeltMadeFromHumanSkin, BeltMadeOfMonstrousHide, BeltOfAncestors, BeltOfAThousandEntrails, BeltOfEvisceration (+64 more)
 
 ### Community 65 - "boots.py"
 Cohesion: 0.04
@@ -1298,8 +1063,8 @@ Cohesion: 0.04
 Nodes (96): Leggings, AdamantiumLeggingsOfTheUnderdark, AdamantiumScaleSkirt, BarbedLeatherSkirt, BlackElvenchainLeggings, BlackLegPlates, BoiledLeatherCuisses, BoneLegplates (+88 more)
 
 ### Community 68 - "bracer.py"
-Cohesion: 0.04
-Nodes (90): Bracer, AncientForgedSteelBattleBand, AncientForgedSteelWristband, BandOfBlackDragonScales, BandOfDarkFaith, BandOfSinfulDeeds, BhaldorSGoldenCirclet, BlackAndGoldBracelet (+82 more)
+Cohesion: 0.03
+Nodes (114): Bracer, AncientForgedSteelBattleBand, AncientForgedSteelWristband, BandOfAngelicHeroism, BandOfAngelicPurity, BandOfBlackDragonScales, BandOfDarkFaith, BandOfSinfulDeeds (+106 more)
 
 ### Community 69 - "cloak.py"
 Cohesion: 0.04
@@ -1322,8 +1087,8 @@ Cohesion: 0.04
 Nodes (87): Sleeves, AncientForgedSteelArmbands, ArmGuardsOfTheColonel, BalgorSSpikyPauldron, BattleMarredTemperedVambraces, BattlemastersArmguards, BlackElvenchainSleeves, BlackKnightSArmguards (+79 more)
 
 ### Community 74 - "s32"
-Cohesion: 0.03
-Nodes (67): dimension_info, height, length, width, item_set_bonus, apply, bonus_level, pulse_apply (+59 more)
+Cohesion: 0.02
+Nodes (89): apex_level_data, armor_penetration, charisma, constitution, damroll, dexterity, hitpoints, hitroll (+81 more)
 
 ### Community 75 - "gloves.py"
 Cohesion: 0.05
@@ -1334,12 +1099,12 @@ Cohesion: 0.05
 Nodes (50): Trinket, AendriartaSHastyHammer, AodhanSStopwatch, ApolloSManlyBeauty, ArtemisSheBear, BalgorSAnimalisticFury, BalmekSBlackHeart, BanditSCunning (+42 more)
 
 ### Community 77 - "ContainerFlag"
-Cohesion: 0.04
-Nodes (71): Dimensions, ArturianSFestiveStocking_114103, Backpack_18223, Backpack_3636, BagOfLuggage, Basket, BatteredDesk, BeltPouch_18224 (+63 more)
+Cohesion: 0.05
+Nodes (56): ExtraDescription, Backpack, BatteredDesk, BlueFrogHead, BrownRefrigerator, ClenchedSkeletalFist, CorpseOfADwarvenDefender, CorpseOfSirXavier (+48 more)
 
 ### Community 78 - "knife.py"
-Cohesion: 0.05
-Nodes (52): Knife, BasiliskStrike, BloodstainedCeremonialKnife, BloodyGoreKnife, CruelGoblinMadeKnife, DarkIronWarfan, DragonHoundTooth, DragonKnife (+44 more)
+Cohesion: 0.04
+Nodes (59): Knife, BasiliskStrike, BloodstainedCeremonialKnife, BloodyGoreKnife, CruelGoblinMadeKnife, Crysknife, DarkIronWarfan, DragonHoundTooth (+51 more)
 
 ### Community 79 - "Drink"
 Cohesion: 0.07
@@ -1347,47 +1112,51 @@ Nodes (79): DrinkContainer, Barrel_18204, Barrel_21127, Barrel_21128, Barrel_300
 
 ### Community 80 - "Effect"
 Cohesion: 0.03
-Nodes (27): sharpen(), Effect, Thresholds, AgeingSpell, bless(), bless(), bless(), bless() (+19 more)
+Nodes (28): Change, sharpen(), Effect, bless(), bless(), BlessingOfFaithSpell, bless(), bless() (+20 more)
 
 ### Community 81 - "shield.py"
 Cohesion: 0.05
 Nodes (79): Shield, AegisOfFortrum, AncientBlackShield, AncientForgedSteelShield, AncientGlowingMithrilShield, AntiqueGoldenShield, ArmsOfTheNightBlade, BrightlyGlowingShield (+71 more)
 
 ### Community 82 - "item.py"
-Cohesion: 0.02
-Nodes (107): AttackType, Touch, ability_name(), _spells(), _average_damage(), _bits_label(), Bludgeon, Boat (+99 more)
+Cohesion: 0.04
+Nodes (64): AttackType, Touch, Book, Bow, Claw, Claymore, _commas(), _container_save_crack() (+56 more)
 
-### Community 83 - ".room"
-Cohesion: 0.03
-Nodes (3): _condition_number(), act(), eligible()
+### Community 83 - "online.c"
+Cohesion: 0.16
+Nodes (13): ReadObjList(), SaveObjectList(), WriteObject(), do_medit(), do_msave(), do_ocreate(), do_oedit(), do_oload() (+5 more)
 
 ### Community 84 - "Clock"
-Cohesion: 0.07
-Nodes (20): Clock, Scheduled, Condition, SilenceSpell, test_cancel_on_wheel_and_far(), test_far_call_waits_for_its_cycle(), test_reschedule_from_inside_a_call(), test_runs_in_order_at_the_pulse() (+12 more)
+Cohesion: 0.04
+Nodes (41): Clock, Scheduled, Engine, Longsword, Condition, EnergyDrainSpell, test_cancel_on_wheel_and_far(), test_far_call_waits_for_its_cycle() (+33 more)
 
 ### Community 85 - "Armor"
-Cohesion: 0.06
-Nodes (57): Armor, AmuletOfProtection, BagOfMarbles, BaseballGlove, BlackBoldBlackOMagentaBoldLightsaberO, BlackTunic, BlondDolly, BlueBandana (+49 more)
+Cohesion: 0.05
+Nodes (64): Armor, AmuletOfProtection, BagOfMarbles, BaseballGlove, BlackBoldBlackOMagentaBoldLightsaberO, BlackTunic, BlondDolly, BlueBandana (+56 more)
 
-### Community 86 - "other.py"
-Cohesion: 0.03
-Nodes (65): BaetylusOfMetal, BeatenUpCaveFisherSkull, Bench, BindingsOfTheStormreaver, BirdsOfAmnos, BlackTulip, BloodyClaw, BlueTulip (+57 more)
+### Community 86 - "Other"
+Cohesion: 0.02
+Nodes (82): Other, Ace, Alpha0, AntiqueBook, AquaPotionRaisesWisdomOnePoint, BarOfSoap, BeatenUpCaveFisherSkull, Bench (+74 more)
 
 ### Community 87 - "shortsword.py"
 Cohesion: 0.05
 Nodes (52): Anchlachel, Angrist, ArchonsSword, BanditsShortSword, BrokenBlackBroadswordOfTheUndeadPlane, BrokenThighBone, DarkIronSword, DwarvenSteelShortSword (+44 more)
 
+### Community 88 - "Dimensions"
+Cohesion: 0.03
+Nodes (55): Dimensions, BiKnightOfPentacles, BlackMarbleRing, BrassPlaque_41039, BrassPlaque_41054, BrassPlaque_41055, BrassPlaque_41056, BrassPlaque_41085 (+47 more)
+
 ### Community 89 - "skills.py"
 Cohesion: 0.02
-Nodes (97): Skill, AdvancedBackstabSkill, AdvancedBashSkill, AdvancedHideSkill, AdvancedKickSkill, AdvancedPickLockSkill, AdvancedSneakSkill, AdvancedStealSkill (+89 more)
+Nodes (93): Ability, Skill, AdvancedBackstabSkill, AdvancedBashSkill, AdvancedHideSkill, AdvancedKickSkill, AdvancedPickLockSkill, AdvancedSneakSkill (+85 more)
 
 ### Community 90 - "utils.c"
-Cohesion: 0.03
-Nodes (151): do_potion_add(), do_potion_make(), identify_recipie(), InitABoard(), bountyhunter_death(), purge_one_obj(), do_slice(), do_search() (+143 more)
+Cohesion: 0.02
+Nodes (257): ch_acct(), ch_acct_actual(), do_potion_make(), identify_recipie(), auc_instructions(), auc_list(), Auctioneer(), clean_auc() (+249 more)
 
 ### Community 91 - "store"
 Cohesion: 0.03
-Nodes (14): Exit, held(), _load(), Located, location_role_ids(), role_id(), store(), use_store() (+6 more)
+Nodes (14): held(), _load(), Located, location_role_ids(), role_id(), store(), use_store(), worn_role_ids() (+6 more)
 
 ### Community 92 - "trash.py"
 Cohesion: 0.05
@@ -1470,8 +1239,8 @@ Cohesion: 0.09
 Nodes (31): Broadsword, AncientBlackBlade, AncientBrownBlade, AncientSword, BlackBladeOfDisaster, BlackBroadsword, BladeOfPower, BrokenGreatsword (+23 more)
 
 ### Community 112 - "scroll.py"
-Cohesion: 0.08
-Nodes (31): Scroll, SpellItem, AncientIllustratedParchment, BoundScroll, BoundScroll_1560, EncryptedScroll, FireballScroll, FlamingParchment (+23 more)
+Cohesion: 0.09
+Nodes (29): Scroll, AncientIllustratedParchment, BoundScroll, BoundScroll_1560, EncryptedScroll, FireballScroll, FlamingParchment, FloweredScroll (+21 more)
 
 ### Community 113 - "polearm.py"
 Cohesion: 0.07
@@ -1494,16 +1263,16 @@ Cohesion: 0.40
 Nodes (5): makefile.linux, Player Database, PR3 Server, pr-world/compile, Session Transcript (2026-09-18/19)
 
 ### Community 118 - "staff.py"
-Cohesion: 0.11
-Nodes (32): Staff, AuburnColoredOrb, BirchwoodStaff, Blackrazor, BloodyCane, BlueFlower, GoldenHarp, GoldenOboe (+24 more)
+Cohesion: 0.05
+Nodes (50): Staff, AuburnColoredOrb, BirchwoodStaff, BlackCross, Blackrazor, BlackStaff, BloodyCane, BlueFlower (+42 more)
 
 ### Community 119 - "item_t"
 Cohesion: 0.04
-Nodes (44): 1. Survey of the parsing routines, 4. rooms.py, 6. All the other types, 8. Git housekeeping, 9. Later in the session (continued after the first commit round), Session transcript, 2026-09-27: parsers, JSONL extraction, graphify, State at end of session, The binary record format (the core of everything) (+36 more)
+Nodes (45): 1. Survey of the parsing routines, 4. rooms.py, 6. All the other types, 8. Git housekeeping, 9. Later in the session (continued after the first commit round), Session transcript, 2026-09-27: parsers, JSONL extraction, graphify, State at end of session, The binary record format (the core of everything) (+37 more)
 
 ### Community 120 - "wand.py"
-Cohesion: 0.12
-Nodes (31): Wand, BlackAndMeltedWand, BottleOfRedishOintment, CanOfMosquitoRepellent, CrystalWand, FireAntStinger, FlameBreatherSWand, GlowingStaff (+23 more)
+Cohesion: 0.05
+Nodes (49): Wand, AshenWand, BlackAndMeltedWand, BlackenedWand, BlackRod, BlackWand, BottleOfRedishOintment, CanOfMosquitoRepellent (+41 more)
 
 ### Community 121 - "bastard.py"
 Cohesion: 0.11
@@ -1519,7 +1288,7 @@ Nodes (25): char_stats_data, charisma, constitution, dexterity, intelligence, lu
 
 ### Community 124 - "act"
 Cohesion: 0.02
-Nodes (352): bountyhunter(), bountyhunter_master(), bountyhunter_victory(), do_at(), do_foreach(), do_goto(), do_mat(), do_purge() (+344 more)
+Nodes (377): is_ignoring_char(), do_potion_add(), bountyhunter(), bountyhunter_master(), bountyhunter_victory(), do_at(), do_foreach(), do_goto() (+369 more)
 
 ### Community 125 - "sabre.py"
 Cohesion: 0.11
@@ -1537,9 +1306,9 @@ Nodes (22): main(), main(), should_delete(), find_skill(), find_spell(), finish_
 Cohesion: 0.13
 Nodes (18): Scimitar, AdamantiumScimitar, BiteOfTheArachnid, BrilliantScimitarOfTheYuanTi, CurvedScimitar, CurvedScimitar_1519, CurvedSilverXiphos, DazzlingScimitarOfTheYuanTi (+10 more)
 
-### Community 129 - "obj_color_short_description"
-Cohesion: 0.06
-Nodes (76): auc_instructions(), auc_list(), Auctioneer(), clean_auc(), do_auc(), formatedBidString(), free_auc_data(), free_sale() (+68 more)
+### Community 129 - "str_cmp"
+Cohesion: 0.05
+Nodes (91): acct_name_to_path(), add_ignore(), char_account_valid(), clear_acct(), delete_account(), free_acct(), get_account(), record_roll() (+83 more)
 
 ### Community 130 - "flail.py"
 Cohesion: 0.12
@@ -1557,13 +1326,9 @@ Nodes (24): shop_data, do_not_buy, in_room, index, keeper, message_buy, message_
 Cohesion: 0.19
 Nodes (18): dump_options(), arg_subst(), CountSubBlocks(), error(), get_arg(), insert(), macro_expand(), main() (+10 more)
 
-### Community 134 - "_area"
-Cohesion: 0.04
-Nodes (21): each(), each(), _area(), each(), DexteritySpell, FaerieFogSpell, each(), each() (+13 more)
-
-### Community 135 - "ExtraDescription"
-Cohesion: 0.04
-Nodes (44): ExtraDescription, DwarvenSteelAxe, TemperedSteelAxe, BerkStuffie, BlackAndGoldRod, BookOfFairyTales, BrackenredStuffie, BuntagonamadonStuffie (+36 more)
+### Community 134 - "boat.py"
+Cohesion: 0.20
+Nodes (13): Boat, Canoe, FoamWaterboard, LargeSkiff, Raft, Rowboat, SeashellRing, SmallBuoy (+5 more)
 
 ### Community 136 - "AMPL/parser.c"
 Cohesion: 0.13
@@ -1574,8 +1339,8 @@ Cohesion: 0.17
 Nodes (17): proc_effect_BuffCharisma(), proc_effect_BuffConstitution(), proc_effect_BuffDexerity(), proc_effect_BuffIntelligence(), proc_effect_BuffLuck(), proc_effect_BuffStrength(), proc_effect_BuffWisdom(), proc_effect_DamageHP() (+9 more)
 
 ### Community 138 - "CodedFlag"
-Cohesion: 0.05
-Nodes (7): AccountFlag, ClanFlag, CodedFlag, validate(), Intrinsic, PlayerFlag, SectorFlag
+Cohesion: 0.03
+Nodes (12): Exit, AccountFlag, ClanFlag, CodedFlag, validate(), ConfigFlag, ExitFlag, Intrinsic (+4 more)
 
 ### Community 139 - "battleaxe.py"
 Cohesion: 0.17
@@ -1589,29 +1354,25 @@ Nodes (10): ArrayInitFromFile(), ArrayWriteToFile(), HashInitFromFile(), HashRea
 Cohesion: 0.11
 Nodes (18): liquid_t, LIQ_ALE, LIQ_BEER, LIQ_BLOOD, LIQ_COFFE, LIQ_COKE, LIQ_DARKALE, LIQ_FIREBRT (+10 more)
 
-### Community 145 - "apex_level_data"
-Cohesion: 0.10
-Nodes (21): apex_level_data, armor_penetration, charisma, constitution, damroll, dexterity, hitpoints, hitroll (+13 more)
+### Community 145 - "event_t"
+Cohesion: 0.13
+Nodes (14): reset_door(), event_death(), event_t, args, ch, next, obj, room (+6 more)
 
 ### Community 146 - "Schema.c"
 Cohesion: 0.18
 Nodes (17): Calloc(), Free(), MallocDebug(), Realloc(), vlog(), CreateOrInitWithSchema(), FieldWithIdentifier(), FieldWithName() (+9 more)
 
 ### Community 147 - "BodyPart"
-Cohesion: 0.06
-Nodes (11): ability_message(), attack_number(), BodyPart, height_class(), limb_name(), messages_for(), tell_three(), weapon_message() (+3 more)
+Cohesion: 0.05
+Nodes (11): act(), BodyPart, height_class(), limb_name(), tell_three(), weapon_message(), fill(), eligible() (+3 more)
 
 ### Community 148 - "SectorMapStrings"
-Cohesion: 0.12
-Nodes (17): SectorMapStrings, dark_color, detail_color, door_color, doors, exit_color, exits, fill_color (+9 more)
-
-### Community 149 - "Character"
-Cohesion: 0.02
-Nodes (3): Character, inside(), _is_weapon()
+Cohesion: 0.07
+Nodes (27): sector_info, default_size, flags, map, mc, name, SectorMapStrings, dark_color (+19 more)
 
 ### Community 151 - "look.c"
-Cohesion: 0.12
-Nodes (34): do_info2(), do_listcommands(), do_listsocials(), SaveLocker(), appendObjectKeyword(), char_condition(), describe_flags(), describe_pos() (+26 more)
+Cohesion: 0.15
+Nodes (28): appendObjectKeyword(), char_condition(), describe_flags(), describe_pos(), describe_where(), do_equipment(), do_inventory(), find_ex_description() (+20 more)
 
 ### Community 152 - "rapier.py"
 Cohesion: 0.17
@@ -1633,29 +1394,29 @@ Nodes (12): apply_stats, apply_info, avgMod, count, maxMod, minMod, numSubCounts
 Cohesion: 0.22
 Nodes (14): CreateRange(), DataAppendBytes(), DataAppendData(), DataEnsureCapacity(), DataIncreaseLengthBy(), DataReplaceBytesInRange(), DataResetBytesInRange(), EqualRanges() (+6 more)
 
-### Community 158 - "find_path"
-Cohesion: 0.20
-Nodes (14): iqnode, next, x, iqueue, head, tail, create_iqueue(), destroy_iqueue() (+6 more)
+### Community 158 - "check_bin.py"
+Cohesion: 0.24
+Nodes (3): main(), read_vnums(), Reader
 
-### Community 159 - "re"
-Cohesion: 0.15
-Nodes (18): class_name(), main(), py(), convert_classes(), warn(), _exact(), _first_int(), _ints() (+10 more)
+### Community 159 - "prworld/classes.py"
+Cohesion: 0.35
+Nodes (8): convert_classes(), warn(), _exact(), _first_int(), _ints(), _new_class(), _stat_dict(), _table_row()
 
-### Community 160 - "remort_options"
-Cohesion: 0.17
-Nodes (12): remort_options, ability_flag, apex_cost, description, enabled, incrementBy, maxUpgrade, maxValue (+4 more)
+### Community 160 - "string_list"
+Cohesion: 0.26
+Nodes (13): string_list, head, tail, boot_lock_list(), add_string(), create_string_list(), destroy_string_list(), remove_string() (+5 more)
 
-### Community 161 - "Audio"
+### Community 161 - "audio.py"
+Cohesion: 0.03
+Nodes (59): Audio, AlcanzarPlushie, BuntaPlushie, ClumpOfGrass, ClumpOfGrass_112001, ClumpOfGrass_112002, ClumpOfGrass_112003, ClumpOfGrass_112004 (+51 more)
+
+### Community 162 - "search_data"
 Cohesion: 0.18
-Nodes (11): Audio, AlcanzarPlushie, DorfSBeerPoweredGyrocopticContraption, LohrPlushie, MahakalaPlushie, MoguePlushie, OnikumaPlushie, PercivalPlushie (+3 more)
+Nodes (11): search_data, find, n_finds, nothing, ransacked, search_find, item, max (+3 more)
 
-### Community 162 - "audio.py"
-Cohesion: 0.18
-Nodes (9): BuntaPlushie, CountessPlushie, FionnPlushie, KhensuPlushie, MilliePlushie, PhantomPlushie, SladePlushie, TonnPlushie (+1 more)
-
-### Community 163 - "pr_be/classes.py"
-Cohesion: 0.02
-Nodes (79): Canonical JSONL, Identity, Persisted things the extractor covers beyond the world files, pr-be: the Perilous Realms back end, Account, ApplyDefinition, Auction, AuctionSale (+71 more)
+### Community 163 - "CodedStrEnum"
+Cohesion: 0.14
+Nodes (5): ClanRank, CodedStrEnum, ItemKind, PulseType, WearPosition
 
 ### Community 164 - "util.c"
 Cohesion: 0.31
@@ -1694,8 +1455,8 @@ Cohesion: 0.16
 Nodes (13): bad_vnum(), free_char(), main(), should_delete(), find_skill(), find_spell(), free_char(), free_obj() (+5 more)
 
 ### Community 173 - "axe.py"
-Cohesion: 0.15
-Nodes (13): Axe, Battleaxe, Pickaxe, Anchor, ClayPickaxe, GoldenPickaxe, HeavyAxe, LargeAxe (+5 more)
+Cohesion: 0.14
+Nodes (15): Axe, Battleaxe, Pickaxe, Anchor, ClayPickaxe, DwarvenSteelAxe, GoldenPickaxe, HeavyAxe (+7 more)
 
 ### Community 174 - "message_type"
 Cohesion: 0.29
@@ -1742,8 +1503,8 @@ Cohesion: 0.29
 Nodes (14): my_search(), pre_ACTION(), pre_TYPE(), pre_VALUE0(), pre_VALUE1(), pre_VALUE2(), pre_VALUE3(), pre_WEIGHT() (+6 more)
 
 ### Community 187 - "_item_lore"
-Cohesion: 0.16
-Nodes (5): _damaged_by(), _item_lore(), _kind_label(), _save_against(), _take_damage()
+Cohesion: 0.15
+Nodes (6): ability_name(), _bits_label(), _duration_words(), _item_lore(), _kind_label(), _spell_name()
 
 ### Community 188 - "mail_item"
 Cohesion: 0.67
@@ -1755,15 +1516,15 @@ Nodes (13): sale_data, bid, bidder, count, forsale, have_sale, last_update, min 
 
 ### Community 191 - ".bestow"
 Cohesion: 0.01
-Nodes (16): resist_elemental(), CalmSpell, DetectInvisibilitySpell, DetectMagicSpell, gets_through(), strip(), InfravisionSpell, NocharmSpell (+8 more)
+Nodes (23): resist_elemental(), hours(), each(), each(), _area(), each(), DexteritySpell, gets_through() (+15 more)
 
 ### Community 192 - "txt_q"
 Cohesion: 0.67
 Nodes (3): txt_q, head, tail
 
 ### Community 232 - ".tell"
-Cohesion: 0.03
-Nodes (8): matches(), search(), pair(), put(), single(), _two_handed(), coloured_name(), _rarity_colour()
+Cohesion: 0.02
+Nodes (13): _char_condition(), fill(), pair(), put(), single(), _condition_number(), _extra_description(), _hash_string() (+5 more)
 
 ### Community 233 - "obj_room_pair"
 Cohesion: 0.67
@@ -1772,10 +1533,6 @@ Nodes (3): obj_room_pair, item, room
 ### Community 234 - "medit.c"
 Cohesion: 0.35
 Nodes (6): pre_DESCRIPTION(), pre_DONE(), pre_SHORT(), state_DESCRIPTION(), state_NAME(), state_SHORT()
-
-### Community 237 - "topic_list_node"
-Cohesion: 0.25
-Nodes (8): topic_entry, keyword, min_level, next, topic_list_node, list, next, topic
 
 ### Community 238 - "LargeDiamond_2700"
 Cohesion: 0.29
@@ -1797,37 +1554,45 @@ Nodes (3): sale_info, sales, selling
 Cohesion: 0.67
 Nodes (3): string_node, next, s
 
-### Community 527 - "Other"
-Cohesion: 0.03
-Nodes (66): Other, BarOfSoap, BlackJournal, BlackMarbleRing, BlackOnyxStone, BlueThorelOfAgatar, CoreOfTheStormreaver, CouponGoodForThreeObjectRenames (+58 more)
+### Community 527 - "other.py"
+Cohesion: 0.02
+Nodes (77): BaetylusOfMetal, BlackJournal, BlackOnyxStone, BloodyClaw, BluePotionRaisesIntelligenceOnePoint, BrightGoldenMirror, ChalkyPinkPotionClearsKillsList, ClearPotionRaisesCharismaOnePoint (+69 more)
 
 ### Community 632 - "Component"
 Cohesion: 0.06
 Nodes (16): Component, Uses, AdvancedBookOfWisdom, ArtOfDefensiveSpellCasting, ArtOfHealing, ArtOfNecromancy, ArtOfOffensiveSpellCasting, BeginnerSBookOfWisdom (+8 more)
 
 ### Community 667 - "number"
-Cohesion: 0.06
-Nodes (5): _is_spell(), number(), resolve_damage(), _skills(), bolt()
+Cohesion: 0.04
+Nodes (11): _is_melee(), _is_spell(), _is_weapon(), number(), resolve_damage(), _skills(), _spells(), weapon_check() (+3 more)
+
+### Community 721 - "IronGrateKey"
+Cohesion: 0.04
+Nodes (12): CastleKey, ClearBlueIceCrystal, GlowingFrogEye, IronGrateKey, KeyToTowerFive, MausoleumKey, Mob5PointQuestToken, SinisterKey (+4 more)
+
+### Community 900 - "WandOfGreenDragonScales"
+Cohesion: 0.14
+Nodes (4): GlassWand, MagicalWand, MetalWand, WandOfGreenDragonScales
 
 ## Knowledge Gaps
-- **955 isolated node(s):** `head`, `tail`, `learned`, `skill_number`, `learned` (+950 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 5284 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **865 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **955 isolated node(s):** `list`, `num`, `contents`, `dark`, `description` (+950 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 5291 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **626 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Dice` connect `Dice` to `scimitar.py`, `flail.py`, `whip.py`, `ExtraDescription`, `battleaxe.py`, `rapier.py`, `xmasland.py`, `BodyPartDefense`, `Defense`, `Sex`, `audio.py`, `pr_be/classes.py`, `names.py`, `Dimensions`, `RaceName`, `ClassName`, `axe.py`, `WearFlag`, `Material`, `combat.py`, `halberd.py`, `necklace.py`, `ObjectFlag`, `ring.py`, `potion.py`, `container.py`, `towersorcery.py`, `body_armor.py`, `DamageType`, `SparseResistances`, `Rarity`, `belt.py`, `boots.py`, `leggings.py`, `bracer.py`, `cloak.py`, `light.py`, `treasure.py`, `sleeves.py`, `gloves.py`, `ExtraDescription`, `knife.py`, `Drink`, `shield.py`, `item.py`, `Armor`, `other.py`, `shortsword.py`, `trash.py`, `club.py`, `BoardFlag`, `worn.py`, `mace.py`, `quarterstaff.py`, `spear.py`, `broadsword.py`, `scroll.py`, `polearm.py`, `hammer.py`, `staff.py`, `wand.py`, `bastard.py`, `handaxe.py`, `sabre.py`, `wings.py`?**
-  _High betweenness centrality (0.176) - this node is a cross-community bridge._
+- **Why does `Dice` connect `Dice` to `scimitar.py`, `flail.py`, `whip.py`, `boat.py`, `battleaxe.py`, `other.py`, `rapier.py`, `xmasland.py`, `BodyPartDefense`, `Defense`, `audio.py`, `names.py`, `Sex`, `RaceName`, `Dimensions`, `ClassName`, `pr_be/classes.py`, `axe.py`, `WearFlag`, `Material`, `Item`, `halberd.py`, `longsword.py`, `ObjectFlag`, `necklace.py`, `potion.py`, `ring.py`, `container.py`, `towersorcery.py`, `body_armor.py`, `DamageType`, `warhammer.py`, `SparseResistances`, `Rarity`, `belt.py`, `boots.py`, `leggings.py`, `bracer.py`, `cloak.py`, `light.py`, `treasure.py`, `sleeves.py`, `gloves.py`, `ExtraDescription`, `knife.py`, `Drink`, `shield.py`, `item.py`, `Armor`, `shortsword.py`, `trash.py`, `club.py`, `BoardFlag`, `worn.py`, `mace.py`, `quarterstaff.py`, `spear.py`, `broadsword.py`, `scroll.py`, `polearm.py`, `hammer.py`, `staff.py`, `wand.py`, `bastard.py`, `handaxe.py`, `sabre.py`, `wings.py`?**
+  _High betweenness centrality (0.160) - this node is a cross-community bridge._
 - **Are the 4128 inferred relationships involving `Dice` (e.g. with `Weapon` and `Anchor`) actually correct?**
   _`Dice` has 4128 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `head`, `tail`, `learned` to the rest of the system?**
+- **What connects `list`, `num`, `contents` to the rest of the system?**
   _955 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `players.py` be split into smaller, more focused modules?**
   _Cohesion score 0.051329622758194186 - nodes in this community are weakly interconnected._
-- **Why does `Mob` connect `Defense` to `CodedFlag`, `Other`, `Character`, `xmasland.py`, `.cast_buff_spell`, `BodyPartDefense`, `spells.py`, `.echo`, `Sex`, `names.py`, `pr_be/classes.py`, `RaceName`, `Dimensions`, `Dice`, `ClassName`, `necklace.py`, `combat.py`, `Room`, `things.py`, `towersorcery.py`, `CharmPersonSpell`, `SparseResistances`, `Rarity`, `Effect`, `.room`, `Clock`, `Armor`, `skills.py`, `store`, `.tell`?**
-  _High betweenness centrality (0.094) - this node is a cross-community bridge._
+- **Why does `ObjectFlag` connect `ObjectFlag` to `Defense`, `spells.py`, `names.py`, `Dimensions`, `pr_be/classes.py`, `WearFlag`, `Material`, `necklace.py`, `longsword.py`, `ring.py`, `potion.py`, `Room`, `things.py`, `container.py`, `body_armor.py`, `DamageType`, `warhammer.py`, `Rarity`, `belt.py`, `boots.py`, `leggings.py`, `bracer.py`, `cloak.py`, `light.py`, `Money`, `treasure.py`, `sleeves.py`, `gloves.py`, `ExtraDescription`, `ContainerFlag`, `knife.py`, `Drink`, `shield.py`, `item.py`, `Armor`, `Other`, `shortsword.py`, `Dimensions`, `trash.py`, `club.py`, `BoardFlag`, `worn.py`, `mace.py`, `quarterstaff.py`, `spear.py`, `broadsword.py`, `scroll.py`, `polearm.py`, `hammer.py`, `staff.py`, `wand.py`, `bastard.py`, `handaxe.py`, `sabre.py`, `wings.py`, `scimitar.py`, `flail.py`, `whip.py`, `boat.py`, `CodedFlag`, `battleaxe.py`, `BanditsBag`, `rapier.py`, `audio.py`, `axe.py`, `halberd.py`, `.bestow`, `BeltOfGoldenDiscs`, `BeltOfValor`, `BeltOfWovenAngelFeathers`, `BroadSilverBelt`, `GirdleOfTheFallen`, `HeavyMithrilAnchorCable`, `ObsidianBelt`, `SilverGirdle`, `RuneCoveredBeltARENA`, `WhiteDragonscaleBelt`, `AnuranBandedPlatemail`, `ArcaneIncineratorSRobe`, `AztazsPowerArmor`, `BlackDragonScaleShirt`, `BloodRedShirt`, `BlueDragonScaleShirt`, `BombadilsBombProofChestPlate`, `BrassDragonScaleShirt`, `BreastplateOfValor`, `BumblebeePatternedPyjamaTop`, `DragonboneBreastPlate`, `DragonscaleBreastPlateTEST`, `DrowChainShirt`, `FishScaleRobe`, `GangasGnarlyJacket`, `GlowingSuitOfBandedMail`, `GreenDragonScaleShirt`, `HeavyStenchcoat`, `IntricatelyDetailedSilverPlatemail`, `IntricatelyWovenKelpBreastplate`, `LayeredAndPatchedSteelPlatemail`, `LimosChestPlateOfGlory`, `ObsidianChestPlate`, `OldBattledress`, `OldBattlerobe`, `BeadedRobe`, `BlackCloakLinedInPurpleTEST`, `BlackHoodedCloak`, `BlackRobe`, `BlueAndBlackRags`, `ClericalRobes`, `CloakOfDeception`, `CloakOfFlayedSkin`, `CloakOfTransparency`, `DarkGreenCape`, `DrowPiwafwiCloak_92037`, `ElaboratelyEmbroideredRobe`, `GreenCloak`, `GreyRobe`, `HorribleGreenRobe`, `LongFlowingClothRobe`, `PairOfBatteredOveralls`, `PitchBlackCloakARENA`, `PiwafwiCloak`, `WhiteRobeARENA`, `ShimmeringRobeOfMidnight_107006`, `RobesOfBenthic`, `WhiteRobe`, `StainedApron`, `ShadowShroudOfTheDead`, `WizardSRobe`, `BandedLeatherBoots`, `BootsOfStealth`, `BootsOfTheFallen`, `BootsOfValor`, `DimisMuddyBoots`, `DiplomatSBejewelledBoots`, `DragonboneSabatons`, `GraySwedeBoots`, `LayeredAndPatchedSteelSabatons`, `MagicBoots`, `PairOfDrowBoots`, `PairOfEelSkinBoots`, `PairOfFrogSkinBoots`, `PairOfObsidianBoots`, `PairOfRubySlippers`, `PairOfRustyIronBoots`, `PairOfSilverBootsARENA`, `PairOfSteelPlatedBoots`, `PairOfStrongBlackBootsCoveredInBucklesAndStraps`, `PairSealFlippers`, `PatchedSteelBoots`, `RubberBoots`, `RustyPairOfSabaton`, `SabatonsOfTheDwarvenDefender`, `SashOfColourfulScales`, `ShimmeringRobeOfMidnight`, `OldRustySuitOfPlateMail`, `OldSuitOfRustyChainMail`, `PatchedSteelPlatemail`, `PondersDiamondChestPlate`, `ProtectorOfTheAngelicAvenger`, `PurpleWormHide`, `ShreddedRedTunic`, `RedTunic`, `SilverscaleVestment`, `RuneCoveredBreastPlateARENA`, `SuitOfOrnateWraithMail`, `SuitOfWraithMail`, `WhaleboneBreastplate`, `VestOfFishScales`, `SturdyLeatherBreastplate`, `TightFittingGreenDragonScaleShirt`, `SaladinsChestPlateMadeFromOldRags`, `TraditionalBlackDuergarDress`, `WovenKelpBreastplate`, `SahuaginChampionsBreastPlate`, `EmptyCarrionCrawlerHead`, `IronCrown`, `PairOfSpectacles`, `ShimmeringMaskOfTrueNight_107012`, `IntricatelyCarvedKey`, `KeyToTheLabyrinth`, `RustyKey`, `TowerKey`, `LargeWaterbed`, `BagOfGreenDragonScales`, `CoffeeMachine`, `CoffeeMachine_6950`, `CrackedFountain`, `ThicketLeafCanteen`, `BrassKnuckles`, `DragonboneGauntlets`, `DwarvenGloves`, `GauntletsOfThePit`, `GauntletsOfTheShark`, `GauntletsOfValor`, `GlovesOfTheEverDark`, `GlovesOfTheLivingDead`, `GoldenGlovesOfMeditation`, `LayeredAndPatchedSteelGauntlets`, `PairOfDrowChainGauntlets`, `PairOfFrogSkinGloves`, `PairOfIronGauntlets`, `PairOfJeweledGauntletsARENA`, `PairOfObsidianGauntlets`, `PairOfRustyIronGauntlets`, `PatchedSteelGauntlets`, `SiqixisasGloves`, `SomeFingerlessLacyGloves`, `RustyPairOfGauntlets`, `ShimmeringSilkGloves`, `HelmOfTheDragonsARENA`, `SilverLaurels`, `SilverFiligreeHairnet`, `BlackAndWhiteSkirtOfMagpieFeathers`, `BlackDragonScaleSkirt`, `BronzeGreaves`, `DragonboneCuisses`, `FlamingLeggings`, `HeavyBronzeGreaves`, `JumasShinyLegPlates`, `LayeredAndPatchedSteelGreaves`, `LeatherLegWrapsOfSorcery`, `ManaclesOfImprisonment`, `NetherbaneLegPlates`, `PairOfBarnacleEncrustedGreaves`, `PairOfBumblebeePatternedPyjamaBottoms`, `PairOfDrowChainLeggings`, `PairOfMetallicLegPlatesARENA`, `PairOfObsidianLegPlates`, `PairOfWebCoveredPants`, `PatchedSteelGreaves`, `PondersDiamondLegPlate`, `SomeWhiteDragonscaleGreaves`, `SkirtOfIntricatelyDetailedSilverPleats`, `SkirtOfValor`, `RustyPairOfGreaves`, `SomeSilverGreaves`, `SomeSeaweedCoveredSilverGreaves`, `BagOfHolding_16768`, `other.py`, `BeautifulLargeStatueOfMaleria`, `FrostStone`, `HeartShapedMedallion`, `Component`, `PoisonSpike`, `ZapStone`, `StaffOfJudgement`, `WardMinor`, `IronGrateKey`, `StatueOfAShepherd`, `FireStone`, `Argus`, `DamOfTheDeep`, `DragonboneShield`, `DrowShield`, `FireantCarapice`, `HeavyBronzeShield`, `HugeShield`, `IntricatelyDetailedSilverShield`, `MagiciansBulwark`, `RustyIronShield`, `ScaleFromRizillizesixxiz`, `TurtleBackShield`, `SolarShield`, `RustyShield`, `ShieldOfTheChartreuseRose`, `RustyShield_5507`, `WoodAndBronzeShield`, `SilverShieldARENA`, `WraithShield`, `BandsOfBathyal`, `BarbarianMuscleBand`, `BracersOfDefense`, `DragonboneRerebrace`, `GwydionsSleeves`, `IntricatelyDetailedSilverArmguards`, `LayeredAndPatchedSteelBracers`, `MournasSleevesOfDamage`, `PairOfDrowChainSleeves`, `PairOfLooseKnitSleeves`, `PairOfObsidianArmPlates`, `PairOfOrnamentalSleeves`, `PairOfSilverSleevesARENA`, `PairOfWhiteDragonscaleSleeves`, `PatchedSteelSleeves`, `PaudronsOfValor`, `QuicklingBracers`, `TanggsSleeves`, `RustyPairOfVambrace`, `SilverscalePaudron`, `BlackPearl_16759`, `BrilliantSapphire`, `DeepBlueLapisLazuli`, `DropOfCelestialBlood`, `DropOfCelestialBlood_4257`, `DropOfCelestialBlood_4258`, `DropOfCelestialBlood_4259`, `DropOfCelestialBlood_4260`, `DropOfCelestialBlood_4261`, `FieryGreenEmerald`, `FlamingGauntlets`, `GlitteringDiamond`, `IvoryGoldBracelet`, `LargeRuby_5026`, `SilverGoldRing`, `WornAndDentedRing`, `RewardToken`, `RewardToken_4241`, `RewardToken_4242`, `RewardToken_4243`, `RewardToken_4244`, `RewardToken_4245`, `TinyPairOfWings`, `TigerJewel`, `RedEyedJewel`, `BlueElementalWand`, `BrownElementalWand`, `WandOfGreenDragonScales`, `LittleDrummerStatue`, `ThornyWand`, `BrassRing`, `ChameleonPoncho`, `EmeraldBracelet`, `EmeraldBraceletARENA`, `LongGreyCloak`, `MarbleRing`, `OnyxBracelet_1588`, `PairOfOldBoots`, `PlatinumWeddingBand`, `TitaniumRing_238`, `TalismanDBalor`, `SigilOfHouseMisraria`, `WhiteGoldBraceletARENA`, `SmallEmeraldRingARENA`, `SailorSCompass`, `WhiteGoldBracelet`, `SmallEmeraldRing`, `OrbOfTheNull`, `ScaryMask`, `StaffOfMactans`, `StatueOfPriscilla`, `SkullOfTiamat`, `KeyToBloodclawKeep`, `AlbinoBeholderCentralEye`, `ArchonsLantern`, `BeautifulRedRose`, `BejeweledRod`, `Bubble`, `DamplyLitCrystal`, `EmperorBeholderCentralEye`, `GlowingLeftEyeOfTheNightHag`, `GlowingRightEyeOfTheNightHag`, `GreenBeholderCentralEye`, `IronSceptre`, `LightOfTheAngelicAvenger`, `LongBlackStick_6507`, `NightWatchmansLamp`, `OchreBeholderCentralEye`, `OrbOfDimensions`, `OrbOfTheDeepSea`, `Pearl`, `PurpleBeholderCentralEye`, `PzaltonSEye`, `RubyRedEye`, `YellowBeholderCentralEye`?**
+  _High betweenness centrality (0.088) - this node is a cross-community bridge._
 - **Are the 3612 inferred relationships involving `Material` (e.g. with `AmuletOfProtection` and `BagOfMarbles`) actually correct?**
   _`Material` has 3612 INFERRED edges - model-reasoned connections that need verification._
 - **Should `tranparse.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.09074410163339383 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09285714285714286 - nodes in this community are weakly interconnected._

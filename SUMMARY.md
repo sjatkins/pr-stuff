@@ -2545,3 +2545,16 @@ an immortal; describe says every line to the room). `_hash_string` is
 look.c hash_string. Left out: examining an item set by name (the set
 bonus display is the item-set feature). Tests: tests/test_doors_looking.py
 (3) over the travel world; 84 pass.
+
+### The player queue and the wheel (2026-11-14, pr-be, uncommitted)
+
+The wheel already existed (clock.py). New: `pr_be/engine.py` `Engine`
+(`connect`/`disconnect`, `pulse`, `run`, `run_seconds`): each pulse ticks
+the clock, then every connected player takes a turn, comm.c game_loop's
+order. On Character: `_input` deque, `queue_input`, `pending_input`,
+`clear_input`, `take_turn` (the C's `--wait <= 0` then one line:
+interpret, run, wait = 1, idle timer reset). A new connection gets wait 1
+as the C does, so its first line runs on the first pulse. Not yet:
+scheduling mob `think` on the wheel, the periodic pulse blocks (zone
+save/reset, affect pulse, special rooms, tic), output and prompts
+(connection layer). Tests: tests/test_engine.py (3); 87 pass.
